@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+*.o
 
 # Distribution / packaging
 .Python
@@ -127,3 +128,18 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# R/Rstudio related files
+.Rproj
+.Rproj.user
+.Rhistory
+.RData
+.httr-oauth
+.DS_Store
+*.rds
+
+*.html
+*trace*.json
+*Rplots.pdf
+inst/doc
