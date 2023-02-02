@@ -1,2 +1,6 @@
 ^survivalGPU\.Rproj$
 ^\.Rproj\.user$
+^README\.Rmd$
+^doc$
+^Meta$
+^benchmarks$

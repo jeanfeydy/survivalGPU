@@ -1,0 +1,127 @@
+---
+title: "survivalGPU : Fast survival analysis"
+author: "Alexis van STRAATEN"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{survivalGPU}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.align='center',
+  fig.height=3.5,
+  fig.width=5
+)
+```
+
+
+The survivalGPU library allows you to perform survival analyzes using the resources of Graphic Processing Units (GPU) in order to accelerate the speed of calculations. Currently, two models have been implemented :  
+
+* Cox[^cox1] [^cox2]  
+* WCE[^wce] (Weighted Cumulative Exposure)  
+
+It's also possible to use the library without having Graphics Processing Units (with CPU).
+
+An important thing for this package was to take the same inputs from `survival::coxph()` for Cox models and `WCE::WCE` for WCE models. So after being inspired by these functions, they were rewritten in python with CUDA to make it compatible with CUDA drivers.
+
+```{r setup}
+library(survivalGPU)
+library(survival)
+library(WCE)
+```
+
+During the library loading, we can see if CUDA drivers were detected, and if they are operational. It's also possible to check it with `use_cuda()` function.
+For the examples, we will define in advance the number of bootstraps we will use: if the CUDA drivers are operational, we will execute 1000 bootstraps with the GPU, otherwise 50 bootstraps with the CPU, also adjusting the batchsize argument.
+Batchsize argument is used to put a limit on the number of models to do at the same time. This is very important if you want to run several bootstraps, because too many models at the same time can saturate the RAM memory. Also, the number of bootstrap should be a multiple of the batchsize.
+
+
+```{r cuda}
+if(use_cuda()){
+  n_bootstrap <- 1000; batchsize <- 200
+}else{
+  n_bootstrap <- 50  ; batchsize <- 10}
+```
+
+Let's make an example with `drugdata` dataset from WCE package.
+
+```{r data}
+data(drugdata)
+head(drugdata)
+```
+
+
+## `coxphGPU()`
+
+`coxphGPU()` is constructed in the same way as `survival::coxph()`, with in the formula an object of class 'Surv' of type 'counting', i.e. with the arguments Start and Stop, and the event variable.
+
+The `summary` of a coxphGPU object is the same as a coxph object, a table with the estimated coefficients for the covariates, standards errors, and a significance test (Pr(>|z|)). 
+
+```{r}
+coxphGPU<-coxphGPU(formula = Surv(time = Start, time2 = Stop, event = Event) ~ sex + age,
+                   data = drugdata)
+
+summary(coxphGPU)
+```
+
+The advantage of survivalGPU is to use bootstrap more easily. The `summary` gives the results for the initial model without bootstrap, and at the end, confidence interval for estimates covariates with bootstrap, according to `conf.int` argument.
+
+```{r}
+coxphGPU_bootstrap<-coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+                             data = drugdata,
+                             bootstrap = n_bootstrap,
+                             batchsize = batchsize,
+                             all.results = FALSE)
+
+summary(coxphGPU_bootstrap)
+```
+
+Avec le bootstrap, la fonction effectue autant de modèles que de bootstrap demandé. Pour éviter de saturer la mémoire RAM, la fonction ne calcul pas les linears predictors, wald.test, etc... for all bootstrap (by deafult `all.results = FALSE`), mais donnera toujours tous les coefficients et weights de la fonction de risque (voir pour les matrices de variance covariance)
+
+## `wceGPU()`
+
+In the same idea as the Cox model, `wceGPU` uses the same arguments as the `WCE::WCE` function. The summary changes slightly with the appearance of confidence intervals without bootstrap for the estimators of the covariates.
+
+```{r}
+wce_gpu <- wceGPU(data = drugdata, nknots =  1, cutoff =  90, id="Id",
+                  event = "Event", start = "Start", stop = "Stop",
+                  expos = "dose", covariates = c("age","sex"),
+                  constrained = FALSE, aic = FALSE, confint = 0.95)
+
+summary(wce_gpu)
+```
+
+We can display the risk function of the model in order to observe the weights attributed to each time until the defined cutoff.
+
+```{r}
+plot(wce_gpu)
+```
+
+By applying `wceGPU()` with bootstrap, we obtain the confidence intervals for the estimates of the covariates and the risk function on each time, in addition to the information on the initial model without bootstrap.
+
+```{r}
+wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots =  1, cutoff =  90, id="Id",
+                            event = "Event", start = "Start", stop = "Stop",
+                            expos = "dose", covariates = c("age","sex"),
+                            constrained = FALSE, aic = FALSE, confint = 0.95,
+                            nbootstraps = n_bootstrap, batchsize = batchsize)
+
+summary(wce_gpu_bootstrap)
+```
+
+Now we can see the estimated risk function with the confidence intervals thanks to the bootstrap.
+
+```{r}
+plot(wce_gpu_bootstrap)
+```
+
+
+## References
+
+[^cox1]: Andersen, P. and Gill, R. (1982). Cox's regression model for counting processes, a large sample study. Annals of Statistics 10, 1100-1120.  
+[^cox2]: Therneau, T., Grambsch, P., Modeling Survival Data: Extending the Cox Model. Springer-Verlag, 2000.  
+[^wce]: Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov 30;28(27):3437-53.  

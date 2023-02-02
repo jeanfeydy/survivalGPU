@@ -1,12 +1,27 @@
 Package: survivalGPU
-Title: What the Package Does (One Line, Title Case)
+Title: Fast and scalable implementations for survival models
 Version: 0.0.0.9000
-Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+Authors@R: c(
+    person("Jean", "FEYDY", email = "jean.feydy@inria.fr",role = "aut"),
+    person("Alexis", "van STRAATEN", email = "alexis.vanstraaten@outlook.fr", role = c("aut","cre")),
+    person("Pierre", "SABATIER", role = "ctb"),
+    person("Anne-Sophie", "JANNOT", role = "ctb"))
+Description: Allows to perform survivals analysis on GPU with coxph and WCE models, and several features to use bootstrap and manage memory.
+License: LGPL (>= 2.1)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.1
+Imports: 
+    reticulate,
+    stats,
+    survival,
+    tinytest,
+    utils,
+    WCE
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+VignetteBuilder: knitr
+SystemRequirements: python, TensorFlow, pytorch, pytorch-scatter, pykeops
