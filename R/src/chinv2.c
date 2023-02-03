@@ -1,4 +1,5 @@
 /*
+ ** From `survival` R package
  **
  ** matrix inversion, given the FDF' cholesky decomposition
  **

@@ -1,5 +1,5 @@
 /*
- ** Prototypes of all the survival functions
+ ** Prototypes for functions from `survival` R package
  **  Including this in each routine helps prevent mismatched argument errors
  */
 SEXP agmart3(SEXP nused2,  SEXP surv2,  SEXP score2, SEXP weight2,

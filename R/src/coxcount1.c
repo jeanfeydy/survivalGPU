@@ -1,3 +1,5 @@
+/* From `survival` R package */
+
 /* Automatically generated from the noweb directory */
 #include "survS.h"
 /*

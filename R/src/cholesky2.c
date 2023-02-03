@@ -1,4 +1,5 @@
 /*
+ ** From `survival` R package
  **
  ** subroutine to do Cholesky decompostion on a matrix: C = FDF'
  **   where F is lower triangular with 1's on the diagonal, and D is diagonal

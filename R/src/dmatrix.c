@@ -1,4 +1,6 @@
 /*
+ ** From `survival` R package
+ **
  ** set up the indices so that C code can use x[i][j] notation for R
  **  matrices.  Remember that R sees matrices in column order and C in
  **  row order, so every reference in the C code will be x[col][row].

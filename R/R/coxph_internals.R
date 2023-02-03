@@ -1,4 +1,4 @@
-## coxph internals functions from survival package    --------------------------
+## coxph internals functions from `survival` R package    ----------------------
 
 # terms.inner
 

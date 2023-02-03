@@ -1,5 +1,7 @@
 
 /*
+ ** From `survival` R package
+ **
  ** The fastest possible calculation (at least the fastest I've come up with)
  ** for martingale residuals from a (start, stop] model.
  **

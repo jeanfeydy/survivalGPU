@@ -1,4 +1,6 @@
 /*
+ ** From `survival` R package
+ **
  ** Compute the martingale residual for a Cox model
  **
  ** Input

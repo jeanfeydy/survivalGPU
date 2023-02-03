@@ -4,6 +4,7 @@ Version: 0.0.0.9000
 Authors@R: c(
     person("Jean", "FEYDY", email = "jean.feydy@inria.fr",role = "aut"),
     person("Alexis", "van STRAATEN", email = "alexis.vanstraaten@outlook.fr", role = c("aut","cre")),
+    person("Terry", "THERNEAU", role = "cph", comment = "Author of survival library"),
     person("Pierre", "SABATIER", role = "ctb"),
     person("Anne-Sophie", "JANNOT", role = "ctb"))
 Description: Allows to perform survivals analysis on GPU with coxph and WCE models, and several features to use bootstrap and manage memory.

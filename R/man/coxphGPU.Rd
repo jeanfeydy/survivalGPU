@@ -2,6 +2,7 @@
 % Please edit documentation in R/coxphGPU.R
 \name{coxphGPU}
 \alias{coxphGPU}
+\alias{summary.coxphGPU}
 \title{Fast Cox Proportional Hazards Regression Model}
 \usage{
 coxphGPU(
@@ -10,7 +11,6 @@ coxphGPU(
   ties = c("efron", "breslow"),
   bootstrap = 1,
   batchsize = 0,
-  confint = 0.95,
   all.results = FALSE,
   na.action,
   control,
@@ -20,11 +20,16 @@ coxphGPU(
   y = TRUE,
   ...
 )
+
+\method{summary}{coxphGPU}(object, ..., conf.int = 0.95, scale = 1)
 }
 \arguments{
 \item{formula}{a formula object, with the response on the left of a ~
 operator, and the terms on the right. The response must be a survival
-object as returned by the \code{survival::Surv} function.}
+object as returned by the \code{survival::Surv} function. For the moment,
+\code{coxphGPU()} only manages the counting type for \code{Surv} object, i.e. two
+\code{time} argument in the function (Surv(time = start, time2 = stop, event)
+for example)}
 
 \item{data}{a data.frame in which to interpret the variables named in the
 formula.}
@@ -41,8 +46,6 @@ computationally.}
 \item{batchsize}{Number of bootstrap copies that should be handled at a time.
 Defaults to 0, which means that we handle all copies at once. If you run
 into out of memory errors, please consider using batchsize=100, 10 or 1.}
-
-\item{confint}{Level for confidence intervals. Default to 0.95.}
 
 \item{all.results}{Post-processing calculations. If TRUE, coxphGPU returns
 linears.predictors, wald.test, concordance for all bootstraps. Default to
@@ -70,15 +73,40 @@ model.}
 \item{y}{logical value: if TRUE, the response vector is returned in component
 y.}
 
-\item{...}{Other arguments for methods.}
+\item{...}{additional argument(s) for methods.}
+
+\item{object}{a coxphGPU object}
+
+\item{conf.int}{level for computation of the confidence intervals.}
+
+\item{scale}{vector of scale factors for the coefficients, defaults to 1. The
+printed coefficients, se, and confidence intervals will be associated with
+one scale unit.}
 }
 \value{
-a coxphGPU representing the fit.
+A coxphGPU object representing the fit.
+
+With \code{summary()} :
+\itemize{
+\item \code{conf.int}:                  a matrix with one row for each coefficient,
+containing the confidence limits for exp(coef).
+\item \code{conf.int_bootstrap}:        confidence limits for exp(coef) determined by
+bootstrap
+\item \verb{logtest, sctest, waldtest}: the overall likelihood ratio, score, and Wald
+test statistics for the model
+\item \code{concordance}:               the concordance statistic and its standard
+error
+\item \code{rsq}:                       an approximate R^2 based on Nagelkirke
+(Biometrika 1991).
+}
 }
 \description{
 Fits a Cox proportional hazards regression model. An extension
 to use (or not) your GPU to speed up calculations, in particular for
 bootstrap.
+
+Use \code{summary()} method to see confidence interval for covariates with two
+process : normal distribution and bootstrap (if \code{bootstrap > 1}).
 }
 \examples{
 \dontrun{
@@ -94,12 +122,12 @@ coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
          data = drugdata,
          bootstrap = 1)
 
- ## Cox Proportional Hazards with bootstrap
+## Cox Proportional Hazards with bootstrap
 
  if(use_cuda()){
- n_bootstrap <- 1000; batchsize <- 200
+     n_bootstrap <- 1000; batchsize <- 200
  }else{
- n_bootstrap <- 50  ; batchsize <- 10}
+     n_bootstrap <- 50  ; batchsize <- 10}
 
 coxph_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
                             data = drugdata,

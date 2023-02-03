@@ -1,17 +1,15 @@
 #' Fast WCE
 #'
-#' @description New implementation of the WCE model (see details), compatible
-#' with GPU to accelerate calculation speed and work with large datasets.
+#' @description New implementation of the Weighted Cumulative Exposure model
+#'   (see @details), compatible with GPU to accelerate calculation speed and
+#'   work with large datasets.
 #'
-#' It's also possible to use the package without GPU
-#'
+#'   Use `summary()` and `plot()` methods to see results and risk function.
 #' @param data A data frame in an interval (long) format, in which each line
 #'   corresponds to one and only one time unit for a given individual.
-#' @param nknots A scalar or a vector. Corresponds to the number(s) of interior
-#'   knots for the cubic splines to estimate the weight function. For example,
-#'   if nknots is set to 2, then a model with two interior knots is fitted. If
-#'   nknots is set to 1:3 or alternatively c(1,2,3) then three models with 1, 2,
-#'   and 3 interior knots, respectively, are fitted.
+#' @param nknots Corresponds to the number(s) of interior knots for the cubic
+#'   splines to estimate the weight function. For example, if nknots is set to
+#'   2, then a model with two interior knots is fitted.
 #' @param cutoff Integer. Time window over which the WCE model is estimated.
 #'   Corresponds to the length of the estimated weight function.
 #' @param constrained Controls whether the weight function should be constrained
@@ -53,15 +51,15 @@
 #' @param ... Optional; other parameters to be passed through to WCE
 #'
 #' @details WCE implements a flexible method for modeling cumulative effects of
-#' time-varying exposures, weighted according to their relative proximity in
-#' time, and represented by time-dependent covariates. The current
-#' implementation estimates the weight function in the Cox proportional hazards
-#' model. The function that assigns weights to doses taken in the past is
-#' estimated using cubic regression splines.
+#'   time-varying exposures, weighted according to their relative proximity in
+#'   time, and represented by time-dependent covariates. The current
+#'   implementation estimates the weight function in the Cox proportional
+#'   hazards model. The function that assigns weights to doses taken in the past
+#'   is estimated using cubic regression splines.
 #'
 #' @references Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative
-#' effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov
-#' 30;28(27):3437-53.
+#'   effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov
+#'   30;28(27):3437-53.
 #'
 #' @return WCE results
 #' @export
@@ -313,11 +311,10 @@ print.wceGPU <- function(x, ...){
 
 #' Summary method for wceGPU object
 #'
-#' @description Produces a summary of a fitted WCE model from wceGPU
 #' @param object wceGPU object
 #' @param ... additional argument(s) for methods.
 #' @exportS3Method summary wceGPU
-#' @noRd
+#' @rdname wceGPU
 summary.wceGPU <- function(object, ...){
 
   estimates <- object$coef[1,object$covariates]
@@ -368,7 +365,7 @@ summary.wceGPU <- function(object, ...){
 
 #' Coef method for wceGPU object
 #'
-#' @param object wceGPU object
+#' @param object wceGPU object.
 #' @param ... additional argument(s) for methods.
 #' @exportS3Method coef wceGPU
 #' @noRd
@@ -392,14 +389,14 @@ coef.wceGPU <- function(object, ...){
 
 #' Plot method for wceGPU
 #'
-#' @param object wceGPU object
+#' @param x wceGPU object.
 #' @param hist.covariates show histogram for each covariates if you use
-#'   bootstrap
+#'   bootstrap.
 #' @param ... additional argument(s) for methods.
 #' @importFrom graphics matplot
 #' @importFrom graphics hist
 #' @importFrom graphics title
-#' @noRd
+#' @rdname wceGPU
 #' @exportS3Method plot wceGPU
 plot.wceGPU <- function(x, ..., hist.covariates = FALSE){
 
@@ -449,10 +446,10 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE){
 #'   intervals, either a vector of numbers or a vector of names. If missing, all
 #'   parameters are considered.
 #' @param level the confidence level required.
-#' @param digits significant digits to print
+#' @param digits significant digits to print.
 #' @param ... additional argument(s) for methods.
 #' @exportS3Method confint wceGPU
-#' @noRd
+#' @rdname wceGPU
 confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3){
 
   cf <- object$coef[1,]

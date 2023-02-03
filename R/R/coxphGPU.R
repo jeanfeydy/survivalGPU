@@ -6,7 +6,10 @@
 #'
 #' @param formula a formula object, with the response on the left of a ~
 #'   operator, and the terms on the right. The response must be a survival
-#'   object as returned by the `survival::Surv` function.
+#'   object as returned by the `survival::Surv` function. For the moment,
+#'   `coxphGPU()` only manages the counting type for `Surv` object, i.e. two
+#'   `time` argument in the function (Surv(time = start, time2 = stop, event)
+#'   for example)
 #' @param data a data.frame in which to interpret the variables named in the
 #'   formula.
 #' @param ties a character string specifying the method for tie handling. If
@@ -19,7 +22,6 @@
 #' @param batchsize Number of bootstrap copies that should be handled at a time.
 #'   Defaults to 0, which means that we handle all copies at once. If you run
 #'   into out of memory errors, please consider using batchsize=100, 10 or 1.
-#' @param confint Level for confidence intervals. Default to 0.95.
 #' @param all.results Post-processing calculations. If TRUE, coxphGPU returns
 #'   linears.predictors, wald.test, concordance for all bootstraps. Default to
 #'   FALSE if bootstrap.
@@ -46,7 +48,7 @@
 #' @importFrom utils methods
 #' @importFrom utils head
 #'
-#' @return a coxphGPU representing the fit.
+#' @return A coxphGPU object representing the fit.
 #' @export
 #'
 #' @references Therneau T (2021). _A Package for Survival Analysis in R_. R
@@ -66,12 +68,12 @@
 #'          data = drugdata,
 #'          bootstrap = 1)
 #'
-#'  ## Cox Proportional Hazards with bootstrap
+#' ## Cox Proportional Hazards with bootstrap
 #'
 #'  if(use_cuda()){
-#'  n_bootstrap <- 1000; batchsize <- 200
+#'      n_bootstrap <- 1000; batchsize <- 200
 #'  }else{
-#'  n_bootstrap <- 50  ; batchsize <- 10}
+#'      n_bootstrap <- 50  ; batchsize <- 10}
 #'
 #' coxph_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
 #'                             data = drugdata,
@@ -80,9 +82,9 @@
 #' summary(coxph_bootstrap)
 #' }
 coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
-                     batchsize = 0, confint = 0.95, all.results = FALSE,
-                     na.action, control, singular.ok = TRUE, model = FALSE,
-                     x = FALSE, y = TRUE, ...) {
+                     batchsize = 0, all.results = FALSE, na.action, control,
+                     singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
+                     ...) {
   UseMethod("coxphGPU")
 }
 
@@ -91,12 +93,11 @@ coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
 #' @method coxphGPU default
 #' @exportS3Method coxphGPU default
 coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
-                             bootstrap = 1, batchsize = 0, confint = 0.95,
-                             all.results = FALSE, na.action, control,
-                             singular.ok = TRUE, model = FALSE, x = FALSE,
-                             y = TRUE, ...,  weights, subset, init, robust, tt,
-                             method = ties, id, cluster, istate, statedata,
-                             nocenter=c(-1, 0, 1)){
+                             bootstrap = 1, batchsize = 0, all.results = FALSE,
+                             na.action, control, singular.ok = TRUE,
+                             model = FALSE, x = FALSE, y = TRUE, ...,  weights,
+                             subset, init, robust, tt, method = ties, id,
+                             cluster, istate, statedata, nocenter=c(-1, 0, 1)){
 
   if(!missing(weights)) stop("weights are not yet implemented in coxphGPU")
   if(!missing(init)) stop("init is not yet implemented in coxphGPU")
@@ -469,7 +470,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
       robust <- FALSE
     }
   }
-  if(robust == TRUE) stop("robust variance is not yet impleme,ted in coxphGPU")
+  if(robust == TRUE) stop("robust variance is not yet implemented in coxphGPU")
 
   if (!is.logical(robust)) stop("robust must be TRUE/FALSE")
 
@@ -718,8 +719,10 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   rname <- row.names(mf)
 
+  if(type == "right") stop("right Surv not yet implemented in coxphGPU.
+                           Please use `Surv(time1,time2,event)` in formaula")
 
-  # from agreg.fit.R (survival)
+  # from agreg.fit.R (survival) / for counting type Surv object
   nvar <- ncol(X)
   event <- Y[,3]
   if (all(event==0)) stop("Can't fit a Cox model with 0 failures")
@@ -804,6 +807,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   # agfit4 centers variables within strata, so does not return a vector
   #  of means.  Use a fill in consistent with other coxph routines
+
   agmeans <- ifelse(zero.one, 0, colMeans(X))
 
   ##############################################################################
@@ -890,6 +894,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   fit$method      = method
   fit$nbootstraps = bootstrap
+  if(bootstrap > 1) fit$coef_bootstrap = coef
   fit$class       = 'coxphGPU'
 
 
@@ -1055,19 +1060,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   fit$contrasts <- contr.save
   if (any(offset !=0)) fit$offset <- offset
 
-  ## For bootstrap ------------
-  if(bootstrap > 1){
-
-    fit$confint   = confint
-    probs         = c((1-confint)/2,1-(1-confint)/2)
-
-    # confidence Interval for coefficients (default 95%)
-    fit$coef_CI   = apply(coef, 2, stats::quantile, p = probs)
-
-    # confidence Interval for loglik (default 95%)
-    fit$loglik_CI = stats::quantile(coxfit$loglik, p = probs)
-  }
-
   fit$all.results = all.results
   fit$call        = Call
   fit$pterms      = pterms
@@ -1187,24 +1179,29 @@ print.coxphGPU <- function(x, ..., digits=max(1L, getOption("digits") - 3L),
 
 #' Summary method for coxphGPU object
 #'
-#' @description Produces a summary of a fitted coxph model from coxphGPU
-#' @param object coxphGPU object
-#' @param conf.int level for computation of the confidence intervals. If set to
-#'   FALSE no confidence intervals are printed
+#' Use `summary()` method to see confidence interval for covariates with two
+#' process : normal distribution and bootstrap (if `bootstrap > 1`).
+#' @param object a coxphGPU object
+#' @param conf.int level for computation of the confidence intervals.
 #' @param scale vector of scale factors for the coefficients, defaults to 1. The
 #'   printed coefficients, se, and confidence intervals will be associated with
 #'   one scale unit.
-#' @param digits significant digits to print
-#' @param signif.stars show stars to highlight small p-values
-#' @param expand if the summary is for a multi-state coxph fit, print the
-#'   results in an expanded format.
 #' @param ... additional argument(s) for methods.
+#'
+#' @return With `summary()` :
+#' * `conf.int`:                  a matrix with one row for each coefficient,
+#' containing the confidence limits for exp(coef).
+#' * `conf.int_bootstrap`:        confidence limits for exp(coef) determined by
+#' bootstrap
+#' * `logtest, sctest, waldtest`: the overall likelihood ratio, score, and Wald
+#' test statistics for the model
+#' * `concordance`:               the concordance statistic and its standard
+#' error
+#' * `rsq`:                       an approximate R^2 based on Nagelkirke
+#' (Biometrika 1991).
 #' @exportS3Method summary coxphGPU
-#' @noRd
-summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1,
-                             digits = max(getOption('digits')-3, 3),
-                             signif.stars = getOption("show.signif.stars"),
-                             expand=FALSE){
+#' @rdname coxphGPU
+summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1){
 
   cox<-object
 
@@ -1224,19 +1221,28 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1,
              # fail=cox$fail,
              # na.action=cox$na.action,
              n=cox$n,
-             loglik=cox$loglik)
+             loglik=cox$loglik,
+             nbootstraps = cox$nbootstraps,
+             conf.int_level = conf.int)
   if (!is.null(cox$nevent)) rval$nevent <- cox$nevent
 
   if (is.null(cox$naive.var)) {
     tmp <- cbind(beta, exp(beta), se, beta/se,
                  pchisq((beta/ se)^2, 1, lower.tail=FALSE))
-    dimnames(tmp) <- list(cov_names, c("coef", "exp(coef)",
-                                       "se(coef)", "z", "Pr(>|z|)"))
+    dimnames(tmp) <- list(cov_names, c("coef",
+                                       "exp(coef)",
+                                       "se(coef)",
+                                       "z",
+                                       "Pr(>|z|)"))
   }else {
     tmp <- cbind(beta, exp(beta), nse, se, beta/se,
                  pchisq((beta/ se)^2, 1, lower.tail=FALSE))
-    dimnames(tmp) <- list(cov_names, c("coef", "exp(coef)",
-                                       "se(coef)", "robust se", "z", "Pr(>|z|)"))
+    dimnames(tmp) <- list(cov_names, c("coef",
+                                       "exp(coef)",
+                                       "se(coef)",
+                                       "robust se",
+                                       "z",
+                                       "Pr(>|z|)"))
   }
   rval$coefficients <- tmp
 
@@ -1251,6 +1257,17 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1,
                                       paste("lower .", round(100 * conf.int, 2), sep = ""),
                                       paste("upper .", round(100 * conf.int, 2), sep = "")))
     rval$conf.int <- tmp
+  }
+
+  if(object$nbootstraps > 1){
+
+    probs = c((1-conf.int)/2,1-(1-conf.int)/2)
+
+    # confidence Interval for coefficients (default 95%)
+    rval$conf.int_bootstrap = apply(object$coef_bootstrap, 2, stats::quantile, p = probs)
+
+    # # confidence Interval for loglik (default 95%)
+    # rval$loglik_CI = stats::quantile(object$loglik, p = probs)
   }
 
   df <- length(beta2)
@@ -1286,8 +1303,25 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1,
     rval$states <- cox$states
   }
 
-  x = rval
+  class(rval) = "summary.coxphGPU"
+  return(rval)
+}
 
+
+
+#' Print summary for coxphGPU object
+#'
+#' @param x summary.coxphGPU object
+#' @param digits significant digits to print
+#' @param signif.stars show stars to highlight small p-values
+#' @param ... additional argument(s) for methods.
+#'
+#' @exportS3Method print summary.coxphGPU
+#' @noRd
+print.summary.coxphGPU <- function(x, ...,
+                                   digits = max(getOption('digits')-3, 3),
+                                   signif.stars = getOption("show.signif.stars")){
+  #x = rval
   if (!is.null(x$call)) {
     cat("Call:\n")
     dput(x$call)
@@ -1298,7 +1332,7 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1,
     return()
   }
 
-  if(cox$nbootstraps > 1){
+  if(x$nbootstraps > 1){
     cat("Results without bootstrap :\n\n")
   }
   savedig <- options(digits = digits)
@@ -1311,54 +1345,21 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1,
   if (length(omit))
     cat("   (", naprint(omit), ")\n", sep="")
 
-  if (nrow(x$coef)==0) {   # Null model
+  if (nrow(x$coefficients)==0) {   # Null model
     cat ("   Null model\n")
     return()
   }
 
-  if (expand && !is.null(x$cmap)) { # this was a coxphms object
-    signif.stars <- FALSE  #work around issue with printCoefmat
-    # print it group by group
-    tmap <- x$cmap
-    cname <- colnames(tmap)
-    printed <- rep(FALSE, length(cname))
-    for (i in 1:length(cname)) {
-      # if multiple colums of tmat are identical, only print that
-      #  set of coefficients once
-      if (!printed[i]) { # this column hasn't been printed
-        j <- apply(tmap, 2, function(x) all(x == tmap[,i]))
-        printed[j] <- TRUE  # mark all that match as 'printed'
-
-        tmp2 <- x$coefficients[tmap[,i],, drop=FALSE]
-        names(dimnames(tmp2)) <- c(paste(cname[j], collapse=", "), "")
-        # restore character row names
-        rownames(tmp2) <- rownames(tmap)[tmap[,i]>0]
-
-        printCoefmat(tmp2, digits=digits, P.values=TRUE,
-                     has.Pvalue=TRUE, signif.legend=FALSE,
-                     signif.stars = signif.stars, ...)
-
-        if (!is.null(x$conf.int)) {
-          tmp2 <- x$conf.int[tmap[,i],, drop=FALSE]
-          rownames(tmp2) <- rownames(tmap)[tmap[,i] >0]
-          names(dimnames(tmp2)) <- c(paste(cname[j], collapse=", "),"")
-          print(tmp2, digits=digits, ...)
-        }
-      }
-    }
-    cat("\n States:", paste(paste(seq(along.with =x$states), x$states, sep='= '),
-                            collapse=", "), '\n')
-  } else {
-    if(!is.null(x$coefficients)) {
-      cat("\n")
-      printCoefmat(x$coefficients, digits=digits,
-                   signif.stars=signif.stars, ...)
-    }
-    if(!is.null(x$conf.int)) {
-      cat("\n")
-      print(x$conf.int)
-    }
+  if(!is.null(x$coefficients)) {
+    cat("\n")
+    printCoefmat(x$coefficients, digits=digits,
+                 signif.stars=signif.stars, ...)
   }
+  if(!is.null(x$conf.int)) {
+    cat("\n")
+    print(x$conf.int)
+  }
+
   cat("\n")
 
   if (!is.null(x$concordance)) {
@@ -1394,13 +1395,12 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1,
         "the Wald and robust score tests do not).\n")
   invisible()
 
-  if(object$nbootstraps > 1){
-
+  if(x$nbootstraps > 1){
     cat(" ---------------- \n")
-    cat(paste0("Confidence interval with ", object$nbootstraps,
+    cat(paste0("Confidence interval with ", x$nbootstraps,
                " bootstraps for exp(coef), conf.level = ",
-               object$confint," :\n"))
-    print(signif(t(exp(object$coef_CI))))
+               x$conf.int_level," :\n"))
+    print(signif(t(exp(x$conf.int_bootstrap))))
   }
 }
 

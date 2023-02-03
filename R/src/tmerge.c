@@ -1,4 +1,6 @@
 /*
+ ** From `survival` R package
+ **
  ** Fill in a new time-dependent variable
  **
  **  id: subject id in the baseline datata set (integer)

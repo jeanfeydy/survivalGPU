@@ -1,4 +1,5 @@
 /*
+ ** From `survival` R package
  **
  ** Solve the equation Ab = y, where the cholesky decomposition of A and y
  **   are the inputs.

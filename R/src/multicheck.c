@@ -1,5 +1,7 @@
 
 /*
+ ** From `survival` R package
+ **
  ** create three variables
  **   1. dupid = 1 first obs for this id, 2=last, 3=both, 0=neither
  **   2. gap   = -1 the start time for this obs is before the prior end time

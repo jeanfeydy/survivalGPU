@@ -2,6 +2,9 @@
 % Please edit documentation in R/wceGPU.R
 \name{wceGPU}
 \alias{wceGPU}
+\alias{summary.wceGPU}
+\alias{plot.wceGPU}
+\alias{confint.wceGPU}
 \title{Fast WCE}
 \usage{
 wceGPU(
@@ -22,16 +25,20 @@ wceGPU(
   controls = NULL,
   ...
 )
+
+\method{summary}{wceGPU}(object, ...)
+
+\method{plot}{wceGPU}(x, ..., hist.covariates = FALSE)
+
+\method{confint}{wceGPU}(object, parm, level = 0.95, ..., digits = 3)
 }
 \arguments{
 \item{data}{A data frame in an interval (long) format, in which each line
 corresponds to one and only one time unit for a given individual.}
 
-\item{nknots}{A scalar or a vector. Corresponds to the number(s) of interior
-knots for the cubic splines to estimate the weight function. For example,
-if nknots is set to 2, then a model with two interior knots is fitted. If
-nknots is set to 1:3 or alternatively c(1,2,3) then three models with 1, 2,
-and 3 interior knots, respectively, are fitted.}
+\item{nknots}{Corresponds to the number(s) of interior knots for the cubic
+splines to estimate the weight function. For example, if nknots is set to
+2, then a model with two interior knots is fitted.}
 
 \item{cutoff}{Integer. Time window over which the WCE model is estimated.
 Corresponds to the length of the estimated weight function.}
@@ -84,24 +91,40 @@ into out of memory errors, please consider using batchsize=100, 10 or 1.}
 \item{controls}{List corresponding to the control parameters to be passed to
 the coxph function. See coxph.control for more details.}
 
-\item{...}{Optional; other parameters to be passed through to WCE}
+\item{...}{additional argument(s) for methods.}
+
+\item{object}{wceGPU object.}
+
+\item{x}{wceGPU object.}
+
+\item{hist.covariates}{show histogram for each covariates if you use
+bootstrap.}
+
+\item{parm}{a specification of which parameters are to be given confidence
+intervals, either a vector of numbers or a vector of names. If missing, all
+parameters are considered.}
+
+\item{level}{the confidence level required.}
+
+\item{digits}{significant digits to print.}
 }
 \value{
 WCE results
 }
 \description{
-New implementation of the WCE model (see details), compatible
-with GPU to accelerate calculation speed and work with large datasets.
+New implementation of the Weighted Cumulative Exposure model
+(see @details), compatible with GPU to accelerate calculation speed and
+work with large datasets.
 
-It's also possible to use the package without GPU
+Use \code{summary()} and \code{plot()} methods to see results and risk function.
 }
 \details{
 WCE implements a flexible method for modeling cumulative effects of
 time-varying exposures, weighted according to their relative proximity in
 time, and represented by time-dependent covariates. The current
-implementation estimates the weight function in the Cox proportional hazards
-model. The function that assigns weights to doses taken in the past is
-estimated using cubic regression splines.
+implementation estimates the weight function in the Cox proportional
+hazards model. The function that assigns weights to doses taken in the past
+is estimated using cubic regression splines.
 }
 \examples{
 \dontrun{
