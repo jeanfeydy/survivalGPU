@@ -142,3 +142,5 @@ dmypy.json
 *trace*.json
 *Rplots.pdf
 inst/doc
+/doc/
+/Meta/
