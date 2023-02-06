@@ -15,7 +15,6 @@ def form(x):
     return np.array_str(numpy(x), precision=3)
 
 
-
 def wce_features(*, doses, times, nknots, cutoff, order, constrained=None):
     """Compute the WCE features for a batch of patients.
 
@@ -104,7 +103,7 @@ def coxph_fit(
     bootstrap=1,
 ):
     """Fits a Cox model to the exposure covariates.
-    
+
     Args:
         exposures (Tensor): (Drugs, Patients, Times, Features) float32 Tensor
             of time-dependent covariates.
@@ -117,16 +116,16 @@ def coxph_fit(
         areas (Tensor): (Features,) float32 Tensor that contains the areas of the B-spline atoms.
         permutation (Tensor, optional): (Patients,) int32 Tensor that may contain a random
             permutation of the patient indices, to apply in a permutation test
-            to destroy the correlation between the covariates and the events. 
+            to destroy the correlation between the covariates and the events.
             Defaults to None (i.e. no permutation).
-        interest_drug (int, optional): index of the drug of interest. 
+        interest_drug (int, optional): index of the drug of interest.
             Defaults to None (i.e. all drugs are considered).
-        bootstrap (int, optional): number of bootstrap samples. 
+        bootstrap (int, optional): number of bootstrap samples.
             Defaults to 1 (i.e. no bootstrap).
-        
+
     Returns:
         dict: contains the fitted model parameters, as described in the survival-GPU package.
-            As an additional attribute, we also include "risk", which is a 
+            As an additional attribute, we also include "risk", which is a
             (bootstrap, Drugs) Tensor that contains the estimated total risk associated
             to each drug - i.e. the total area under the risk function.
             These are the logarithms of the "hazard ratios" (HR).
@@ -149,7 +148,7 @@ def coxph_fit(
 
     # We remove all cell with "event >= 2", i.e. after death: -------------------------------
     # N.B.: this is very important, and skipping this step would be an easy mistake to make!
-    mask = events <= 1  
+    mask = events <= 1
     N = mask.sum()
 
     events = events[mask]
@@ -175,7 +174,7 @@ def coxph_fit(
 
     # (bootstrap, Drugs) = (bootstrap, Drugs, Features) @ (Features)
     coxph_output["risk"] = coxph_output["coef"] @ areas
-    
+
     assert coxph_output["coef"].shape == (bootstrap, Drugs, Features)
     assert coxph_output["risk"].shape == (bootstrap, Drugs)
 

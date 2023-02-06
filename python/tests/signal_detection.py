@@ -89,8 +89,9 @@ permutation_risks = permutation_test(
 def cumulative_distributions(x):
     """Compute the cumulative distribution function of the given data"""
     sorted_x, indices = x.sort()
-    
+
     return x, torch.arange(1, len(x) + 1) / len(x)
+
 
 # Our main run was in no batch mode, so we "pop" the first dimension:
 coefs = model["coef"][0]  # (Drugs, Features)

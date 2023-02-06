@@ -54,4 +54,3 @@ def drug_dataset(*, Drugs=1, Patients=1, Times=1, device="cpu"):
         "times": times,
         "events": events,
     }
-
