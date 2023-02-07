@@ -3,8 +3,27 @@
 \docType{package}
 \name{survivalGPU-package}
 \alias{survivalGPU-package}
+\alias{survivalGPU}
 \title{survivalGPU: Fast survival analysis}
 \description{
 Allows to perform survivals analysis on GPU with coxph and WCE
 models, and several features to use bootstrap and manage memory.
+
+To learn more about survivalGPU, start with the vignette :
+\code{vignette("survivalGPU")}
+}
+\section{Functions}{
+
+\itemize{
+\item \code{use_cuda()}: check CUDA drivers for GPU use.
+\item \code{coxphGPU()}: fit a Cox proportional hazards regression model.
+\item \code{wceGPU()}:   fit a Weighted Cumulative Exposure model.
+}
+}
+
+\author{
+\itemize{
+\item \href{https://www.jeanfeydy.com}{Jean FEYDY}
+\item Alexis van STRAATEN
+}
 }
