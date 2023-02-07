@@ -5,12 +5,12 @@ import torch
 from matplotlib import pyplot as plt
 from torch.profiler import profile, record_function, ProfilerActivity
 
-from .utils import numpy, form, wce_features, coxph_fit
+from tests.utils import numpy, form, wce_features, coxph_fit
 from survivalgpu.datasets import drug_dataset
 
 
 # Setup ==================================================================================
-use_cuda = False  # torch.cuda.is_available()
+use_cuda = torch.cuda.is_available()
 
 ds = drug_dataset(
     Drugs=4,

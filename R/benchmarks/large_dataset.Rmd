@@ -1,0 +1,100 @@
+---
+title: "Large dataset benchmark"
+author: "Alexis van STRAATEN"
+output:
+  rmdformats::readthedown
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, warning=FALSE}
+#library(survivalGPU)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(PermAlgo)
+library(survival)
+library(WCE)
+library(profvis)
+```
+
+
+```{r}
+# Inspired by PermAlgo vignette
+n=1000 # subjects
+m=3650 # days
+# Generate the matrix of two covariate, in a 'long' format.
+Xmat=matrix(ncol=3, nrow=n*m)
+# time-independant binary covariate
+Xmat[,1] <- rep(rbinom(n, 1, 0.3), each=m)
+Xmat[,2] <- rep(round(runif(n,min =  18, max = 68)), each=m)
+# Function to generate an individual time-dependent exposure history
+# e.g. generate prescriptions of different durations and doses.
+TDhist <- function(m){
+  
+  # Start : Uniform distribution U[1,m]
+  start <- round(runif(1,1,m),0) # individual start date
+  
+  # Duration : lognormal distribution(0.5,0.8)
+  duration <-  7 + 7*round(rlnorm(1, meanlog = 0.5, sdlog = 0.8),0) # in weeks
+  
+  # Dose : random assigment of values 0.5, 1, 1.5, 2, 2.5 and 3
+  dose <-  sample(seq(from = 0.5, to = 3,by = 0.5),size = 1)
+  
+  vec <- c(rep(0, start-1), rep(dose, duration))
+  
+  # Repeat until the vector larger than m
+  while (length(vec)<=m){
+    intermission <- 21 + 7*round(rlnorm(1, meanlog = 0.5, sdlog = 0.8),0) # in weeks
+    duration <-  7 + 7*round(rlnorm(1, meanlog = 0.5, sdlog = 0.8),0) # in weeks
+    dose <-  sample(c(0.5,1,1.5,2,2.5,3), size = 1)
+    vec <- append(vec, c(rep(0, intermission), rep(dose, duration)))}
+  return(vec[1:m])}
+# create TD var
+Xmat[,3] <- do.call("c", lapply(1:n, function(i) TDhist(m)))
+# genereate vectors of event and censoring times prior to calling the
+# function for the algorithm
+eventRandom <- round(rexp(n, 0.012)+1,0)
+censorRandom <- round(runif(n, 1,870),0)
+# Generate the survival data conditional on the three covariates
+data <- permalgorithm(n,
+                      m,
+                      Xmat,
+                      XmatNames = c("sex","age","dose"),
+                      eventRandom = eventRandom,
+                      censorRandom = censorRandom, 
+                      betas=c(log(2),log(1.6),log(1.04)),
+                      groupByD=FALSE)
+```
+
+# Coxph
+
+```{r coxph}
+# Coxph
+start <- Sys.time()
+profvis({
+coxph(Surv(Start, Stop, Event) ~ sex + age,
+      data = data)
+})
+time_coxph <- Sys.time() - start
+
+```
+
+```{r coxphGPU}
+# Warm up the GPU:
+use_cuda()
+
+# CoxphGPU
+start <- Sys.time()
+profvis({
+coxphGPU(Surv(Start,Stop,Event) ~ sex + age,
+         data = data)
+})
+time_coxphGPU <- Sys.time() - start
+```
+
+Time for one Coxph : **`r round(time_coxph, 3)`**
+Time for one Coxph with GPU : **`r round(time_coxphGPU, 3)`**  
+

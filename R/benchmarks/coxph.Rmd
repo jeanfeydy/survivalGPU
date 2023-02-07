@@ -1,0 +1,188 @@
+---
+title: "Coxph benchmark"
+author: "Alexis van STRAATEN"
+output:
+  rmdformats::readthedown
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+library(survival)
+library(WCE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+# library(parallel)
+#library(survivalGPU)
+
+```
+
+
+```{r}
+
+drugdata <- WCE::drugdata
+
+```
+
+Bootstrap with :  
+- survival::coxph  
+- survival.GPU.R::coxphGPU
+
+
+# Functions
+
+```{r}
+
+list_df_bootstrap <- function(dataset,n_bootstrap){
+  
+  liste_df<-lapply(1:n_bootstrap, function(x) dataset  %>%
+                     slice_sample(prop = 1, replace = TRUE))
+  liste_df[[1]] <- dataset
+  
+  return(liste_df)
+}
+
+```
+
+
+```{r coxph}
+
+time_cox <- function(dataset,n_bootstrap){
+  
+  if(n_bootstrap > 100){
+    return(NA)
+  }else{
+    
+    list_df<-list_df_bootstrap(dataset = dataset,
+                               n_bootstrap = n_bootstrap)
+    
+    start_time<-Sys.time()
+    lapply(list_df, function(x) coxph(Surv(Start,Stop,Event) ~ sex + age,
+                                      data = x,
+                                      id = Id))
+    return(difftime(Sys.time(),start_time,units = "secs")) 
+    
+  }
+  
+}
+
+```
+
+
+```{r coxph parallel, eval=FALSE, include=FALSE}
+
+# time_cox_parallel <- function(list_df){
+#   
+#   no_cores <- detectCores()
+#   clust <- makeCluster(no_cores - 1)
+#   
+#   clusterEvalQ(clust, {
+#     library(survival)
+#   })
+#   
+#   #clusterExport(clust,"list_df")
+#   
+#   start_time<-Sys.time()
+#   
+#   parLapply(clust,list_df,function(x) coxph(Surv(Start,Stop,Event) ~ sex + age,
+#                                     data = x,
+#                                     id = Id))
+#   
+#   end_time <- Sys.time()
+#   stopCluster(clust)  
+#   
+#   return(difftime(end_time, start_time, units = "secs") )
+# }
+
+
+```
+
+
+```{r coxphGPU CPU}
+
+time_coxphGPU <- function(dataset,n_bootstrap){
+  
+  start_time <- Sys.time()
+  coxphGPU(Surv(Start,Stop,Event) ~ sex + age,
+           data = dataset,
+           id = Id,
+           bootstrap = n_bootstrap,
+           batchsize = ifelse(n_bootstrap>1000,1000,0)) 
+  return(difftime(Sys.time(),start_time,units = "secs"))
+  
+}
+
+```
+
+
+```{r}
+
+combine_time<-function(dataset,n_bootstrap){
+  
+  return(list(coxph = time_cox(dataset,n_bootstrap),
+              coxphGPU = time_coxphGPU(dataset,n_bootstrap)))
+  
+}
+
+```
+
+
+# Results
+
+```{r GPU wake up, include=FALSE}
+
+coxphGPU(Surv(Start,Stop,Event) ~ sex + age,
+         data = drugdata,
+         id = Id,
+         bootstrap = 1) 
+
+```
+
+
+```{r, message=FALSE}
+
+n_bootstrap <- c(1, 2, 5, 10, 20, 100, 1000, 2000, 10000, 50000)
+
+benchmark_coxph <- lapply(n_bootstrap,combine_time,dataset = drugdata)
+benchmark_coxph_df <- do.call(rbind, benchmark_coxph) %>%
+  as.data.frame() %>%
+  mutate_all(as.numeric) %>%
+  mutate(`N bootstrap` = n_bootstrap, .before = 1)
+
+```
+
+
+```{r, warning=FALSE}
+
+benchmark_coxph_df %>%
+  gather("Method", "Time in secs",-`N bootstrap`) %>%
+  ggplot(aes(x = `N bootstrap`, y = `Time in secs`, group = Method)) +
+  geom_line(aes(color = Method)) +
+  geom_point(aes(color = Method)) +
+  scale_x_log10() +
+  scale_y_log10() +
+  ggtitle("Coxph benchmark")
+
+```
+
+
+```{r, include=FALSE}
+
+saveRDS(benchmark_coxph,"benchmark_coxph.rds")
+
+```
+
+
+```{r, include=FALSE}
+
+# if(survivalgpu$use_cuda == TRUE){
+#   print("GPU mode")
+# }else{
+#   print("CPU mode")
+# }
+
+```
