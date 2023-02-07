@@ -143,3 +143,9 @@ dmypy.json
 *trace*.json
 *Rplots.pdf
 inst/doc
+
+survivalGPU_*.tar.gz
+
+*trace*.json
+*output*.png
+*Rplots.pdf

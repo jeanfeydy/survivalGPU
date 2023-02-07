@@ -8,9 +8,9 @@ from survivalgpu.utils import timer, numpy
 np.set_printoptions(precision=4)
 
 
-def benchmark(data, bootstrap=1, backends=None):
+def benchmark(data, bootstrap=1, backends=None, alpha=0.0):
     if backends is None:
-        backends = ([] if use_cuda else ["torch"]) + ["pyg", "coo", "csr", "keops"]
+        backends = ([] if use_cuda else ["torch"]) + ["pyg", "coo", "csr"]
 
     for backend in backends:
         print(f"Backend: {backend} **************")
@@ -36,7 +36,7 @@ def benchmark(data, bootstrap=1, backends=None):
                 bootstrap=bootstrap,
                 maxiter=20,
                 verbosity=0,
-                alpha=0.0,
+                alpha=alpha,
             )
 
             end = timer()
@@ -68,8 +68,8 @@ benchmark(data_1)
 print("")
 
 # 2. Mini benchmark ====================================
-n_points = 100000
-n_times = 10000
+n_points = 100000 if use_cuda else 100
+n_times = 10000 if use_cuda else 50
 n_features = 5
 death_ratio = 0.1
 n_bootstraps = 100
@@ -84,5 +84,5 @@ print(
 )
 print(f"{n_times} death times and a death ratio of {death_ratio:.2f}")
 
-benchmark(data_2, backends=["pyg", "coo", "csr"], bootstrap=n_bootstraps)
+benchmark(data_2, backends=["pyg", "coo", "csr"], bootstrap=n_bootstraps, alpha=0.1)
 print("")

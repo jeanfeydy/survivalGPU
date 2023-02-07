@@ -209,11 +209,10 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
     )
 
     # Step 3: roll-back the re-ordering of Step 1 ==============================
-    features = torch.zeros_like(features_i)
-    features[
-        sort_ids
-    ] = features_i  # equivalent to "features = features_i[inverse(sort_ids)]"
 
+    features = torch.zeros_like(features_i)
+    # equivalent to "features = features_i[inverse(sort_ids)]":
+    features[sort_ids] = features_i
     return features, knots
 
 

@@ -208,7 +208,8 @@ def coxph_objective_torch(
     N,  # int
     B,  # int
     T,  # int
-    x,  # (N,D) tensor
+    risk_scores,  # (B,D) -> (B,N) function
+    # x,  # (N,D) tensor
     deaths,  # (N,) tensor
     weights,  # (B,N) tensor
     log_weights,  # (B,N) tensor
@@ -295,7 +296,7 @@ def coxph_objective_torch(
             We use weights instead of data copies to implement bootstrap cross-validation
             as efficiently as possible.
         ties (string): convention to handle tied deaths. Either "efron" or "breslow".
-        tied_dead_weights ((T,) tensor): total weights of the dead samples per death time.
+        tied_dead_weights ((B,T) tensor): total weights of the dead samples per death time.
         cluster_indices ((N,) vector): "batch vector" that indicates the id of the
             "death time" that is associated to each sample.
 
@@ -360,8 +361,11 @@ def coxph_objective_torch(
     def negloglikelihood(params):
         # nonlocal weight_factor
 
-        # Compute the linear scores:
-        scores = params @ x.T  # (B,D) @ (D,N) = (B,N)
+        # Compute the risk scores associated to the N feature vectors
+        # by our current estimate of the parameters.
+        # For linear scores "dot(beta, x[i])", this corresponds to
+        # scores = params @ x.T, (B,D) @ (D,N) = (B,N)
+        scores = risk_scores(params)  # (B,N)
         # And add the logarithms of the weights, so that
         # exp(weighted_scores) = w_i * exp(beta . x_i):
         weighted_scores = scores + log_weights  # (B,N)
