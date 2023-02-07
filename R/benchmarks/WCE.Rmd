@@ -129,7 +129,11 @@ use_cuda()
 
 ```{r, message=FALSE}
 
-n_bootstrap <- c(1, 2, 5, 10, 20, 100,1000,2000,10000, 50000)
+if (use_cuda()) {
+n_bootstrap <- c(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000)
+} else {
+n_bootstrap <- c(1, 2, 5, 10, 20, 50, 100)
+}
 
 benchmark_wce <- lapply(n_bootstrap,combine_time,dataset = drugdata)
 benchmark_wce_df <- do.call("rbind", benchmark_wce) %>%

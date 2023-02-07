@@ -432,7 +432,6 @@ def coxph_R(
             maxiter=20 if profile is None else 1,
             verbosity=0,
             alpha=0.0,
-            profile=profile,
             doscale=doscale,
         )
 
