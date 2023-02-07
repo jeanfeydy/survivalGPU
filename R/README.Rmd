@@ -59,9 +59,11 @@ By default, functions run with GPU if detected. Then we specify the number of bo
 
 ```{r}
 if (use_cuda()) {
-  n_bootstrap <- 1000; batchsize <- 200
+  n_bootstrap <- 1000
+  batchsize <- 200
 } else {
-  n_bootstrap <- 50  ; batchsize <- 10
+  n_bootstrap <- 50
+  batchsize <- 10
 }
 ```
 

@@ -33,8 +33,10 @@ Bootstrap with :
 
 ```{r}
 list_df_bootstrap <- function(dataset, n_bootstrap) {
-  liste_df <- lapply(1:n_bootstrap, function(x) dataset %>%
-    slice_sample(prop = 1, replace = TRUE))
+  liste_df <- lapply(1:n_bootstrap, function(x) {
+    dataset %>%
+      slice_sample(prop = 1, replace = TRUE)
+  })
   liste_df[[1]] <- dataset
 
   return(liste_df)
@@ -53,10 +55,12 @@ time_cox <- function(dataset, n_bootstrap) {
     )
 
     start_time <- Sys.time()
-    lapply(list_df, function(x) coxph(Surv(Start, Stop, Event) ~ sex + age,
-      data = x,
-      id = Id
-    ))
+    lapply(list_df, function(x) {
+      coxph(Surv(Start, Stop, Event) ~ sex + age,
+        data = x,
+        id = Id
+      )
+    })
     return(difftime(Sys.time(), start_time, units = "secs"))
   }
 }

@@ -23,10 +23,10 @@ library(profvis)
 
 ```{r}
 # Inspired by PermAlgo vignette
-n = 1000 # subjects
-m = 3650 # days
+n <- 1000 # subjects
+m <- 3650 # days
 # Generate the matrix of two covariate, in a 'long' format.
-Xmat = matrix(ncol = 3, nrow = n * m)
+Xmat <- matrix(ncol = 3, nrow = n * m)
 # time-independant binary covariate
 Xmat[, 1] <- rep(rbinom(n, 1, 0.3), each = m)
 Xmat[, 2] <- rep(round(runif(n, min = 18, max = 68)), each = m)

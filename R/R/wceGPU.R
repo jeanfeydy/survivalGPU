@@ -153,31 +153,31 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
 
   # Outputs post processing
-  knotsmat = matrix(c(wce$knotsmat), nrow = 1)
-  rownames(knotsmat) = paste(nknots, "knot(s)")
+  knotsmat <- matrix(c(wce$knotsmat), nrow = 1)
+  rownames(knotsmat) <- paste(nknots, "knot(s)")
 
-  WCEmat = wce$WCEmat
-  colnames(WCEmat) = paste0("t", 1:cutoff)
-  rownames(WCEmat) = paste0("bootstrap", 1:nbootstraps)
+  WCEmat <- wce$WCEmat
+  colnames(WCEmat) <- paste0("t", 1:cutoff)
+  rownames(WCEmat) <- paste0("bootstrap", 1:nbootstraps)
 
-  coef = wce$coef
-  cov = c(covariates, paste0("D", 1:(ncol(coef) - length(covariates))))
-  colnames(coef) = cov
-  rownames(coef) = paste0("bootstrap", 1:nbootstraps)
+  coef <- wce$coef
+  cov <- c(covariates, paste0("D", 1:(ncol(coef) - length(covariates))))
+  colnames(coef) <- cov
+  rownames(coef) <- paste0("bootstrap", 1:nbootstraps)
 
-  vcovmat = lapply(c(1:nbootstraps), function(x) wce$imat[x, , ])
-  vcovmat = lapply(vcovmat, "colnames<-", cov)
-  vcovmat = lapply(vcovmat, "rownames<-", cov)
-  names(vcovmat) = paste0("bootstrap", 1:nbootstraps)
+  vcovmat <- lapply(c(1:nbootstraps), function(x) wce$imat[x, , ])
+  vcovmat <- lapply(vcovmat, "colnames<-", cov)
+  vcovmat <- lapply(vcovmat, "rownames<-", cov)
+  names(vcovmat) <- paste0("bootstrap", 1:nbootstraps)
 
-  SE = cbind(wce$std, wce$SED)
-  colnames(SE) = cov
-  rownames(SE) = paste0("bootstrap", 1:nbootstraps)
+  SE <- cbind(wce$std, wce$SED)
+  colnames(SE) <- cov
+  rownames(SE) <- paste0("bootstrap", 1:nbootstraps)
 
-  names(data)[names(data) == event] = 'Event'
-  nevents = length(data$Event[data$Event == 1])
+  names(data)[names(data) == event] <- "Event"
+  nevents <- length(data$Event[data$Event == 1])
 
-  BIC = sapply(wce$loglik, BIC_for_wce,
+  BIC <- sapply(wce$loglik, BIC_for_wce,
     n.events = nevents, n.knots = nknots,
     cons = constrained, aic = aic, covariates = covariates
   )
@@ -201,15 +201,15 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   )
 
   if (nbootstraps > 1) {
-    probs = c((1 - confint) / 2, 1 - (1 - confint) / 2)
+    probs <- c((1 - confint) / 2, 1 - (1 - confint) / 2)
     # confidence Interval for weights (default 95%)
-    results$WCEmat_CI = apply(WCEmat, 2, stats::quantile, p = probs)
+    results$WCEmat_CI <- apply(WCEmat, 2, stats::quantile, p = probs)
 
     # confidence Interval for coefficients (default 95%)
-    results$coef_CI = apply(coef, 2, stats::quantile, p = probs)
+    results$coef_CI <- apply(coef, 2, stats::quantile, p = probs)
   }
 
-  results$analysis = "Cox"
+  results$analysis <- "Cox"
 
   # wceGPU object
   class(results) <- "wceGPU"
@@ -268,13 +268,13 @@ BIC_for_wce <- function(PL, n.events, n.knots, cons = F, aic = FALSE, covariates
 print.wceGPU <- function(x, ...) {
   object <- x
   if (object$constrained == FALSE) {
-    cat_constrained = "Unconstrained"
+    cat_constrained <- "Unconstrained"
   } else if (object$constrained %in% c("R", "r", "RIGHT", "Right", "right")) {
-    cat_constrained = "Right constrained"
+    cat_constrained <- "Right constrained"
   } else if (object$constrained %in% c("L", "l", "LEFT", "Left", "left")) {
-    cat_constrained = "Left constrained"
+    cat_constrained <- "Left constrained"
   } else {
-    cat_constrained = "Constrained ?"
+    cat_constrained <- "Constrained ?"
   }
 
   cat(paste(
@@ -282,7 +282,7 @@ print.wceGPU <- function(x, ...) {
     ifelse(object$nknots > 1, "knots", "knot"), " -------\n"
   ))
 
-  rownames(object$WCEmat) = rep(" ", object$nbootstraps)
+  rownames(object$WCEmat) <- rep(" ", object$nbootstraps)
   print(object$WCEmat[1, ])
 
   cat("\n")
@@ -439,17 +439,17 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
   object <- x
   if (object$nbootstraps == 1) {
     if (object$aic == TRUE) {
-      info = "AIC"
+      info <- "AIC"
     } else {
-      info = "BIC"
+      info <- "BIC"
     }
-    bic_legend = paste(info, "=", round(object$info.criterion, 2))
+    bic_legend <- paste(info, "=", round(object$info.criterion, 2))
 
     graphics::matplot(t(object$WCEmat),
-      lty = 1, type = 'l', ylab = 'weights',
-      xlab = 'Time elapsed'
+      lty = 1, type = "l", ylab = "weights",
+      xlab = "Time elapsed"
     )
-    graphics::title(paste('Estimated weight functions\n', bic_legend))
+    graphics::title(paste("Estimated weight functions\n", bic_legend))
     graphics::matplot(t(object$WCEmat), pch = 1, add = TRUE)
   } else { # If bootstrap
 
@@ -468,11 +468,11 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
     }
 
     graphics::matplot((object$WCEmat[1, ]),
-      lty = 1, type = 'l', ylab = 'weights',
-      xlab = 'Time elapsed'
+      lty = 1, type = "l", ylab = "weights",
+      xlab = "Time elapsed"
     )
     graphics::title(paste0(
-      'Estimated weight functions\n with confidence interval (',
+      "Estimated weight functions\n with confidence interval (",
       object$nbootstraps, " bootstraps)"
     ))
     graphics::matplot((object$WCEmat[1, ]), pch = 1, add = TRUE)
@@ -502,10 +502,11 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
 confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
   cf <- object$coef[1, ]
   pnames <- names(cf)
-  if (missing(parm))
+  if (missing(parm)) {
     parm <- pnames
-  else if (is.numeric(parm))
+  } else if (is.numeric(parm)) {
     parm <- pnames[parm]
+  }
   a <- (1 - level) / 2
   a <- c(a, 1 - a)
   pct <- paste(format(100 * a, trim = TRUE, scientific = FALSE, digits = digits), "%")

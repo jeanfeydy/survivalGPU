@@ -13,7 +13,7 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  fig.align = 'center',
+  fig.align = "center",
   fig.height = 3.5,
   fig.width = 5
 )
@@ -42,9 +42,11 @@ Batchsize argument is used to put a limit on the number of models to do at the s
 
 ```{r cuda}
 if (use_cuda()) {
-  n_bootstrap <- 1000; batchsize <- 200
+  n_bootstrap <- 1000
+  batchsize <- 200
 } else {
-  n_bootstrap <- 50  ; batchsize <- 10
+  n_bootstrap <- 50
+  batchsize <- 10
 }
 ```
 

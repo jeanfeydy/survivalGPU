@@ -111,7 +111,6 @@ combine_time <- function(dataset, n_bootstrap) {
 
 
 ```{r GPU wake up, include=FALSE}
-
 use_cuda()
 ```
 

@@ -6,18 +6,28 @@
 # is before/after the "~"
 terms.inner <- function(x) {
   if (inherits(x, "formula")) {
-    if (length(x) == 3) c(terms.inner(x[[2]]), terms.inner(x[[3]]))
-    else terms.inner(x[[2]])
+    if (length(x) == 3) {
+      c(terms.inner(x[[2]]), terms.inner(x[[3]]))
+    } else {
+      terms.inner(x[[2]])
+    }
   } else if (inherits(x, "call") &&
     (x[[1]] != as.name("$") && x[[1]] != as.name("["))) {
-    if (x[[1]] == '+' || x[[1]] == '*' || x[[1]] == '-' || x[[1]] == ':') {
+    if (x[[1]] == "+" || x[[1]] == "*" || x[[1]] == "-" || x[[1]] == ":") {
       # terms in a model equation, unary minus only has one argument
-      if (length(x) == 3) c(terms.inner(x[[2]]), terms.inner(x[[3]]))
-      else terms.inner(x[[2]])
-    } else if (x[[1]] == as.name("Surv"))
+      if (length(x) == 3) {
+        c(terms.inner(x[[2]]), terms.inner(x[[3]]))
+      } else {
+        terms.inner(x[[2]])
+      }
+    } else if (x[[1]] == as.name("Surv")) {
       unlist(lapply(x[-1], terms.inner))
-    else terms.inner(x[[2]])
-  } else (deparse(x))
+    } else {
+      terms.inner(x[[2]])
+    }
+  } else {
+    (deparse(x))
+  }
 }
 
 
@@ -41,24 +51,27 @@ drop.special <- function(termobj, i, addparen = FALSE) {
 
   newterms <- attr(termobj, "term.labels")[-index]
   # the above ignores offsets, add them back in
-  if (length(attr(termobj, "offset")) > 0)
+  if (length(attr(termobj, "offset")) > 0) {
     newterms <- c(newterms, rownames(ff)[attr(termobj, "offset")])
+  }
 
   rvar <- if (attr(termobj, "response") == 1) termobj[[2L]]
 
   # Adding () around each term is for a formula containing  + (sex=='male')
   #   It's a crude fix and causes the formula to look different
-  if (addparen)
+  if (addparen) {
     newformula <- reformulate(paste0("(", newterms, ")"),
       response = rvar,
       intercept = attr(termobj, "intercept"),
       env = environment(termobj)
     )
-  else newformula <- reformulate(newterms,
-    response = rvar,
-    intercept = attr(termobj, "intercept"),
-    env = environment(termobj)
-  )
+  } else {
+    newformula <- reformulate(newterms,
+      response = rvar,
+      intercept = attr(termobj, "intercept"),
+      env = environment(termobj)
+    )
+  }
   if (length(newformula) == 0L) newformula <- "1"
 
   # addition of an extra specials label causes no harm
@@ -67,10 +80,12 @@ drop.special <- function(termobj, i, addparen = FALSE) {
   # now add back the predvars and dataClasses attributes; which do contain
   # the response and offset.
   index2 <- seq.int(nrow(ff))[-i]
-  if (!is.null(attr(termobj, "predvars")))
+  if (!is.null(attr(termobj, "predvars"))) {
     attr(result, "predvars") <- attr(termobj, "predvars")[c(1, index2 + 1)]
-  if (!is.null(attr(termobj, "dataClasses")))
+  }
+  if (!is.null(attr(termobj, "dataClasses"))) {
     attr(result, "dataClasses") <- attr(termobj, "dataClasses")[index2]
+  }
 
   result
 }
@@ -78,10 +93,12 @@ drop.special <- function(termobj, i, addparen = FALSE) {
 
 # Automatically generated from the noweb directory
 parsecovar1 <- function(flist, statedata) {
-  if (any(sapply(flist, function(x) !inherits(x, "formula"))))
+  if (any(sapply(flist, function(x) !inherits(x, "formula")))) {
     stop("an element of the formula list is not a formula")
-  if (any(sapply(flist, length) != 3))
+  }
+  if (any(sapply(flist, length) != 3)) {
     stop("all formulas must have a left and right side")
+  }
 
   # split the formulas into a right hand and left hand side
   lhs <- lapply(flist, function(x) x[-3]) # keep the ~
@@ -92,20 +109,27 @@ parsecovar1 <- function(flist, statedata) {
   # the next routine cuts at '+' signs
   pcut <- function(form) {
     if (length(form) == 3) {
-      if (form[[1]] == '+')
+      if (form[[1]] == "+") {
         c(pcut(form[[2]]), pcut(form[[3]]))
-      else if (form[[1]] == '~') pcut(form[[2]])
-      else list(form)
-    } else list(form)
+      } else if (form[[1]] == "~") {
+        pcut(form[[2]])
+      } else {
+        list(form)
+      }
+    } else {
+      list(form)
+    }
   }
   lcut <- lapply(lhs, function(x) pcut(x[[2]]))
   env1 <- new.env(parent = parent.frame(2))
   env2 <- new.env(parent = env1)
   if (missing(statedata)) {
-    assign("state", function(...) list(
-      stateid = "state",
-      values = c(...)
-    ), env1)
+    assign("state", function(...) {
+      list(
+        stateid = "state",
+        values = c(...)
+      )
+    }, env1)
     assign("state", list(stateid = "state"))
   } else {
     for (i in statedata) {
@@ -121,22 +145,29 @@ parsecovar1 <- function(flist, statedata) {
     lapply(x, function(z) {
       if (length(z) == 1) {
         temp <- eval(z, envir = env2)
-        if (is.list(temp) && names(temp)[[1]] == "stateid") temp
-        else temp
-      } else if (length(z) == 3 && z[[1]] == ':')
+        if (is.list(temp) && names(temp)[[1]] == "stateid") {
+          temp
+        } else {
+          temp
+        }
+      } else if (length(z) == 3 && z[[1]] == ":") {
         list(left = eval(z[[2]], envir = env2), right = eval(z[[3]], envir = env2))
-      else stop("invalid term: ", deparse(z))
+      } else {
+        stop("invalid term: ", deparse(z))
+      }
     })
   })
   list(rhs = rhs, lhs = lterm)
 }
 rightslash <- function(x) {
-  if (!inherits(x, 'call')) return(x)
-  else {
-    if (x[[1]] == as.name('/')) return(list(x[[2]], x[[3]]))
-    else if (x[[1]] == as.name('+') || (x[[1]] == as.name('-') && length(x) == 3) ||
-      x[[1]] == as.name('*') || x[[1]] == as.name(':') ||
-      x[[1]] == as.name('%in%')) {
+  if (!inherits(x, "call")) {
+    return(x)
+  } else {
+    if (x[[1]] == as.name("/")) {
+      return(list(x[[2]], x[[3]]))
+    } else if (x[[1]] == as.name("+") || (x[[1]] == as.name("-") && length(x) == 3) ||
+      x[[1]] == as.name("*") || x[[1]] == as.name(":") ||
+      x[[1]] == as.name("%in%")) {
       temp <- rightslash(x[[3]])
       if (is.list(temp)) {
         x[[3]] <- temp[[1]]
@@ -146,9 +177,13 @@ rightslash <- function(x) {
         if (is.list(temp)) {
           x[[2]] <- temp[[2]]
           return(list(temp[[1]], x))
-        } else return(x)
+        } else {
+          return(x)
+        }
       }
-    } else return(x)
+    } else {
+      return(x)
+    }
   }
 }
 parse_rightside <- function(rhs) {
@@ -168,11 +203,12 @@ parse_rightside <- function(rhs) {
       optterms <- terms(temp)
       ff <- rownames(attr(optterms, "factors"))
       index <- match(ff, c("common", "shared", "init"))
-      if (any(is.na(index)))
+      if (any(is.na(index))) {
         stop(
           "option not recognized in a covariates formula: ",
           paste(ff[is.na(index)], collapse = ", ")
         )
+      }
       common <- any(index == 1)
       shared <- any(index == 2)
       if (any(index == 3)) {
@@ -180,7 +216,9 @@ parse_rightside <- function(rhs) {
         j <- optatt$variables[1 + which(index == 3)]
         j[[1]] <- as.name("list")
         ival <- unlist(eval(j, parent.frame()))
-      } else ival <- NULL
+      } else {
+        ival <- NULL
+      }
       tform[[2]] <- opt[[1]]
       list(formula = tform, ival = ival, common = common, shared = shared)
     }
@@ -189,7 +227,9 @@ parse_rightside <- function(rhs) {
 }
 termmatch <- function(f1, f2) {
   # look for f1 in f2, each the factors attribute of a terms object
-  if (length(f1) == 0) return(NULL) # a formula with only ~1
+  if (length(f1) == 0) {
+    return(NULL)
+  } # a formula with only ~1
   irow <- match(rownames(f1), rownames(f2))
   if (any(is.na(irow))) stop("termmatch failure 1")
   hashfun <- function(j) sum(ifelse(j == 0, 0, 2^(seq(along.with = j))))
@@ -201,17 +241,19 @@ termmatch <- function(f1, f2) {
 }
 
 parsecovar2 <- function(covar1, statedata, dformula, Terms, transitions, states) {
-  if (is.null(statedata))
+  if (is.null(statedata)) {
     statedata <- data.frame(state = states, stringsAsFactors = FALSE)
-  else {
-    if (is.null(statedata$state))
+  } else {
+    if (is.null(statedata$state)) {
       stop("the statedata data set must contain a variable 'state'")
+    }
     indx1 <- match(states, statedata$state, nomatch = 0)
-    if (any(indx1 == 0))
+    if (any(indx1 == 0)) {
       stop(
         "statedata does not contain all the possible states: ",
         states[indx1 == 0]
       )
+    }
     statedata <- statedata[indx1, ] # put it in order
   }
 
@@ -220,7 +262,7 @@ parsecovar2 <- function(covar1, statedata, dformula, Terms, transitions, states)
   #  those were eliminated above.
   # Likewise, the formula list might have rules for transitions that are
   #  not present.  Don't worry about it at this stage.
-  allterm <- attr(Terms, 'factors')
+  allterm <- attr(Terms, "factors")
   nterm <- ncol(allterm)
 
   # create a map for every transition, even ones that are not used.
@@ -245,22 +287,25 @@ parsecovar2 <- function(covar1, statedata, dformula, Terms, transitions, states)
         # x is one term
         if (!is.list(x) || is.null(x$left)) stop("term found without a ':' ", x)
         # left of the colon
-        if (!is.list(x$left) && length(x$left) == 1 && x$left == 0)
+        if (!is.list(x$left) && length(x$left) == 1 && x$left == 0) {
           temp1 <- 1:nrow(statedata)
-        else if (is.numeric(x$left)) {
+        } else if (is.numeric(x$left)) {
           temp1 <- as.integer(x$left)
           if (any(temp1 != x$left)) stop("non-integer state number")
-          if (any(temp1 < 1 | temp1 > nstate))
+          if (any(temp1 < 1 | temp1 > nstate)) {
             stop("numeric state is out of range")
+          }
         } else if (is.list(x$left) && names(x$left)[1] == "stateid") {
-          if (is.null(x$left$value))
+          if (is.null(x$left$value)) {
             stop("state variable with no list of values: ", x$left$stateid)
-          else {
-            if (any(k = is.na(match(x$left$stateid, names(statedata)))))
+          } else {
+            if (any(k = is.na(match(x$left$stateid, names(statedata))))) {
               stop(x$left$stateid[k], ": state variable not found")
+            }
             zz <- statedata[[x$left$stateid]]
-            if (any(k = is.na(match(x$left$value, zz))))
+            if (any(k = is.na(match(x$left$value, zz)))) {
               stop(x$left$value[k], ": state value not found")
+            }
             temp1 <- which(zz %in% x$left$value)
           }
         } else {
@@ -270,22 +315,25 @@ parsecovar2 <- function(covar1, statedata, dformula, Terms, transitions, states)
         }
 
         # right of colon
-        if (!is.list(x$right) && length(x$right) == 1 && x$right == 0)
+        if (!is.list(x$right) && length(x$right) == 1 && x$right == 0) {
           temp2 <- 1:nrow(statedata)
-        else if (is.numeric(x$right)) {
+        } else if (is.numeric(x$right)) {
           temp2 <- as.integer(x$right)
           if (any(temp2 != x$right)) stop("non-integer state number")
-          if (any(temp2 < 1 | temp2 > nstate))
+          if (any(temp2 < 1 | temp2 > nstate)) {
             stop("numeric state is out of range")
+          }
         } else if (is.list(x$right) && names(x$right)[1] == "stateid") {
-          if (is.null(x$right$value))
+          if (is.null(x$right$value)) {
             stop("state variable with no list of values: ", x$right$stateid)
-          else {
-            if (any(k = is.na(match(x$right$stateid, names(statedata)))))
+          } else {
+            if (any(k = is.na(match(x$right$stateid, names(statedata))))) {
               stop(x$right$stateid[k], ": state variable not found")
+            }
             zz <- statedata[[x$right$stateid]]
-            if (any(k = is.na(match(x$right$value, zz))))
+            if (any(k = is.na(match(x$right$value, zz)))) {
               stop(x$right$value[k], ": state value not found")
+            }
             temp2 <- which(zz %in% x$right$value)
           }
         } else {
@@ -308,8 +356,11 @@ parsecovar2 <- function(covar1, statedata, dformula, Terms, transitions, states)
       # the update.formula function is good at identifying changes
       # formulas that start with  "- x" have to be pasted on carefully
       temp <- substring(deparse(rhs$formula, width.cutoff = 500), 2)
-      if (substring(temp, 1, 1) == '-') dummy <- formula(paste("~ .", temp))
-      else dummy <- formula(paste("~. +", temp))
+      if (substring(temp, 1, 1) == "-") {
+        dummy <- formula(paste("~ .", temp))
+      } else {
+        dummy <- formula(paste("~. +", temp))
+      }
 
       rindex1 <- termmatch(attr(terms(dformula), "factors"), allterm)
       rindex2 <- termmatch(
@@ -322,11 +373,12 @@ parsecovar2 <- function(covar1, statedata, dformula, Terms, transitions, states)
       }
 
       # grab initial values
-      if (length(rhs$ival))
+      if (length(rhs$ival)) {
         inits <- c(inits, list(
           term = rindex, state1 = state1,
           state2 = state2, init = rhs$ival
         ))
+      }
 
       # adding -1 to the front is a trick, to check if there is a "+1" term
       dummy <- ~ -1 + x
@@ -341,22 +393,27 @@ parsecovar2 <- function(covar1, statedata, dformula, Terms, transitions, states)
           j <- dmap[rindex, state1[1], state2[1]]
           for (k in 1:npair) tmap[rindex, state1[k], state2[k]] <- j
         } else {
-          for (k in 1:npair)
+          for (k in 1:npair) {
             tmap[rindex, state1[k], state2[k]] <- dmap[rindex, state1[k], state2[k]]
+          }
         }
       }
 
       # Deal with the shared argument, using - for a separate coef
       if (rhs$shared && npair > 1) {
         j <- dmap[1, state1[1], state2[1]]
-        for (k in 2:npair)
+        for (k in 2:npair) {
           tmap[1, state1[k], state2[k]] <- -j
+        }
       }
     }
   }
   i <- match("(censored)", colnames(transitions), nomatch = 0)
-  if (i == 0) t2 <- transitions
-  else t2 <- transitions[, -i, drop = FALSE] # transitions to 'censor' don't count
+  if (i == 0) {
+    t2 <- transitions
+  } else {
+    t2 <- transitions[, -i, drop = FALSE]
+  } # transitions to 'censor' don't count
   indx1 <- match(rownames(t2), states)
   indx2 <- match(colnames(t2), states)
   tmap2 <- matrix(0L, nrow = 1 + nterm, ncol = sum(t2 > 0))
@@ -364,8 +421,9 @@ parsecovar2 <- function(covar1, statedata, dformula, Terms, transitions, states)
   trow <- row(t2)[t2 > 0]
   tcol <- col(t2)[t2 > 0]
   for (i in 1:nrow(tmap2)) {
-    for (j in 1:ncol(tmap2))
+    for (j in 1:ncol(tmap2)) {
       tmap2[i, j] <- tmap[i, indx1[trow[j]], indx2[tcol[j]]]
+    }
   }
 
   # Remember which hazards had ph
@@ -378,12 +436,13 @@ parsecovar2 <- function(covar1, statedata, dformula, Terms, transitions, states)
   phbaseline <- ifelse(temp < 0, tmap2[1, ], 0) # remembers column numbers
   tmap2[1, ] <- match(tmap2[1, ], unique(tmap2[1, ])) # unique strata 1,2, ...
 
-  if (nrow(tmap2) > 1)
+  if (nrow(tmap2) > 1) {
     tmap2[-1, ] <- match(tmap2[-1, ], unique(c(0L, tmap2[-1, ]))) - 1L
+  }
 
   dimnames(tmap2) <- list(
     c("(Baseline)", colnames(allterm)),
-    paste(indx1[trow], indx2[tcol], sep = ':')
+    paste(indx1[trow], indx2[tcol], sep = ":")
   )
   # mapid gives the from,to for each realized state
   list(
@@ -405,8 +464,9 @@ parsecovar3 <- function(tmap, Xcol, Xassign, phbaseline = NULL) {
   ii <- 0
   for (i in uterm) {
     k <- seq_len(xcount[i])
-    for (j in 1:ncol(tmap))
+    for (j in 1:ncol(tmap)) {
       cmap[ii + k, j] <- if (tmap[i + 1, j] == 0) 0L else tmap[i + 1, j] * mult + k
+    }
     ii <- ii + max(k)
   }
 
@@ -420,14 +480,19 @@ parsecovar3 <- function(tmap, Xcol, Xassign, phbaseline = NULL) {
       cmap[ii, j] <- max(cmap) + k # fill in elements
     }
     newname <- paste0("ph(", colnames(tmap)[unique(temp)], ")")
-  } else newname <- NULL
+  } else {
+    newname <- NULL
+  }
 
   # renumber coefs as 1, 2, 3, ...
   cmap[, ] <- match(cmap, sort(unique(c(0L, cmap)))) - 1L
 
   colnames(cmap) <- colnames(tmap)
-  if (hasintercept) rownames(cmap) <- c(Xcol[-1], newname)
-  else rownames(cmap) <- c(Xcol, newname)
+  if (hasintercept) {
+    rownames(cmap) <- c(Xcol[-1], newname)
+  } else {
+    rownames(cmap) <- c(Xcol, newname)
+  }
 
   cmap
 }
@@ -525,8 +590,11 @@ stacker <- function(cmap, smap, istate, X, Y, strata, states, dropzero = TRUE) {
     transition <- transition[keep]
   }
 
-  if (ncol(Y) == 2) newY <- Surv(Y[rindex, 1], newstat)
-  else newY <- Surv(Y[rindex, 1], Y[rindex, 2], newstat)
+  if (ncol(Y) == 2) {
+    newY <- Surv(Y[rindex, 1], newstat)
+  } else {
+    newY <- Surv(Y[rindex, 1], Y[rindex, 2], newstat)
+  }
 
   # newstrat will be an integer vector.
   newstrat <- smap[1, transition] # start with strata induced by multi-state
@@ -585,8 +653,9 @@ surv2data <- function(mf, check = FALSE) {
   if (length(id) != n) stop("id statement is required")
 
   # relax this some later day (or not?)
-  if (any(is.na(id)) || any(is.na(y[, 1])))
+  if (any(is.na(id)) || any(is.na(y[, 1]))) {
     stop("id and time cannot be missing")
+  }
 
   isort <- order(id, y[, 1])
   id2 <- id[isort]
@@ -600,18 +669,23 @@ surv2data <- function(mf, check = FALSE) {
     if (all(y3[, 1] == 0)) {
       y3 <- y3[, 2:3]
       attr(y3, "type") <- "mright"
-    } else attr(y3, "type") <- "mcounting"
+    } else {
+      attr(y3, "type") <- "mcounting"
+    }
     attr(y3, "states") <- states
   } else {
     if (all(y3[, 1] == 0)) {
       y3 <- y3[, 2:3]
       attr(y3, "type") <- "right"
-    } else attr(y3, "type") <- "counting"
+    } else {
+      attr(y3, "type") <- "counting"
+    }
   }
   class(y3) <- "Surv"
 
-  if (!check && ncol(y3) == 3 && any(y3[, 1] == y3[, 2]))
+  if (!check && ncol(y3) == 3 && any(y3[, 1] == y3[, 2])) {
     stop("duplicated time values for a single id")
+  }
 
   # We no longer need the last row of the data
   # tmerge3 expects the data in time within id order
@@ -621,16 +695,22 @@ surv2data <- function(mf, check = FALSE) {
   #  the response and id.  The response is always first and
   #  the id and cluster will be at the end
   fixup <- !(names(mf) %in% c("(id)", "(cluster)"))
-  if (is.factor(id3)) idi <- as.integer(id3)
-  else idi <- match(id3, unique(id3))
+  if (is.factor(id3)) {
+    idi <- as.integer(id3)
+  } else {
+    idi <- match(id3, unique(id3))
+  }
   for (i in (which(fixup))[-1]) {
     miss <- is.na(mf2[[i]])
     if (any(miss)) {
       k <- .Call("tmerge3", idi, miss)
       update <- (miss & k > 0) # some values will be updated
       if (any(update)) { # some successful replacements
-        if (is.matrix(mf2[[i]])) mf2[[i]][update, ] <- mf2[[i]][k[update], ]
-        else mf2[[i]][update] <- (mf2[[i]])[k[update]]
+        if (is.matrix(mf2[[i]])) {
+          mf2[[i]][update, ] <- mf2[[i]][k[update], ]
+        } else {
+          mf2[[i]][update] <- (mf2[[i]])[k[update]]
+        }
       }
     }
   }
@@ -645,36 +725,40 @@ surv2data <- function(mf, check = FALSE) {
   if (all(is.na(temp) | (temp == 0))) {
     # special case -- no initial state for anyone
     temp <- survcheck(y3 ~ 1, id = id3)
-  } else if (any(is.na(temp) | (temp == 0)))
+  } else if (any(is.na(temp) | (temp == 0))) {
     stop("everyone or no one should have an initial state")
-  else {
+  } else {
     # survcheck does not like missing istate values.  Only the initial
     #  one for each subject needs to be correct though
     itemp <- istate[match(id3, id3)]
-    if (is.null(states))
+    if (is.null(states)) {
       temp <- survcheck(y3 ~ 1, id = id3, istate = itemp)
-    else temp <- survcheck(y3 ~ 1,
-      id = id3,
-      istate = factor(itemp, 1:length(states), states)
-    )
+    } else {
+      temp <- survcheck(y3 ~ 1,
+        id = id3,
+        istate = factor(itemp, 1:length(states), states)
+      )
+    }
   }
 
   # Treat any repeated events as censors
   if (!repeated) {
     ny <- ncol(y3)
-    if (is.null(states)) stutter <- y3[, ny] == temp$istate
-    else {
+    if (is.null(states)) {
+      stutter <- y3[, ny] == temp$istate
+    } else {
       itemp <- c(0L, match(attr(y3, "states"), temp$states, nomatch = 0L))
       stutter <- (itemp[1L + y3[, ny]] == as.integer(temp$istate))
     }
     if (any(stutter)) y3[stutter, ny] <- 0L
   }
 
-  if (check) list(
-    y = y3, id = id3, istate = temp$istate, mf = mf2, isort = isort,
-    last = last
-  )
-  else { # put the data back into the original order
+  if (check) {
+    list(
+      y = y3, id = id3, istate = temp$istate, mf = mf2, isort = isort,
+      last = last
+    )
+  } else { # put the data back into the original order
     jj <- order(isort[!last]) # this line is not obvious, but it works!
     list(y = y3[jj, ], id = id3[jj], istate = temp$istate[jj], mf = mf2[jj, ])
   }
@@ -699,8 +783,9 @@ survcheck2 <- function(y, id, istate = NULL, istate0 = "(s0)") {
   # the next few line are a debug for my code; survcheck2 is not visible
   #  to users so only survival can call it directly
   if (!is.Surv(y) || is.null(attr(y, "states")) ||
-    any(y[, ncol(y)] > length(attr(y, "states"))))
+    any(y[, ncol(y)] > length(attr(y, "states")))) {
     stop("survcheck2 called with an invalid y argument")
+  }
   to.names <- c(attr(y, "states"), "(censored)")
 
   if (length(istate) == 0) {
@@ -708,8 +793,12 @@ survcheck2 <- function(y, id, istate = NULL, istate0 = "(s0)") {
     cstate <- factor(rep(istate0, n))
   } else {
     if (length(istate) != n) stop("wrong length for istate")
-    if (is.factor(istate)) cstate <- istate[, drop = TRUE] # drop unused levels
-    else cstate <- as.factor(istate)
+    if (is.factor(istate)) {
+      cstate <- istate[, drop = TRUE]
+    } # drop unused levels
+    else {
+      cstate <- as.factor(istate)
+    }
     inull <- FALSE
   }
 
@@ -733,8 +822,10 @@ survcheck2 <- function(y, id, istate = NULL, istate0 = "(s0)") {
     # In this special case the table command does not give a matrix
     #  A data set with no events falls here, for instance
     events <- matrix(tab1.levels, nrow = 1, ncol = (1 + length(ystate)))
-  } else events <- apply(tab1, 2, function(x) table(factor(x, tab1.levels)))
-  dimnames(events) = list(
+  } else {
+    events <- apply(tab1, 2, function(x) table(factor(x, tab1.levels)))
+  }
+  dimnames(events) <- list(
     "count" = tab1.levels,
     "state" = c(ystate, "(any)")
   )
