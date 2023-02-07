@@ -1,9 +1,22 @@
 #' @name survivalGPU-package
+#' @aliases survivalGPU
 #' @docType package
 #' @title survivalGPU: Fast survival analysis
 #' @description Allows to perform survivals analysis on GPU with coxph and WCE
 #' models, and several features to use bootstrap and manage memory.
 #'
+#' To learn more about survivalGPU, start with the vignette :
+#' `vignette("survivalGPU")`
+#'
+#' @section Functions:
+#'
+#' - `use_cuda()`: check CUDA drivers for GPU use.
+#' - `coxphGPU()`: fit a Cox proportional hazards regression model.
+#' - `wceGPU()`:   fit a Weighted Cumulative Exposure model.
+#'
+#' @author
+#' - [Jean FEYDY](https://www.jeanfeydy.com)
+#' - Alexis van STRAATEN
 #' @useDynLib survivalGPU, .registration = TRUE
 NULL
 
