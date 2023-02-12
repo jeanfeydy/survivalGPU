@@ -40,6 +40,7 @@ def wce_features(*, doses, times, nknots, cutoff, order, constrained=None):
             - "atoms": a (cutoff, Features) float32 Tensor that contains the sampled
                 values of the fundamental B-splines functions on [0, 1, ..., cutoff-1].
             - "areas": a (Features,) float32 Tensor with the areas of each B-spline atom.
+            - "cutoff": int that keeps track of the maximum time.
     """
 
     Drugs, Patients, Times = doses.shape
@@ -89,6 +90,7 @@ def wce_features(*, doses, times, nknots, cutoff, order, constrained=None):
         "knots": knots,
         "atoms": atoms,
         "areas": areas,
+        "cutoff": cutoff,
     }
 
 
@@ -124,7 +126,7 @@ def coxph_fit(
             Defaults to 1 (i.e. no bootstrap).
 
     Returns:
-        dict: contains the fitted model parameters, as described in the survival-GPU package.
+        dict: contains the fitted model parameters, as described in the survivalGPU package.
             As an additional attribute, we also include "risk", which is a
             (bootstrap, Drugs) Tensor that contains the estimated total risk associated
             to each drug - i.e. the total area under the risk function.

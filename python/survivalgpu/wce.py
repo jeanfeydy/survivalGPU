@@ -1,6 +1,9 @@
 # Use NumPy for basic array manipulation:
 import numpy as np
 
+# We use matplotlib to display the results:
+from matplotlib import pyplot as plt
+
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
@@ -220,3 +223,94 @@ def wce_R(
     )
 
     return res
+
+
+
+class WCESurvivalAnalysis:
+    def __init__(self, *, cutoff, nknots=1, order=3, constrained="Right"):
+        
+        # Let the model remember the parameters of the analysis:
+        self.cutoff = cutoff
+        self.knots = knots
+        self.atoms = atoms
+        self.atom_areas = areas
+
+    def fit(self, *, doses, times, events, covariates=None):
+        
+
+        # Rough Gaussian-like esimation of the confidence intervals for the total risk area: -----
+        # We use a simple model:
+        # the ideal coefs are the minimizers of the neglog-likelihood function of the CoxPH model,
+        # with gradient = 0 at the optimum and a Hessian that is a positive-definite matrix
+        # of shape (Features, Features) for each drug.
+        # For each drug, we may reasonably expect the "coefs" vector to follow a Gaussian
+        # distribution with:
+        # - mean = estimated vector "coefs[drug]"
+        # - covariance = Imat[drug] = inverse(Hessian[drug]).
+        #
+        # In this context, the total risk area = \sum_{b-spline atom i} areas[i] * coef[i]
+        # is a 1D-Gaussian vector with:
+        # - mean[drug] = \sum_{b-spline atom i} areas[i] * estimated_coefs[drug,i]
+        # - variance[drug] = \sum_{i, j} areas[i] * areas[j] *
+
+        risk_variances = torch.einsum("ijk,j,k->i", Imat, areas, areas)
+        risk_stds = risk_variances.sqrt()
+        print("Estimated log-HR:", form(risk_means), "+-", form(risk_stds))
+
+        assert risk_variances.shape == (Drugs,)
+        assert risk_stds.shape == (Drugs,)
+
+        # ci_95 = 1.96 / np.sqrt(coefs.shape[-1])
+
+        # (Drugs, Features, Features) @ (Features,)
+        ci_95 = Imat @ areas
+        ci_95 = 1.96 * ci_95 / risk_stds.view(Drugs, 1)
+        assert ci_95.shape == (Drugs, Features)
+
+        if False:
+            print("Area deltas for the 95% CI:")
+            print(form(ci_95 @ areas))
+            print("Expected values:")
+            print(form(1.96 * risk_stds))
+
+
+    def display_atoms(self, ax=None):
+
+        ax = plt.gca() if ax is None else ax
+        ax.title("B-Spline atoms")
+        for i, f in enumerate(atoms.t()):
+            ax.plot(x, numpy(f), label=f"{i}")
+        ax.legend()
+
+    def display_risk_functions(self, ax=None):
+
+        ax = plt.gca() if ax is None else ax
+        ax.title("Estimated risk functions, with 95% CI for the total risk area")
+        for i, (coef, ci) in enumerate(zip(coefs, ci_95)):
+            ax.plot(numpy(atoms @ coef), label=f"{i}")
+            ax.fill_between(
+                x, numpy(atoms @ (coef - ci)), numpy(atoms @ (coef + ci)), alpha=0.2
+            )
+        ax.legend()
+
+    def display_risk_distribution(self, *, drug, ax=None):
+
+        ax = plt.gca() if ax is None else ax
+        ax.title(f"Distribution of the total risk for drug {drug}")
+        
+        t = np.linspace(bootstrap_risk.min().item(), bootstrap_risk.max().item(), 100)
+        plt.plot(
+            t,
+            np.exp(-0.5 * (t - risk_mean_est) ** 2 / risk_std_est**2)
+            / np.sqrt(2 * np.pi * risk_std_est**2),
+            label="Estimation",
+        )
+        plt.hist(
+            numpy(bootstrap_risk),
+            density=True,
+            histtype="step",
+            bins=50,
+            log=True,
+            label="Bootstrap",
+        )
+        plt.legend()

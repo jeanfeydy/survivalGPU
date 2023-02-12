@@ -7,58 +7,49 @@ from torch.profiler import profile, record_function, ProfilerActivity
 
 from tests.utils import numpy, form, wce_features, coxph_fit
 from survivalgpu.datasets import drug_dataset
+from survivalgpu import WCESurvivalAnalysis
 
 
 # Setup ==================================================================================
 use_cuda = torch.cuda.is_available()
 
+# Dict with keys "doses", "times", "events":
 ds = drug_dataset(
-    Drugs=4,
-    Patients=100,
-    Times=100,
+    drugs=4,
+    patients=100,
+    times=100,
     device="cuda" if use_cuda else "cpu",
 )
 
-# WCE Analysis ===========================================================================
-# Features = B-spline covariates: --------------------------------------------------------
-# We compute in parallel all the (Drugs, Patients, Times, Features) values
 
-ds_wce = wce_features(
-    doses=ds["doses"],
-    times=ds["times"],
+# WCE Analysis ===========================================================================
+
+model = WCESurvivalAnalysis(
     nknots=1,
     order=3,
     cutoff=10,
     constrained=None,
 )
 
-ds = {**ds, **ds_wce}
+model.fit(doses=ds["doses"], times=ds["times"], events=ds["events"])
 
-print("B-Spline knots:", form(ds["knots"]))
-print("B-Spline function areas:", form(ds["areas"]))
+print("B-Spline knots:", form(model.knots))
+print("B-Spline function areas:", form(model.atom_areas))
 
-
-# Compute the "true" output of the CoxPH model: --------------------------------------------
-model = coxph_fit(
-    exposures=ds["exposures"],
-    times=ds["times"],
-    events=ds["events"],
-    areas=ds["areas"],
-)
 
 # Perform the permutation test: -----------------------------------------------------------
 Permutations, Bootstraps = 100, 1000
 
 
-def permutation_test(*, exposures, times, events, areas, Permutations):
+def permutation_test(*, exposures, times, events, areas, permutations):
 
     Drugs, Patients, Times, Features = exposures.shape
-    permutation_risks = torch.zeros(Permutations, Drugs, device=exposures.device)
+    permutation_risks = torch.zeros(permutations, Drugs, device=exposures.device)
 
     # with torch.autograd.profiler.profile(use_cuda=use_cuda) as prof:
     # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
     # with profile(activities=[ProfilerActivity.CPU]) as prof:
-    for p in tqdm(range(Permutations)):
+    for p in tqdm(range(permutations)):
         coxph_output_p = coxph_fit(
             exposures=exposures,
             times=times,
@@ -70,7 +61,7 @@ def permutation_test(*, exposures, times, events, areas, Permutations):
         permutation_risks[p, :] = coxph_output_p["risk"][0]
 
     # prof.export_chrome_trace("trace_profile_bootstrap.json")
-    assert permutation_risks.shape == (Permutations, Drugs)
+    assert permutation_risks.shape == (permutations, Drugs)
     return permutation_risks
 
 
@@ -82,7 +73,7 @@ permutation_risks = permutation_test(
     times=ds["times"],
     events=ds["events"],
     areas=ds["areas"],
-    Permutations=100,
+    permutations=100,
 )
 
 
@@ -91,6 +82,7 @@ def cumulative_distributions(x):
     sorted_x, indices = x.sort()
 
     return x, torch.arange(1, len(x) + 1) / len(x)
+
 
 
 # Our main run was in no batch mode, so we "pop" the first dimension:
@@ -125,70 +117,15 @@ print(
 
 
 # Inspect the results ====================================================================
-
-# Our main run was in no batch mode, so we "pop" the first dimension
-stds = coxph_output["imat"][0].diagonal(dim1=-2, dim2=-1).sqrt()
-Hessian = coxph_output["hessian"][0]
-Imat = coxph_output["imat"][0]
-
-assert stds.shape == (Drugs, Features)
-assert Hessian.shape == (Drugs, Features, Features)
-assert Imat.shape == (Drugs, Features, Features)
-
-
-# Rough Gaussian-like esimation of the confidence intervals for the total risk area: -----
-# We use a simple model:
-# the ideal coefs are the minimizers of the neglog-likelihood function of the CoxPH model,
-# with gradient = 0 at the optimum and a Hessian that is a positive-definite matrix
-# of shape (Features, Features) for each drug.
-# For each drug, we may reasonably expect the "coefs" vector to follow a Gaussian
-# distribution with:
-# - mean = estimated vector "coefs[drug]"
-# - covariance = Imat[drug] = inverse(Hessian[drug]).
-#
-# In this context, the total risk area = \sum_{b-spline atom i} areas[i] * coef[i]
-# is a 1D-Gaussian vector with:
-# - mean[drug] = \sum_{b-spline atom i} areas[i] * estimated_coefs[drug,i]
-# - variance[drug] = \sum_{i, j} areas[i] * areas[j] *
-
-risk_variances = torch.einsum("ijk,j,k->i", Imat, areas, areas)
-risk_stds = risk_variances.sqrt()
-print("Estimated log-HR:", form(risk_means), "+-", form(risk_stds))
-
-assert risk_variances.shape == (Drugs,)
-assert risk_stds.shape == (Drugs,)
-
-# ci_95 = 1.96 / np.sqrt(coefs.shape[-1])
-
-# (Drugs, Features, Features) @ (Features,)
-ci_95 = Imat @ areas
-ci_95 = 1.96 * ci_95 / risk_stds.view(Drugs, 1)
-assert ci_95.shape == (Drugs, Features)
-
-if False:
-    print("Area deltas for the 95% CI:")
-    print(form(ci_95 @ areas))
-    print("Expected values:")
-    print(form(1.96 * risk_stds))
-
 x = np.arange(cutoff)
 
 plt.figure()
-plt.title("B-Spline atoms")
-for i, f in enumerate(atoms.t()):
-    plt.plot(numpy(f), label=f"{i}")
-plt.legend()
+model.display_atoms()
 plt.savefig("output_atoms.png")
 
 
 plt.figure()
-plt.title("Estimated risk functions, with 95% CI for the total risk area")
-for i, (coef, ci) in enumerate(zip(coefs, ci_95)):
-    plt.plot(numpy(atoms @ coef), label=f"{i}")
-    plt.fill_between(
-        x, numpy(atoms @ (coef - ci)), numpy(atoms @ (coef + ci)), alpha=0.2
-    )
-plt.legend()
+model.display_risk_functions()
 plt.savefig("output_functions.png")
 
 
@@ -235,23 +172,7 @@ plt.savefig("output_bootstrap.png")
 
 
 plt.figure()
-plt.title(f"Distribution of the total risk for drug {D}")
-t = np.linspace(bootstrap_risk.min().item(), bootstrap_risk.max().item(), 100)
-plt.plot(
-    t,
-    np.exp(-0.5 * (t - risk_mean_est) ** 2 / risk_std_est**2)
-    / np.sqrt(2 * np.pi * risk_std_est**2),
-    label="Estimation",
-)
-plt.hist(
-    numpy(bootstrap_risk),
-    density=True,
-    histtype="step",
-    bins=50,
-    log=True,
-    label="Bootstrap",
-)
-plt.legend()
+model.display_risk_distribution(drug=0)
 plt.savefig("output_bootstrap_risks.png")
 
 
