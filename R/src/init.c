@@ -13,9 +13,14 @@ static const R_CallMethodDef Callentries[] = {
   {NULL, NULL, 0}
 };
 
+static const R_CMethodDef Centries[] = {
+  {"coxmart",    (DL_FUNC) &coxmart,  8},
+  {NULL, NULL, 0}
+};
+
 void R_init_survivalGPU(DllInfo *dll)
 {
-  R_registerRoutines(dll, NULL, Callentries, NULL, NULL);
+  R_registerRoutines(dll, Centries, Callentries, NULL, NULL);
   R_useDynamicSymbols(dll, FALSE);
 
 }
