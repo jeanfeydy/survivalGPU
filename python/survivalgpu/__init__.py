@@ -21,3 +21,8 @@ __all__ = sorted(
         "wce_R",
     ]
 )
+
+
+# Warm up the GPU:
+if use_cuda:
+    _ = torch.zeros(1, device=device)

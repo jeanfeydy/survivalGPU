@@ -254,7 +254,7 @@ def coxph_torch(
             """
 
             # If C was equal to 1, the lines below would be equivalent to:
-            # return params @ x.T  # (B,D) @ (D,N) = (B,N)
+            # return params @ x.view(N,D).T  # (B,D) @ (D,N) = (B,N)
             p = params.view(B, C, D)  # (B*C,D) -> (B,C,D)
             s = torch.einsum("bcd,cnd->bcn", p, x)  # (B,C,D) @ (C,N,D) = (B,C,N)
             return s.view(B * C, N)
@@ -375,30 +375,22 @@ def coxph_torch(
 # Python >= 3.7:
 from contextlib import nullcontext
 
+from time import sleep
+
 # NumPy wrapper:
 def coxph_numpy(
     *,
     x,
     times,
     deaths,
-    profile=None,
     **kwargs,
 ):
-    with torch.autograd.profiler.profile(
-        use_cuda=use_cuda
-    ) if profile is not None else nullcontext() as prof:
+    x = torch.tensor(x, dtype=float32, device=device)
+    times = torch.tensor(times, dtype=int32, device=device)
+    deaths = torch.tensor(deaths, dtype=int32, device=device)
 
-        x = torch.tensor(x, dtype=float32, device=device)
-        times = torch.tensor(times, dtype=int32, device=device)
-        deaths = torch.tensor(deaths, dtype=int32, device=device)
-
-        result = coxph_torch(x=x, times=times, deaths=deaths, **kwargs)
-
-    if profile is not None:
-        prof.export_chrome_trace(profile)
-
+    result = coxph_torch(x=x, times=times, deaths=deaths, **kwargs)
     result = {k: numpy(v) for k, v in result.items()}
-
     return result
 
 
@@ -414,26 +406,36 @@ def coxph_R(
     profile=None,
 ):
 
-    times = np.array(data[stop])
-    deaths = np.array(data[death])
-    N = len(times)
+    if profile is not None:
+        print("Profile trace:", profile)
+        print("use_cuda:", use_cuda)
 
-    cov = [data[covar] for covar in covars]
-    x = np.array(cov).T.reshape([N, len(cov)])
+    with torch.autograd.profiler.profile(
+        use_cuda=use_cuda
+    ) if profile is not None else nullcontext() as prof:
 
-    res = coxph_numpy(
-        x=x,
-        times=times,
-        deaths=deaths,
-        ties=ties,
-        backend="csr",
-        bootstrap=int(bootstrap),
-        batchsize=int(batchsize),
-        maxiter=20,
-        verbosity=0,
-        alpha=0.0,
-        profile=profile,
-        doscale=doscale,
-    )
+        times = np.array(data[stop])
+        deaths = np.array(data[death])
+        N = len(times)
+
+        cov = [data[covar] for covar in covars]
+        x = np.array(cov).T.reshape([N, len(cov)])
+
+        res = coxph_numpy(
+            x=x,
+            times=times,
+            deaths=deaths,
+            ties=ties,
+            backend="csr",
+            bootstrap=int(bootstrap),
+            batchsize=int(batchsize),
+            maxiter=20 if profile is None else 1,
+            verbosity=0,
+            alpha=0.0,
+            doscale=doscale,
+        )
+
+    if profile is not None:
+        prof.export_chrome_trace(profile)
 
     return res

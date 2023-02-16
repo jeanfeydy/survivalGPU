@@ -1,0 +1,157 @@
+---
+title: "WCE benchmark"
+author: "Alexis van STRAATEN"
+output:
+  rmdformats::readthedown
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, warning=FALSE}
+library(survival)
+library(WCE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+# library(parallel)
+# library(survivalGPU)
+```
+
+
+```{r}
+drugdata <- WCE::drugdata
+
+head(drugdata, 20)
+```
+
+Bootstrap with :  
+- WCE::WCE  
+- survivalGPU::wceGPU
+
+
+# Functions
+
+```{r wce bootstrap}
+time_wce_bootstrap <- function(n_bootstrap) {
+  if (n_bootstrap > 100) {
+    return(NA)
+  } else {
+    # Bootstrap in WCE vignette (with drugdata dataset)
+    B <- n_bootstrap
+
+    start_time <- Sys.time()
+
+    # Obtain the list of Id for sampling:
+    ID <- unique(drugdata$Id)
+    # Prepare vectors to extract estimated weight function and (if relevant) HRs for each bootstrap
+    # resample:
+    boot.WCE <- matrix(NA, ncol = 90, nrow = B) # to store estimated weight functions
+    boot.HR <- rep(NA, B) # to store estimated HRs
+    # Sample IDs with replacement:
+    for (i in 1:B) {
+      ID.resamp <- sort(sample(ID, replace = T))
+      datab <- drugdata[drugdata$Id %in% ID.resamp, ] # select obs. but duplicated Id are ignored
+      # deal with duplicated Id and assign them new Id
+      step <- 1
+      repeat {
+        # select duplicated Id in ID.resamp
+        ID.resamp <- ID.resamp[duplicated(ID.resamp) == TRUE]
+        if (length(ID.resamp) == 0) break # stop when no more duplicated Id to deal with
+        # select obs. but remaining duplicated Id are ignored
+        subset.dup <- drugdata[drugdata$Id %in% ID.resamp, ]
+        # assign new Id to duplicates
+        subset.dup$Id <- subset.dup$Id + step * 10^ceiling(log10(max(drugdata$Id)))
+        # 10^ceiling(log10(max(drugdata$Id)) is the power of 10
+        # above the maximum Id from original data
+        datab <- rbind(datab, subset.dup)
+        step <- step + 1
+      }
+      mod <- WCE(
+        data = datab, analysis = "Cox", nknots = 1, cutoff = 90,
+        constrained = FALSE,
+        id = "Id", event = "Event", start = "Start", stop = "Stop", expos = "dose",
+        covariates = c("sex", "age")
+      )
+    }
+
+    return(difftime(Sys.time(), start_time, units = "secs"))
+  }
+}
+```
+
+
+
+```{r wceGPU}
+time_wceGPU <- function(dataset, n_bootstrap) {
+  start_time <- Sys.time()
+  wceGPU(dataset, 1, 90,
+    id = "Id", event = "Event",
+    start = "Start", stop = "Stop", expos = "dose",
+    covariates = c("age", "sex"), nbootstraps = n_bootstrap,
+    batchsize = ifelse(n_bootstrap > 1000, 1000, 0)
+  )
+  return(difftime(Sys.time(), start_time, units = "secs"))
+}
+```
+
+
+```{r}
+combine_time <- function(dataset, n_bootstrap) {
+  return(list(
+    WCE = time_wce_bootstrap(n_bootstrap),
+    wceGPU = time_wceGPU(dataset, n_bootstrap)
+  ))
+}
+```
+
+
+# Results
+
+
+```{r GPU wake up, include=FALSE}
+use_cuda()
+```
+
+
+```{r, message=FALSE}
+if (use_cuda()) {
+  n_bootstrap <- c(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000)
+} else {
+  n_bootstrap <- c(1, 2, 5, 10, 20, 50, 100)
+}
+
+benchmark_wce <- lapply(n_bootstrap, combine_time, dataset = drugdata)
+benchmark_wce_df <- do.call("rbind", benchmark_wce) %>%
+  as.data.frame() %>%
+  mutate_all(as.numeric) %>%
+  mutate(`N bootstrap` = n_bootstrap, .before = 1)
+```
+
+
+```{r, warning=FALSE}
+benchmark_wce_df %>%
+  gather("Method", "Time in secs", -`N bootstrap`) %>%
+  ggplot(aes(x = `N bootstrap`, y = `Time in secs`, group = Method)) +
+  geom_line(aes(color = Method)) +
+  geom_point(aes(color = Method)) +
+  scale_x_log10() +
+  scale_y_log10() +
+  ggtitle("WCE benchmark")
+```
+
+
+
+```{r, include=FALSE}
+saveRDS(benchmark_wce, "benchmark_wce.rds")
+```
+
+
+```{r, include=FALSE}
+# if(survivalgpu$use_cuda == TRUE){
+#   print("GPU mode")
+# }else{50000
+#   print("CPU mode")
+# }
+```
