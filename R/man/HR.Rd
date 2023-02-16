@@ -33,11 +33,12 @@ drugdata <- WCE::drugdata
 
 # WCE model with bootstrap (example with 20 bootstraps)
 cutoff <- 90
-wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1,cutoff = cutoff,
-             id="Id", event = "Event", start = "Start", stop = "Stop",
-             expos = "dose", covariates = c("age","sex"),
-             constrained = FALSE, aic = FALSE, confint = 0.95,
-             nbootstraps = 20, batchsize = 0)
+wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff,
+                            id = "Id", event = "Event", start = "Start",
+                            stop = "Stop", expos = "dose",
+                            covariates = c("age", "sex"),
+                            constrained = FALSE, aic = FALSE, confint = 0.95,
+                            nbootstraps = 20, batchsize = 0)
 
 # Exposed at a dose vs. unexposed
 exposed   <- rep(1, cutoff)

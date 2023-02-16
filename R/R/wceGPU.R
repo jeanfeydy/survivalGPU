@@ -70,12 +70,11 @@
 #' drugdata <- WCE::drugdata
 #'
 #' # WCE model
-#' wce_gpu <- wceGPU(
-#'   data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-#'   event = "Event", start = "Start", stop = "Stop", expos = "dose",
-#'   covariates = c("age", "sex"), constrained = FALSE, aic = FALSE,
-#'   confint = 0.95, nbootstraps = 1, batchsize = 0
-#' )
+#' wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+#'                   event = "Event", start = "Start", stop = "Stop",
+#'                   expos = "dose", covariates = c("age", "sex"),
+#'                   constrained = FALSE, aic = FALSE, confint = 0.95,
+#'                   nbootstraps = 1, batchsize = 0)
 #'
 #' # Results
 #' wce_gpu
@@ -85,12 +84,12 @@
 #' plot(wce_gpu)
 #'
 #' # WCE model with bootstrap (example with 20 bootstraps)
-#' wce_gpu_bootstrap <- wceGPU(
-#'   data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-#'   event = "Event", start = "Start", stop = "Stop", expos = "dose",
-#'   covariates = c("age", "sex"), constrained = FALSE, aic = FALSE,
-#'   confint = 0.95, nbootstraps = 20, batchsize = 0
-#' )
+#' wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = 90,
+#'                             id = "Id", event = "Event", start = "Start",
+#'                             stop = "Stop", expos = "dose",
+#'                             covariates = c("age", "sex"),
+#'                             constrained = FALSE, aic = FALSE, confint = 0.95,
+#'                             nbootstraps = 20, batchsize = 0)
 #'
 #' # See confidence bands for the estimated weight function due to bootstrap
 #' plot(wce_gpu_bootstrap)
@@ -541,16 +540,15 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #'
 #' # WCE model with bootstrap (example with 20 bootstraps)
 #' cutoff <- 90
-#' wce_gpu_bootstrap <- wceGPU(
-#'   data = drugdata, nknots = 1, cutoff = cutoff,
-#'   id = "Id", event = "Event", start = "Start", stop = "Stop",
-#'   expos = "dose", covariates = c("age", "sex"),
-#'   constrained = FALSE, aic = FALSE, confint = 0.95,
-#'   nbootstraps = 20, batchsize = 0
-#' )
+#' wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff,
+#'                             id = "Id", event = "Event", start = "Start",
+#'                             stop = "Stop", expos = "dose",
+#'                             covariates = c("age", "sex"),
+#'                             constrained = FALSE, aic = FALSE, confint = 0.95,
+#'                             nbootstraps = 20, batchsize = 0)
 #'
 #' # Exposed at a dose vs. unexposed
-#' exposed <- rep(1, cutoff)
+#' exposed   <- rep(1, cutoff)
 #' unexposed <- rep(0, cutoff)
 #'
 #' HR(wce_gpu_bootstrap, exposed, unexposed)

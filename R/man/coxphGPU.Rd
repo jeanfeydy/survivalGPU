@@ -124,15 +124,19 @@ coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
 
 ## Cox Proportional Hazards with bootstrap
 
- if(use_cuda()){
-     n_bootstrap <- 1000; batchsize <- 200
- }else{
-     n_bootstrap <- 50  ; batchsize <- 10}
+if (use_cuda()) {
+  n_bootstrap <- 1000
+  batchsize <- 200
+} else {
+  n_bootstrap <- 50
+  batchsize <- 10
+}
 
 coxph_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
                             data = drugdata,
                             bootstrap = n_bootstrap,
                             batchsize = batchsize)
+
 summary(coxph_bootstrap)
 }
 }

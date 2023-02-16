@@ -36,6 +36,8 @@ devtools::install_github("jeanfeydy/survivalGPU",
 You can build the package on tar.gz file with `devtools::build()` after
 git clone this repository.
 
+> **Warning**: if R offers you to install Miniconda, refuse.
+
 ## Examples
 
 Let’s make an example with `drugdata` dataset from WCE package.
@@ -53,10 +55,13 @@ number of bootstrap, and consequently the batchsize argument, according
 to CUDA drivers detection.
 
 ``` r
-if(use_cuda()){
-  n_bootstrap <- 1000; batchsize <- 200
-}else{
-  n_bootstrap <- 50  ; batchsize <- 10}
+if (use_cuda()) {
+  n_bootstrap <- 1000
+  batchsize <- 200
+} else {
+  n_bootstrap <- 50
+  batchsize <- 10
+}
 ```
 
 ### Cox
@@ -67,10 +72,11 @@ package, with a Surv object in the formula, containing Start, Stop and
 Event variables.
 
 ``` r
-coxphGPU_bootstrap<-coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-                             data = drugdata,
-                             bootstrap = n_bootstrap,
-                             batchsize = batchsize)
+coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+  data = drugdata,
+  bootstrap = n_bootstrap,
+  batchsize = batchsize
+)
 ```
 
 You obtain with `summary` all results for initial model, and a
@@ -105,8 +111,8 @@ summary(coxphGPU_bootstrap)
 #>  ---------------- 
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>      2.5% 97.5%
-#> sex 1.487 2.447
-#> age 1.002 1.018
+#> sex 1.484 2.351
+#> age 1.002 1.016
 ```
 
 ### WCE
@@ -119,11 +125,13 @@ can use the `wceGPU` function in the same way as the `WCE::WCE` function
 from WCE package.
 
 ``` r
-wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots =  1, cutoff =  90, id="Id",
-                            event = "Event", start = "Start", stop = "Stop",
-                            expos = "dose", covariates = c("age","sex"),
-                            constrained = FALSE, aic = FALSE, confint = 0.95,
-                            nbootstraps = n_bootstrap, batchsize = batchsize)
+wce_gpu_bootstrap <- wceGPU(
+  data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+  event = "Event", start = "Start", stop = "Stop",
+  expos = "dose", covariates = c("age", "sex"),
+  constrained = FALSE, aic = FALSE, confint = 0.95,
+  nbootstraps = n_bootstrap, batchsize = batchsize
+)
 ```
 
 In the summary, there are estimated coefficients for the covariates with
@@ -149,8 +157,8 @@ summary(wce_gpu_bootstrap)
 #> 
 #> CI of estimates :
 #>          2.5%     97.5%
-#> age 0.0012846 0.0176067
-#> sex 0.4742390 0.8820490
+#> age 0.0031964 0.0199091
+#> sex 0.4063560 0.8810200
 ```
 
 The risk function can be plot, and if you added bootstrap, confidence

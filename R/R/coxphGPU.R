@@ -65,9 +65,8 @@
 #'
 #' ## Cox Proportional Hazards without bootstrap
 #' coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-#'   data = drugdata,
-#'   bootstrap = 1
-#' )
+#'          data = drugdata,
+#'          bootstrap = 1)
 #'
 #' ## Cox Proportional Hazards with bootstrap
 #'
@@ -80,10 +79,10 @@
 #' }
 #'
 #' coxph_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-#'   data = drugdata,
-#'   bootstrap = n_bootstrap,
-#'   batchsize = batchsize
-#' )
+#'                             data = drugdata,
+#'                             bootstrap = n_bootstrap,
+#'                             batchsize = batchsize)
+#'
 #' summary(coxph_bootstrap)
 #' }
 coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
@@ -802,8 +801,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   rname <- row.names(mf)
 
-  if (type == "right") stop("right Surv not yet implemented in coxphGPU.
-                           Please use `Surv(time1,time2,event)` in formaula")
+  # if (type == "right") stop("right Surv not yet implemented in coxphGPU.
+  #                          Please use `Surv(time1,time2,event)` in formaula")
 
   # from agreg.fit.R (survival) / for counting type Surv object
   nvar <- ncol(X)

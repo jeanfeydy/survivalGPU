@@ -44,6 +44,8 @@ devtools::install_github("jeanfeydy/survivalGPU",
 
 You can build the package on tar.gz file with `devtools::build()` after git clone this repository.
 
+> **Warning**: if R offers you to install Miniconda, refuse.
+
 ## Examples
 
 Let's make an example with `drugdata` dataset from WCE package.
