@@ -719,96 +719,220 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   rname <- row.names(mf)
 
-  if(type == "right") stop("right Surv not yet implemented in coxphGPU.
-                           Please use `Surv(time1,time2,event)` in formaula")
+  # if(type == "right") stop("right Surv not yet implemented in coxphGPU.
+  #                          Please use `Surv(time1,time2,event)` in formula")
 
-  # from agreg.fit.R (survival) / for counting type Surv object
-  nvar <- ncol(X)
-  event <- Y[,3]
-  if (all(event==0)) stop("Can't fit a Cox model with 0 failures")
 
-  if (missing(offset) || is.null(offset)) offset <- rep(0.0, nrow(Y))
-  if (missing(weights)|| is.null(weights))weights<- rep(1.0, nrow(Y))
-  else if (any(weights<=0)) stop("Invalid weights, must be >0")
-  else weights <- as.vector(weights)
+  if(type == "right"){
+    print("right")
 
-  # Find rows to be ignored.  We have to match within strata: a
-  #  value that spans a death in another stratum, but not it its
-  #  own, should be removed.  Hence the per stratum delta
-  if (length(istrat) ==0) {y1 <- Y[,1]; y2 <- Y[,2]; strata = NULL}
-  else  {
-    if (is.numeric(istrat)) strata <- as.integer(istrat)
-    else strata <- as.integer(as.factor(istrat))
-    delta  <-  strata* (1+ max(Y[,2]) - min(Y[,1]))
-    y1 <- Y[,1] + delta
-    y2 <- Y[,2] + delta
+    # # Add resid in future (from coxph.fit.R)
+    n <-  nrow(Y)
+    if (is.matrix(X)) nvar <- ncol(X)
+    else {
+      if (length(X)==0) nvar <-0
+      else nvar <-1
+    }
+    time <- Y[,1]
+    status <- Y[,2]
+
+    # Sort the data (or rather, get a list of sorted indices)
+    if (length(istrat)==0) {
+      sorted <- order(time)
+      strata <- NULL
+      newstrat <- as.integer(rep(0,n))
+    }
+    else {
+      sorted <- order(istrat, time)
+      strata <- istrat[sorted]
+      newstrat <- as.integer(c(1*(diff(as.numeric(strata))!=0), 1))
+    }
+    if (missing(offset) || is.null(offset)) offset <- rep(0,n)
+    if (missing(weights)|| is.null(weights))weights<- rep(1,n)
+    else {
+      if (any(weights<=0)) stop("Invalid weights, must be >0")
+      weights <- weights[sorted]
+    }
+    stime <- as.double(time[sorted])
+    sstat <- as.integer(status[sorted])
+
+    if (nvar==0) {
+      # A special case: Null model.
+      #  (This is why I need the rownames arg- can't use x' names)
+      # Set things up for 0 iterations on a dummy variable
+      x <- as.matrix(rep(1.0, n))
+      nullmodel <- TRUE
+      nvar <- 1
+      init <- 0
+      maxiter <- 0
+    }
+    else {
+      nullmodel <- FALSE
+      maxiter <- control$iter.max
+      if (!missing(init) && length(init)>0) {
+        if (length(init) != nvar) stop("Wrong length for inital values")
+      }
+      else init <- rep(0,nvar)
+    }
+
+    # 2012 change: individually choose which variable to rescale
+    # default: leave 0/1 variables along
+    if (is.null(nocenter)) zero.one <- rep(FALSE, ncol(X))
+    else zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
+
+
+    return(list(
+      stime = stime,
+      sstat = sstat,
+      x_sorted = X[sorted,],
+      offset_sorted = offset[sorted],
+      weights = weights,
+      newstrat = newstrat
+    ))
+
+    #coxfit6.C
+
+    # # if (resid) { # already TRUE
+    # temp <- lp[sorted]
+    # if (any(temp > log(.Machine$double.xmax))) { # on regarde si des valeurs ne sont pas gigantesques
+    #   # prevent a failure message due to overflow
+    #   #  this occurs with near-infinite coefficients
+    #   temp <- temp + log(.Machine$double.xmax) - (1 + max(temp))
+    # }
+    # score <- exp(temp)
+    #
+    # fit$sorted <- sorted
+    # fit$stime <- stime
+    # fit$sstat <- sstat
+    # fit$newstrat <- newstrat
+    # fit$weights <- weights
+    # fit$time <- time
+    # fit$status <- status
+    # fit$score_temp <- score
+    # fit$double_n <- double(n)
+    #
+    # # coxres <- .C("coxmart", as.integer(n),
+    # #              as.integer(method=='efron'),
+    # #              stime,
+    # #              sstat,
+    # #              newstrat,
+    # #              as.double(score),
+    # #              as.double(weights),
+    # #              resid=double(n))
+    # # resid <- double(n)
+    # # resid[sorted] <- coxres$resid
+    # # names(resid) <- rname # rname for rownames
+    # # # fit$residuals <- resid  # not good enough
+    # # # some other code expects the ORDER of components in a coxph
+    # # # object will never change: residuals right before means
+    # # fit <- c(fit[1:6], list(residuals=resid), fit[-(1:6)])
+    # # # }
+
+
+
+  }else if(type == "counting"){
+
+    # from agreg.fit.R (survival) / for counting type Surv object
+    nvar <- ncol(X)
+    event <- Y[,3]
+    if (all(event==0)) stop("Can't fit a Cox model with 0 failures")
+
+    if (missing(offset) || is.null(offset)) offset <- rep(0.0, nrow(Y))
+    if (missing(weights)|| is.null(weights))weights<- rep(1.0, nrow(Y))
+    else if (any(weights<=0)) stop("Invalid weights, must be >0")
+    else weights <- as.vector(weights)
+
+    # Find rows to be ignored.  We have to match within strata: a
+    #  value that spans a death in another stratum, but not it its
+    #  own, should be removed.  Hence the per stratum delta
+    if (length(istrat) ==0) {y1 <- Y[,1]; y2 <- Y[,2]; strata = NULL}
+    else  {
+      if (is.numeric(istrat)) strata <- as.integer(istrat)
+      else strata <- as.integer(as.factor(istrat))
+      delta  <-  strata* (1+ max(Y[,2]) - min(Y[,1]))
+      y1 <- Y[,1] + delta
+      y2 <- Y[,2] + delta
+    }
+    event <- Y[,3] > 0
+    dtime <- sort(unique(y2[event]))
+    indx1 <- findInterval(y1, dtime)
+    indx2 <- findInterval(y2, dtime)
+    # indx1 != indx2 for any obs that spans an event time
+    ignore <- (indx1 == indx2)
+    nused  <- sum(!ignore)
+
+    # Sort the data (or rather, get a list of sorted indices)
+    #  For both stop and start times, the indices go from last to first
+    if (length(strata)==0) {
+      sort.end  <- order(ignore, -Y[,2]) -1L #indices start at 0 for C code
+      sort.start<- order(ignore, -Y[,1]) -1L
+      strata <- rep(0L, nrow(Y))
+    }
+    else {
+      sort.end  <- order(ignore, strata, -Y[,2]) -1L
+      sort.start<- order(ignore, strata, -Y[,1]) -1L
+    }
+
+    if (is.null(nvar) || nvar==0) {
+      # A special case: Null model.  Just return obvious stuff
+      #  To keep the C code to a small set, we call the usual routines, but
+      #  with a dummy X matrix and 0 iterations
+      nvar <- 1
+      x <- matrix(as.double(1:nrow(Y)), ncol=1)  #keep the .C call happy
+      maxiter <- 0
+      nullmodel <- TRUE
+      if (length(init) !=0) stop("Wrong length for inital values")
+      init <- 0.0  #dummy value to keep a .C call happy (doesn't like 0 length)
+    }
+    else {
+      nullmodel <- FALSE
+      maxiter <- control$iter.max
+
+      if (is.null(init)) init <- rep(0., nvar)
+      if (length(init) != nvar) stop("Wrong length for inital values")
+    }
+
+    # 2021 change: pass in per covariate centering.  This gives
+    #  us more freedom to experiment.  Default is to leave 0/1 variables alone
+    if (is.null(nocenter)) zero.one <- rep(FALSE, ncol(X))
+    zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
+
+    # the returned value of agfit$coef starts as a copy of init, so make sure
+    #  is is a vector and not a matrix; as.double suffices.
+    # Solidify the storage mode of other arguments
+    storage.mode(Y) <- storage.mode(X) <- "double"
+    storage.mode(offset) <- storage.mode(weights) <- "double"
+
+    return(list(
+      nused = nused,
+      Y = Y,
+      X = X,
+      strata = weights,
+      offset = offset,
+      init = init,
+      sort.start = sort.start,
+      sort.end = sort.end,
+      zero.one = zero.one
+    ))
+
+    # # survival routine
+    # agfit <- .Call("agfit4", nused,
+    #                Y, X, strata, weights,
+    #                offset,
+    #                as.double(init),
+    #                sort.start, sort.end,
+    #                as.integer(method=="efron"),
+    #                as.integer(maxiter),
+    #                as.double(control$eps),
+    #                as.double(control$toler.chol),
+    #                ifelse(zero.one, 0L, 1L))
+
+    # agfit4 centers variables within strata, so does not return a vector
+    #  of means.  Use a fill in consistent with other coxph routines
+
   }
-  event <- Y[,3] > 0
-  dtime <- sort(unique(y2[event]))
-  indx1 <- findInterval(y1, dtime)
-  indx2 <- findInterval(y2, dtime)
-  # indx1 != indx2 for any obs that spans an event time
-  ignore <- (indx1 == indx2)
-  nused  <- sum(!ignore)
-
-  # Sort the data (or rather, get a list of sorted indices)
-  #  For both stop and start times, the indices go from last to first
-  if (length(strata)==0) {
-    sort.end  <- order(ignore, -Y[,2]) -1L #indices start at 0 for C code
-    sort.start<- order(ignore, -Y[,1]) -1L
-    strata <- rep(0L, nrow(Y))
-  }
-  else {
-    sort.end  <- order(ignore, strata, -Y[,2]) -1L
-    sort.start<- order(ignore, strata, -Y[,1]) -1L
-  }
-
-  if (is.null(nvar) || nvar==0) {
-    # A special case: Null model.  Just return obvious stuff
-    #  To keep the C code to a small set, we call the usual routines, but
-    #  with a dummy X matrix and 0 iterations
-    nvar <- 1
-    x <- matrix(as.double(1:nrow(Y)), ncol=1)  #keep the .C call happy
-    maxiter <- 0
-    nullmodel <- TRUE
-    if (length(init) !=0) stop("Wrong length for inital values")
-    init <- 0.0  #dummy value to keep a .C call happy (doesn't like 0 length)
-  }
-  else {
-    nullmodel <- FALSE
-    maxiter <- control$iter.max
-
-    if (is.null(init)) init <- rep(0., nvar)
-    if (length(init) != nvar) stop("Wrong length for inital values")
-  }
-
-  # 2021 change: pass in per covariate centering.  This gives
-  #  us more freedom to experiment.  Default is to leave 0/1 variables alone
-  if (is.null(nocenter)) zero.one <- rep(FALSE, ncol(X))
-  zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
-
-  # the returned value of agfit$coef starts as a copy of init, so make sure
-  #  is is a vector and not a matrix; as.double suffices.
-  # Solidify the storage mode of other arguments
-  storage.mode(Y) <- storage.mode(X) <- "double"
-  storage.mode(offset) <- storage.mode(weights) <- "double"
-
-  # # survival routine
-  # agfit <- .Call("agfit4", nused,
-  #                Y, X, strata, weights,
-  #                offset,
-  #                as.double(init),
-  #                sort.start, sort.end,
-  #                as.integer(method=="efron"),
-  #                as.integer(maxiter),
-  #                as.double(control$eps),
-  #                as.double(control$toler.chol),
-  #                ifelse(zero.one, 0L, 1L))
-
-  # agfit4 centers variables within strata, so does not return a vector
-  #  of means.  Use a fill in consistent with other coxph routines
-
-  agmeans <- ifelse(zero.one, 0, colMeans(X))
+  stop()
+    agmeans <- ifelse(zero.one, 0, colMeans(X))
 
   ##############################################################################
   ##############################################################################
@@ -900,6 +1024,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   # return to agreg.fit.R
   lp <- apply(matrix(fit$coefficients, ncol = length(covar)),1,function(x) c(X %*% x) + offset - sum(x*agmeans))
+
+  if(type == "counting"){
+
   if (any(lp > log(.Machine$double.xmax))) {
     # prevent a failure message due to overflow
     #  this occurs with near-infinite coefficients
@@ -913,10 +1040,36 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
                      sort.start, sort.end,
                      as.integer(method=='efron'))
 
+  }else if(type=="right"){
+
+    temp <- lp[sorted]
+    if (any(temp > log(.Machine$double.xmax))) {
+      # prevent a failure message due to overflow
+      #  this occurs with near-infinite coefficients
+      temp <- temp + log(.Machine$double.xmax) - (1 + max(temp))
+    }
+    score <- exp(temp)
+
+    coxres <- .C("coxmart", as.integer(n),
+                 as.integer(method=='efron'),
+                 stime,
+                 sstat,
+                 newstrat,
+                 as.double(score),
+                 as.double(weights),
+                 resid=double(n))
+
+    residuals <- double(n)
+    residuals[sorted] <- coxres$resid
+  }
+
   names(residuals) <- rname
 
   fit$linear.predictors = lp
   fit$residuals         = residuals
+
+  # return(fit)
+  # stop()
 
   if (is.character(fit)) {
     fit <- list(fail = fit)
