@@ -24,14 +24,12 @@ NULL
 
 #' Import of survivalgpu python package
 #' @noRd
-use_survivalGPU <- function(){
-
+use_survivalGPU <- function() {
   # Python path
-  python_path <- system.file("python",package = "survivalGPU")
-  survivalgpu <- reticulate::import_from_path("survivalgpu",path = python_path)
+  python_path <- system.file("python", package = "survivalGPU")
+  survivalgpu <- reticulate::import_from_path("survivalgpu", path = python_path)
 
   return(survivalgpu)
-
 }
 
 
@@ -45,9 +43,7 @@ use_survivalGPU <- function(){
 #'
 #' @examples
 #' use_cuda()
-use_cuda <- function(){
-
+use_cuda <- function() {
   survivalgpu <- use_survivalGPU()
   return(survivalgpu$use_cuda)
-
 }

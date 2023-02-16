@@ -13,9 +13,9 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  fig.align='center',
-  fig.height=3.5,
-  fig.width=5
+  fig.align = "center",
+  fig.height = 3.5,
+  fig.width = 5
 )
 ```
 
@@ -41,10 +41,13 @@ Batchsize argument is used to put a limit on the number of models to do at the s
 
 
 ```{r cuda}
-if(use_cuda()){
-  n_bootstrap <- 1000; batchsize <- 200
-}else{
-  n_bootstrap <- 50  ; batchsize <- 10}
+if (use_cuda()) {
+  n_bootstrap <- 1000
+  batchsize <- 200
+} else {
+  n_bootstrap <- 50
+  batchsize <- 10
+}
 ```
 
 Let's make an example with `drugdata` dataset from WCE package.
@@ -62,8 +65,10 @@ head(drugdata)
 The `summary` of a coxphGPU object is the same as a coxph object, a table with the estimated coefficients for the covariates, standards errors, and a significance test (Pr(>|z|)). 
 
 ```{r}
-coxphGPU<-coxphGPU(formula = Surv(time = Start, time2 = Stop, event = Event) ~ sex + age,
-                   data = drugdata)
+coxphGPU <- coxphGPU(
+  formula = Surv(time = Start, time2 = Stop, event = Event) ~ sex + age,
+  data = drugdata
+)
 
 summary(coxphGPU)
 ```
@@ -71,11 +76,12 @@ summary(coxphGPU)
 The advantage of survivalGPU is to use bootstrap more easily. The `summary` gives the results for the initial model without bootstrap, and at the end, confidence interval for estimates covariates with bootstrap, according to `conf.int` argument.
 
 ```{r}
-coxphGPU_bootstrap<-coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-                             data = drugdata,
-                             bootstrap = n_bootstrap,
-                             batchsize = batchsize,
-                             all.results = FALSE)
+coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+  data = drugdata,
+  bootstrap = n_bootstrap,
+  batchsize = batchsize,
+  all.results = FALSE
+)
 
 summary(coxphGPU_bootstrap)
 ```
@@ -87,10 +93,12 @@ Avec le bootstrap, la fonction effectue autant de modèles que de bootstrap dema
 In the same idea as the Cox model, `wceGPU` uses the same arguments as the `WCE::WCE` function. The summary changes slightly with the appearance of confidence intervals without bootstrap for the estimators of the covariates.
 
 ```{r}
-wce_gpu <- wceGPU(data = drugdata, nknots =  1, cutoff =  90, id="Id",
-                  event = "Event", start = "Start", stop = "Stop",
-                  expos = "dose", covariates = c("age","sex"),
-                  constrained = FALSE, aic = FALSE, confint = 0.95)
+wce_gpu <- wceGPU(
+  data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+  event = "Event", start = "Start", stop = "Stop",
+  expos = "dose", covariates = c("age", "sex"),
+  constrained = FALSE, aic = FALSE, confint = 0.95
+)
 
 summary(wce_gpu)
 ```
@@ -104,11 +112,13 @@ plot(wce_gpu)
 By applying `wceGPU()` with bootstrap, we obtain the confidence intervals for the estimates of the covariates and the risk function on each time, in addition to the information on the initial model without bootstrap.
 
 ```{r}
-wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots =  1, cutoff =  90, id="Id",
-                            event = "Event", start = "Start", stop = "Stop",
-                            expos = "dose", covariates = c("age","sex"),
-                            constrained = FALSE, aic = FALSE, confint = 0.95,
-                            nbootstraps = n_bootstrap, batchsize = batchsize)
+wce_gpu_bootstrap <- wceGPU(
+  data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+  event = "Event", start = "Start", stop = "Stop",
+  expos = "dose", covariates = c("age", "sex"),
+  constrained = FALSE, aic = FALSE, confint = 0.95,
+  nbootstraps = n_bootstrap, batchsize = batchsize
+)
 
 summary(wce_gpu_bootstrap)
 ```
