@@ -76,3 +76,15 @@ test_that("info.criterion", {
     round(as.numeric(wce_gpu$info.criterion), 0)
   )
 })
+
+
+# Check HR between WCE GPU and original WCE
+exposed   <- rep(1, 90)
+unexposed <- rep(0, 90)
+
+test_that("HR", {
+  expect_equal(
+    round(HR(wce_gpu_bootstrap, exposed, unexposed)[1], 3),
+    round(WCE::HR.WCE(wce, exposed, unexposed)[1], 3)
+  )
+})

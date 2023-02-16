@@ -96,6 +96,12 @@
 #'
 #' # All estimated coefficients in bootstrap
 #' coef(wce_gpu_bootstrap)
+#'
+#' # Estimate a HR (Exposed at a dose vs. unexposed)
+#' exposed   <- rep(1, 90)
+#' unexposed <- rep(0, 90)
+#'
+#' HR(wce_gpu_bootstrap, exposed, unexposed)
 #' }
 wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
                    event, start, stop, expos, covariates = NULL,
