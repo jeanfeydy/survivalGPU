@@ -142,6 +142,7 @@ def bspline_conv(
 
         knots ((K,) tensor): positions for the B-Spline knots.
         window ((2,) tensor): start and end times for the observation window.
+            Typically, this is equal to [1, cutoff+1].
         order (int, optional): order of the B-Spline piece-wise polynomials.
             Should be >= 0. Defaults to 3 (= cubic splines).
 
@@ -153,31 +154,38 @@ def bspline_conv(
     #       on a domain x = [1, ..., cutoff] instead of [0, ..., cutoff].
     #       As a consequence, we should offset the event times
     #       by 1 to retrieve the exact same results.
-    events_i = LazyTensor((target_times + 1).float().view(-1, 1, 1))
-    doses_times_j = LazyTensor(source_times.float().view(1, -1, 1))
-    doses_values_j = LazyTensor(source_weights.float().view(1, -1, 1))
+    events_i = LazyTensor((target_times + 1).float().view(-1, 1, 1))  # (N,1,1)
+    doses_times_j = LazyTensor(source_times.float().view(1, -1, 1))  # (1,M,1)
+    doses_values_j = LazyTensor(source_weights.float().view(1, -1, 1))  # (1,M,1)
 
     # The constant parameters are simply encoded as vectors:
-    knots_ = LazyTensor(knots.float().view(1, 1, -1))
+    knots_ = LazyTensor(knots.float().view(1, 1, -1))  # (1,1,K)
 
     # Our rule for the "cutoff" window will be to ensure that
     # 1 <= my_ev_i - stop_j < cutoff + 1
-    cut_ = LazyTensor(window.float().view(1, 1, -1))
+    cut_ = LazyTensor(window.float().view(1, 1, -1))  # (1,1,2)
 
     # Symbolic KeOps computation.
-    window_ij = cut_.bspline(events_i - doses_times_j, 0)
-    atoms_ij = knots_.bspline(events_i - doses_times_j, order)
-    full_ij = window_ij * atoms_ij * doses_values_j
+    # We encode the cutoff window as a B-Spline of order 0:
+    window_ij = cut_.bspline(events_i - doses_times_j, 0)  # (N,M,1)
+    # We use the general B-Spline KeOps formula to compute the features in parallel:
+    atoms_ij = knots_.bspline(events_i - doses_times_j, order)  # (N,M,K-order-1)
+    full_ij = window_ij * atoms_ij * doses_values_j  # (N,M,K-order-1)
 
     # Block-diagonal ranges:
     full_ij.ranges = diagonal_ranges(target_ids, source_ids)
 
     # Sum over the source index "j":
-    return full_ij.sum(1)
+    return full_ij.sum(1)  # (N,K-order-1)
 
 
 def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None):
     """This function is equivalent to a parallel application of the .wcecalc method from the WCE package.
+
+    The number of B-spline covariates is equal to
+     F = (K - order - 1)
+    where K is the length of `knots` if it is not None,
+    or is equal to (nknots + 2 + 2*order) otherwise (leading to F = nknots+order+1).
 
     From R, calling:
 
@@ -197,6 +205,12 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
         knots ((K,) tensor): the positions of the knots.
         cutoff (int): the length of the observation window.
         order (int): the order of the B-Spline basis.
+
+    Returns:
+        tuple of ((N, F) tensor, (K,) tensor):
+            - Values of the F B-Spline atom functions, sampled at the required 
+              observation times.
+            - Positions of the knots.
     """
 
     # Step 1: Pre-processing ===================================================
@@ -206,7 +220,8 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
     # Extract the main integer dimensions:
     (N,) = ids.shape  # Number of samples, number of input features
 
-    # Re-order the input variables to make sure that the patient ids are contiguous:
+    # Re-order the input variables to make sure that the patient ids are contiguous
+    # in memory. This is necessary to ensure fast batch processing with KeOps:
     sort_ids = ids.argsort()
 
     sorted_ids = ids[sort_ids]  # (N,), e.g. [0, 0, 0, 0, 1, 1, 2, 2, 2, 3]
@@ -227,9 +242,11 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
         knots = place_knots(cutoff=cutoff, nknots=nknots, order=order)
         knots = torch.tensor(knots, device=device, dtype=float32)
 
+    # The window is a (2,) tensor:
     window = torch.tensor([1.0, cutoff + 1.0], device=device, dtype=float32)
 
     # Step 2: actual computation ===============================================
+    # features_i is a (N,F) tensor:
     features_i = bspline_conv(
         target_times=times,
         target_ids=sorted_ids,
@@ -254,7 +271,8 @@ def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None):
 
     The number of B-spline covariates is equal to
      F = (K - order - 1)
-    where K is the length of `knots` or is equal to nknots + order + 1.
+    where K is the length of `knots` if it is not None,
+    or is equal to (nknots + 2 + 2*order) otherwise (leading to F = nknots+order+1).
 
     Args:
         cutoff (int): size of the time window.
@@ -264,7 +282,9 @@ def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None):
             to use instead of relying on nknots. Defaults to None.
 
     Returns:
-        tuple of (): _description_
+        tuple of ((cutoff, F) tensor, (K,) tensor):
+            - Values of the F B-Spline atom functions, sampled on [0, 1, ..., cutoff-1].
+            - Positions of the knots.
     """
 
     times = torch.arange(0, cutoff, device=device, dtype=int32)
