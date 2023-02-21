@@ -84,7 +84,6 @@ def cumulative_distributions(x):
     return x, torch.arange(1, len(x) + 1) / len(x)
 
 
-
 # Our main run was in no batch mode, so we "pop" the first dimension:
 coefs = model["coef"][0]  # (Drugs, Features)
 risk_means = model["risk"][0]  # (Drugs,)

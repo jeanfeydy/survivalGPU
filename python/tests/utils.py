@@ -15,8 +15,6 @@ def form(x):
     return np.array_str(numpy(x), precision=3)
 
 
-
-
 def coxph_fit(
     *,
     exposures,

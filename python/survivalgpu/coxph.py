@@ -441,10 +441,9 @@ def coxph_R(
     return res
 
 
-
 class CoxPHSurvivalAnalysis:
     """Cox Proportional Hazards model.
-    
+
     The API of this object is loosely based on scikit-survival.
 
     Args:
@@ -458,8 +457,19 @@ class CoxPHSurvivalAnalysis:
         doscale (bool): Whether to scale the covariates for stability.
         verbosity (int): Verbosity level.
     """
-    def __init__(self, alpha=0.0, ties="efron", backend="torch", bootstrap=1, batchsize=0,
-                 maxiter=20, eps=1e-5, doscale=False, verbosity=1):
+
+    def __init__(
+        self,
+        alpha=0.0,
+        ties="efron",
+        backend="torch",
+        bootstrap=1,
+        batchsize=0,
+        maxiter=20,
+        eps=1e-5,
+        doscale=False,
+        verbosity=1,
+    ):
         self.alpha = alpha
         self.ties = ties
         self.backend = backend
@@ -472,7 +482,7 @@ class CoxPHSurvivalAnalysis:
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model.
-        
+
         Args:
             X (array-like): Covariates.
             y (array-like): Survival times and event indicators.
@@ -487,5 +497,3 @@ class CoxPHSurvivalAnalysis:
         assert stds.shape == (Drugs, Features)
         assert Hessian.shape == (Drugs, Features, Features)
         assert Imat.shape == (Drugs, Features, Features)
-
-

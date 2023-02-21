@@ -16,6 +16,7 @@ from .wce_features import wce_features_batch, bspline_atoms
 
 # Our main, object-oriented API ==========================================================
 
+
 class WCESurvivalAnalysis:
     def __init__(self, *, cutoff, n_knots=1, order=3, constrained="Right"):
         """Weighted Cumulative Exposure Model that combines B-spline time-varying features with a CoxPH analysis.
@@ -39,14 +40,14 @@ class WCESurvivalAnalysis:
                 Defaults to None (i.e. no constrain).
                 Other options are:
                 - "Left" or "L": the drug has no immediate effect on the risk.
-                  We remove features that correspond to basis functions that have 
-                  a non-zero value or derivative on the "left" of the domain, 
+                  We remove features that correspond to basis functions that have
+                  a non-zero value or derivative on the "left" of the domain,
                   i.e. around the exposure time.
                   This is useful to model a risk function that has no "immediate" impact.
-                
+
                 - "Right" or "R": the drug has no effect on the risk around the cutoff time.
-                  We remove features that correspond to basis functions that have 
-                  a non-zero value or derivative on the "right" of the domain, 
+                  We remove features that correspond to basis functions that have
+                  a non-zero value or derivative on the "right" of the domain,
                   i.e. around the "exposure+cutoff" time.
                   This is useful to model a risk function that vanishes "at infinity".
         """
@@ -55,8 +56,7 @@ class WCESurvivalAnalysis:
         self.order = order
         self.cutoff = cutoff
         self.n_knots = n_knots
-        self.constrained = constrained 
-
+        self.constrained = constrained
 
     # The order should be an integer >= 0 --------------------------------
     @property
@@ -66,11 +66,14 @@ class WCESurvivalAnalysis:
     @order.setter
     def order(self, new_o):
         if int(new_o) != new_o:
-            raise TypeError("The order of the B-splines should be an integer. "
-            f"Received {new_o} of type {type(new_o)}.") 
+            raise TypeError(
+                "The order of the B-splines should be an integer. "
+                f"Received {new_o} of type {type(new_o)}."
+            )
         elif int(new_o) < 0:
-            raise ValueError("The order of the B-splines should be >= 0. "
-                f"Received {new_o}.")
+            raise ValueError(
+                "The order of the B-splines should be >= 0. " f"Received {new_o}."
+            )
         else:
             self._order = int(new_o)
 
@@ -82,15 +85,17 @@ class WCESurvivalAnalysis:
     @n_knots.setter
     def n_knots(self, new_n):
         if int(new_n) != new_n:
-            raise TypeError("The number of knots should be an integer. "
-            f"Received {new_n} of type {type(new_n)}.") 
+            raise TypeError(
+                "The number of knots should be an integer. "
+                f"Received {new_n} of type {type(new_n)}."
+            )
         elif int(new_n) < 0:
-            raise ValueError("The number of knots should be >= 0. "
-                f"Received {new_n}.")
+            raise ValueError(
+                "The number of knots should be >= 0. " f"Received {new_n}."
+            )
         else:
             self._n_knots = int(new_n)
 
-    
     # The cutoff value should be an integer >= 0 -----------------------------------------
     @property
     def cutoff(self):
@@ -99,11 +104,15 @@ class WCESurvivalAnalysis:
     @cutoff.setter
     def cutoff(self, new_cutoff):
         if int(new_cutoff) != new_cutoff:
-            raise TypeError("The cutoff (size of the time window) should be an integer. "
-            f"Received {new_cutoff} of type {type(new_cutoff)}.") 
+            raise TypeError(
+                "The cutoff (size of the time window) should be an integer. "
+                f"Received {new_cutoff} of type {type(new_cutoff)}."
+            )
         elif int(new_cutoff) < 0:
-            raise ValueError("The cutoff (size of the time window) should be >= 0. "
-                f"Received {new_cutoff}.")
+            raise ValueError(
+                "The cutoff (size of the time window) should be >= 0. "
+                f"Received {new_cutoff}."
+            )
         else:
             self._cutoff = int(new_cutoff)
 
@@ -116,8 +125,10 @@ class WCESurvivalAnalysis:
     def constrained(self, new_c):
         supported_values = [None, "L", "Left", "R", "Right"]
         if new_c not in supported_values:
-            raise ValueError(f"constrained should be one of {supported_values}. "
-            f"Received {new_c}.")
+            raise ValueError(
+                f"constrained should be one of {supported_values}. "
+                f"Received {new_c}."
+            )
         else:
             self._constrained = new_c
 
@@ -153,15 +164,15 @@ class WCESurvivalAnalysis:
         else:
             return features
 
-
     @property
     def atoms(self):
         """Samples the B-spline basis functions on the interval [0, cutoff-1]."""
-        atoms, _ = bspline_atoms(cutoff=self.cutoff, order=self.order, knots=self.n_knots)
+        atoms, _ = bspline_atoms(
+            cutoff=self.cutoff, order=self.order, knots=self.n_knots
+        )
         atoms = self._constrain(atoms)
         assert atoms.shape == (self.cutoff, self.n_atoms)
         return atoms
-
 
     @property
     def atom_areas(self):
@@ -169,7 +180,6 @@ class WCESurvivalAnalysis:
         areas = self.atoms.sum(0)  # {Cutoff, Features) -> (Features,)
         assert areas.shape == (self.n_atoms,)
         return areas
-
 
     # Computation of the WCE features ====================================================
 
@@ -191,7 +201,6 @@ class WCESurvivalAnalysis:
         device = doses.device
         N = Drugs * Patients * Times
 
-
         # We specify a batch computation of (Drugs * Patients) blocks of
         # "Times" values.
         # Assuming that Patients = 3 and Drugs = 2,
@@ -210,20 +219,18 @@ class WCESurvivalAnalysis:
             cutoff=self.cutoff,
             order=self.order,
         )
-        assert exposures.shape == (Drugs * Patients * Times, self.n_knots + self.order + 1)
+        assert exposures.shape == (
+            Drugs * Patients * Times,
+            self.n_knots + self.order + 1,
+        )
         # Remove some of the covariates if required:
         exposures = self._constrain(exposures)
         exposures = exposures.view(Drugs, Patients, Times, self.n_atoms)
         return exposures
 
-
     def fit(self, *, doses, times, events, covariates=None):
-        
+
         exposures = self._wce_features(doses=doses, times=times)
-
-        
-
-
 
     # Read-only properties ===============================================================
     @property
@@ -236,29 +243,28 @@ class WCESurvivalAnalysis:
         """The inverse of the Hessian matrix for each drug."""
         return self._Imat
 
-
     # Rough Gaussian-like estimation of the confidence intervals for the total risk area: -----
-    
+
     @property
     def drug_total_risks(self):
         """Returns the mean and std of the total risk area for each drug.
-        
+
         The total risk area is the area under the curve of the risk function.
         It corresponds to the logarithm of the Hazard Ratio that is associated
         to a dose of 1 unit of the drug.
         It is computed as a weighted sum of the risk areas of each b-spline atom.
 
         We use a simple heuristic to estimate the std of the total risk area for each drug.
-        Recall that the coefficients of the fitted model are the minimizers of 
-        the neglog-likelihood function of the CoxPH model, with gradient = 0 
+        Recall that the coefficients of the fitted model are the minimizers of
+        the neglog-likelihood function of the CoxPH model, with gradient = 0
         at the optimum and a Hessian that is a positive-definite matrix
         of shape (n_atoms, n_atoms) for each drug.
-        
-        For each drug, we may then reasonably expect the "coefs" vector to follow 
+
+        For each drug, we may then reasonably expect the "coefs" vector to follow
         a Gaussian distribution with:
         - mean = estimated vector "coefs[drug]" of shape (n_atoms,)
         - covariance = Imat[drug] = inverse(Hessian[drug]) of shape (n_atoms, n_atoms).
-        
+
         In this context,
         total risk area = \sum_{b-spline atom i} atom_areas[i] * coef[i]
         is a 1D-Gaussian vector with:
@@ -277,7 +283,6 @@ class WCESurvivalAnalysis:
         assert risk_stds.shape == (self.n_drugs,)
         return risk_means, risk_stds
 
-
     @property
     def drug_coeff_ci_95(self):
 
@@ -288,10 +293,6 @@ class WCESurvivalAnalysis:
         ci_95 = 1.96 * ci_95 / risk_stds.view(Drugs, 1)
         assert ci_95.shape == (Drugs, Features)
         assert ci_95 @ areas == 1.96 * risk_stds
-
-
-
-
 
     def display_atoms(self, ax=None):
 
@@ -316,7 +317,7 @@ class WCESurvivalAnalysis:
 
         ax = plt.gca() if ax is None else ax
         ax.title(f"Distribution of the total risk for drug {drug}")
-        
+
         t = np.linspace(bootstrap_risk.min().item(), bootstrap_risk.max().item(), 100)
         plt.plot(
             t,
@@ -333,22 +334,6 @@ class WCESurvivalAnalysis:
             label="Bootstrap",
         )
         plt.legend()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def constrain(*, features, constrained, order):
@@ -560,4 +545,3 @@ def wce_R(
     )
 
     return res
-

@@ -47,7 +47,6 @@ for ties in ["efron", "breslow"]:
             print(item)
 
 
-
 def test_newton_convex():
     """Check that Newton's method works on a separable convex problem."""
 

@@ -1,9 +1,64 @@
+"""This file implements the core numerical routines of the WCE package.
+
+We rely on KeOps to compute convolutions with a collection of B-Spline kernels,
+at arbitrary time sampling locations.
+
+TODO:
+  * Implement a fallback mode that relies on a pure PyTorch implementation 
+    when KeOps is not available.
+"""
+
+
 import numpy as np
 import torch
 
 from pykeops.torch import LazyTensor
 
-from .utils import use_cuda, device, float32, int32, int64
+from .utils import device, float32, int32
+
+
+def place_knots(*, cutoff, nknots, order):
+    """Returns a list of (nknots + 2 + 2*order) knot positions for the B-Splines model.
+
+    The number of knots accounts for the fact that, following the conventions of the
+    WCE R package, we place:
+    - `nknots` inside the time window [0, cutoff] at regular intervals.
+    - 1+1 knots at both ends of the time window (0 and cutoff).
+    - order+order knots for "padding" at both ends of the time window.
+
+    For instance, if order = 3, cutoff = 90 and nknots = 1,
+    knots = [-3 -2 -1  0 46 90 91 92 93]  (length = 1 + 2 + 6 = 9)
+
+    Please note that returning e.g. [0, 0, 0, 0, 46, 90, 90, 90, 90, 90] would be
+    cleaner from a mathematical perspective - but for the sake of compatibility
+    with the WCE R package, we stick to this "counting" convention.
+
+    Args:
+        cutoff (int): length of the observation window.
+        nknots (int): number of inner knots.
+
+    Returns:
+        ((K,) array): (nknots + 2*order + 2) values for the knot positions.
+    """
+    # Place nknots+1 equispaced values in [1, 2, ..., cutoff], at integer positions.
+    knots = np.round(
+        np.quantile(1 + np.arange(cutoff), np.arange(nknots + 1) / (nknots + 1)), 0
+    )
+    # And remove the first quantile:
+    knots = knots[1:]  # (nknots,)
+    # The code above ensures that if nknots=1, our knot will fall around cutoff/2.
+
+    # Pad the knot vectors with:
+    # - [-order, -(order-1), ..., 0] to the left
+    # - [cutoff, cutoff+1, ..., cutoff+order] to the right
+    ends = np.arange(order + 1)
+    knots = np.concatenate(
+        (-ends[::-1], knots, cutoff + ends)
+    )  # (nknots + 2 + 2*order,)
+    return knots
+
+
+# KeOps computation of the B-Spline covariates ===========================================
 
 
 def ranges_slices(batch):
@@ -121,28 +176,6 @@ def bspline_conv(
     return full_ij.sum(1)
 
 
-def place_knots(*, cutoff, nknots, order):
-    """Returns a list of knot positions for the B-Splines model.
-
-    For the placement of the BSpline knots, if knots=None,
-    we follow the exact same convention as in the R WCE package:
-    For instance, if order = 3, cutoff = 90 and nknots = 1,
-    knots = [-3 -2 -1  0 46 90 91 92 93]
-
-    Args:
-        cutoff (int): length of the observation window.
-        nknots (int): number of inner knots.
-    """
-    knots = np.round(
-        np.quantile(1 + np.arange(cutoff), np.arange(nknots + 1) / (nknots + 1)), 0
-    )
-    knots = knots[1:]
-
-    ends = np.arange(order + 1)
-    knots = np.concatenate((-ends[::-1], knots, cutoff + ends))
-    return knots
-
-
 def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None):
     """This function is equivalent to a parallel application of the .wcecalc method from the WCE package.
 
@@ -217,6 +250,22 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
 
 
 def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None):
+    """Returns a set of B-Spline functions sampled on [0, cutoff-1].
+
+    The number of B-spline covariates is equal to
+     F = (K - order - 1)
+    where K is the length of `knots` or is equal to nknots + order + 1.
+
+    Args:
+        cutoff (int): size of the time window.
+        nknots (int, optional): number of inner knots. Defaults to 1.
+        order (int, optional): order of the B-Splines. Defaults to 3 (=cubic splines).
+        knots ((K,) tensor, optional): specific values for the B-Spline knots,
+            to use instead of relying on nknots. Defaults to None.
+
+    Returns:
+        tuple of (): _description_
+    """
 
     times = torch.arange(0, cutoff, device=device, dtype=int32)
     N = len(times)
