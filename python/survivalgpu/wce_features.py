@@ -208,7 +208,7 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
 
     Returns:
         tuple of ((N, F) tensor, (K,) tensor):
-            - Values of the F B-Spline atom functions, sampled at the required 
+            - Values of the F B-Spline atom functions, sampled at the required
               observation times.
             - Positions of the knots.
     """

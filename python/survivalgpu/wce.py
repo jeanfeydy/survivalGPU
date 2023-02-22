@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
-from .coxph import coxph_torch
+from .coxph import coxph_torch, CoxPHSurvivalAnalysis
 
 from .utils import numpy, timer
 from .utils import use_cuda, device, float32, int32, int64
@@ -18,7 +18,15 @@ from .wce_features import wce_features_batch, bspline_atoms
 
 
 class WCESurvivalAnalysis:
-    def __init__(self, *, cutoff, n_knots=1, order=3, constrained="Right"):
+    def __init__(
+        self,
+        *,
+        cutoff,
+        n_knots=1,
+        order=3,
+        constrained="Right",
+        survival_model=CoxPHSurvivalAnalysis(),
+    ):
         """Weighted Cumulative Exposure Model that combines B-spline time-varying features with a CoxPH analysis.
 
         This model is fully described in...
@@ -50,6 +58,9 @@ class WCESurvivalAnalysis:
                   a non-zero value or derivative on the "right" of the domain,
                   i.e. around the "exposure+cutoff" time.
                   This is useful to model a risk function that vanishes "at infinity".
+            survival_model (Estimator, optional): estimator that will be used to
+                perform a risk analysis from the WCE covariates.
+                For now, we only support the CoxPHSurvivalAnalysis model.
         """
         # Let the model remember the parameters of the analysis.
         # Note that all type and value checks are performed in the attribute setters:
@@ -57,6 +68,7 @@ class WCESurvivalAnalysis:
         self.cutoff = cutoff
         self.n_knots = n_knots
         self.constrained = constrained
+        self.survival_model = survival_model
 
     # The order should be an integer >= 0 --------------------------------
     @property
