@@ -1,8 +1,6 @@
 import numpy as np
-import imageio
 from matplotlib import pyplot as plt
-from typing import NamedTuple, Optional, Tuple
-from .typing import typecheck, Int64Array, Float64Array
+from .typing import typecheck, Optional, Int64Array, Float64Array
 
 
 class SurvivalDataset:
@@ -12,6 +10,7 @@ class SurvivalDataset:
         doses (Optional[RealArray["drugs", "patients", "times"]]): doses of drugs.
     """
 
+    @typecheck
     def __init__(
         self,
         stop: Int64Array["intervals"],
@@ -36,6 +35,29 @@ class SurvivalDataset:
                     "is provided, then `dose`, `dose_time` and `dose_patient` must all be provided."
                 )
 
+        # Default value for start is 0: all intervals start at time 0.
+        if start is None:
+            start = np.zeros_like(stop)
+
+        # Check that the intervals are )start < stop].
+        if np.any(start >= stop):
+            raise ValueError("Start times must be < stop times.")
+
+        # Default value for event is 1: all intervals correspond to death, without censoring.
+        if event is None:
+            event = np.ones_like(stop)
+        if np.any((event != 0) & (event != 1)):
+            raise ValueError("Event values must be 0 (survival) or 1 (death).")
+
+        # Default value for patient is [0, 1, 2, ...]: we observe one interval per patient.
+        if patient is None:
+            patient = np.arange(stop.shape[0])
+        else:
+            # If some patients are observed with several intervals,
+            # we must check that they do not overlap.
+
+            order = np.lexsort((start, patient))
+
         self.stop = stop
         self.start = start
         self.event = event
@@ -49,7 +71,7 @@ class SurvivalDataset:
     @property
     def n_patients(self) -> int:
         """Number of patients that are referenced in the dataset."""
-        return np.max(self.patient) - 1
+        return np.max(self.patient) + 1
 
     @property
     def n_intervals(self) -> int:
@@ -64,7 +86,7 @@ class SurvivalDataset:
     @property
     def n_drugs(self) -> int:
         """Number of drugs that are referenced in the dataset."""
-        return 0 if self.dose is None else np.max(self.dose_drug) - 1
+        return 0 if self.dose_drug is None else np.max(self.dose_drug) + 1
 
     @property
     def n_doses(self) -> int:
@@ -74,23 +96,31 @@ class SurvivalDataset:
     @property
     def min_time(self) -> int:
         """First time value in the dataset."""
-        return 0 if self.start is None else np.min(self.start)
+        tmin = np.min(self.start)
+        if self.dose_time is not None:
+            tmin = min(tmin, np.min(self.dose_time))
+        return tmin
 
     @property
     def max_time(self) -> int:
         """Last time value in the dataset."""
-        return np.max(self.stop)
+        tmax = np.max(self.stop)
+        if self.dose_time is not None:
+            tmax = max(tmax, np.max(self.dose_time))
+        return tmax
 
-    def to_img(self, path: str):
-        """Save the dataset as a png file."""
+    def to_img(self):
+        """Return a graphical representation of the dataset as a (H, W, 3) RGB uint8 array."""
         total_covariates = self.n_covariates + self.n_drugs
         min_time = self.min_time
         max_time = self.max_time
-        
-        margin=2
 
-        colors = ['Purples', 'Blues', 'Greens', 'Oranges', 'Reds']
-        covar_maps = [plt.get_cmap(colors[i % len(colors)]) for i in range(self.n_covariates)]
+        margin = 2
+
+        colors = ["Purples", "Blues", "Greens", "Oranges", "Reds"]
+        covar_maps = [
+            plt.get_cmap(colors[i % len(colors)]) for i in range(self.n_covariates)
+        ]
         drug_maps = [plt.get_cmap(colors[i % len(colors)]) for i in range(self.n_drugs)]
 
         # Normalize the covariates.
@@ -100,10 +130,16 @@ class SurvivalDataset:
         max_cov[max_cov == 0] = 1
         covariates /= max_cov
 
-
         # The patients are stacked vertically, with a margin of 2 pixels between them.
         # We add an extra column to account for the "death bar" of the last patient:
-        img = np.ones((self.n_patients * (total_covariates + margin), 1 + max_time - min_time, 3,), dtype=np.uint8)
+        img = np.ones(
+            (
+                self.n_patients * (total_covariates + margin),
+                1 + max_time - min_time,
+                3,
+            ),
+            dtype=np.uint8,
+        )
 
         # Paint the covariates and a gray background for the doses:
         for i in range(self.n_intervals):
@@ -112,22 +148,28 @@ class SurvivalDataset:
             patient = i if self.patient is None else self.patient[i]
 
             offset_y = patient * (total_covariates + margin)
-            # The intervals are always of the form )start, stop], 
+            # The intervals are always of the form )start, stop],
             # so we need to add 1 to the start.
             offset_x = 1 + start - min_time
 
             # Paint the covariates:
             for j in range(self.n_covariates):
                 covar = covariates[i, j]
-                img[offset_y + j, offset_x:stop - min_time, :] = covar_maps[j](covar)[:3]
+                img[offset_y + j, offset_x : stop - min_time, :] = covar_maps[j](covar)[
+                    :3
+                ]
 
             # Paint a gray background for the doses:
-            img[offset_y+self.n_covariates:offset_y+total_covariates, offset_x:stop - min_time, :] = 200
+            img[
+                offset_y + self.n_covariates : offset_y + total_covariates,
+                offset_x : stop - min_time,
+                :,
+            ] = 200
 
             # Paint the death events as a black line:
             # N.B.: self.event is None => event = 1 for all intervals.
             if self.event is None or self.event[i] == 1:
-                img[offset_y:offset_y + total_covariates, 1 + stop - min_time, :] = 0
+                img[offset_y : offset_y + total_covariates, 1 + stop - min_time, :] = 0
 
         # Paint the doses:
         for i in range(self.n_doses):
@@ -142,7 +184,7 @@ class SurvivalDataset:
 
             img[offset_y, offset_x, :] = drug_maps[drug](dose)[:3]
 
-        imageio.imwrite(img, path)
+        return img
 
 
 # Virtual dataset ========================================================================
@@ -151,18 +193,18 @@ class SurvivalDataset:
 @typecheck
 def load_drugs(
     *,
+    n_covariates: int = 0,
     n_drugs: int = 1,
     n_patients: int = 1,
     n_times: int = 1,
-    device: str = "cpu",
 ) -> SurvivalDataset:
     """Create a virtual dataset for testing using a simple risk model.
 
     Args:
+        n_covariates (int, optional): number of constant covariates. Defaults to 0.
         n_drugs (int, optional): number of drugs to test. Defaults to 1.
         n_patients (int, optional): number of patients. Defaults to 1.
         n_times (int, optional): number of sampling times. Defaults to 1.
-        n_device (str, optional): device where the data should be stored. Defaults to "cpu".
 
     Returns:
         SurvivalDataset: contains arrays that describe a drug consumption dataset with:
@@ -179,10 +221,10 @@ def load_drugs(
     """
 
     # Sampling times = [0, 1, ..., Times-1]:
-    sampling_times = torch.arange(n_times, dtype=torch.int32, device=device)
+    sampling_times = np.arange(n_times)
 
     # Random doses - we could try more interesting models:
-    doses = 1.0 * (torch.rand(n_drugs, n_patients, n_times, device=device) < 0.5)
+    doses = 1.0 * (np.random.rand(n_drugs, n_patients, n_times) < 0.5)
     assert doses.shape == (n_drugs, n_patients, n_times)
 
     # events = 0  if everything is all right,
@@ -207,3 +249,10 @@ def load_drugs(
         stop=sampling_times + 1,
         event=events,
     )
+
+
+if __name__ == "__main__":
+    import imageio
+
+    ds = load_drugs(n_drugs=2, n_patients=3, n_times=10)
+    imageio.imwrite(ds.to_img(), "output_test_dataset.png")
