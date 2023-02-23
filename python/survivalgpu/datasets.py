@@ -1,6 +1,8 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from .typecheck import typecheck, Optional, Int64Array, Float64Array
+from .typecheck import typecheck, Optional, Callable
+from .typecheck import Int
+from .typecheck import UInt8Array, Int64Array, Float64Array
 
 
 def contains_duplicates(X):
@@ -112,74 +114,87 @@ class SurvivalDataset:
         self.dose_drug = dose_drug
 
     @property
+    @typecheck
     def n_patients(self) -> int:
         """Number of patients that are referenced in the dataset."""
-        return np.max(self.patient) + 1
+        return int(np.max(self.patient) + 1)
 
     @property
+    @typecheck
     def n_intervals(self) -> int:
         """Number of intervals that are referenced in the dataset."""
         return self.stop.shape[0]
 
     @property
+    @typecheck
     def n_covariates(self) -> int:
         """Number of covariates that are referenced in the dataset."""
         return 0 if self.covariates is None else self.covariates.shape[1]
 
     @property
+    @typecheck
     def n_drugs(self) -> int:
         """Number of drugs that are referenced in the dataset."""
-        return 0 if self.dose_drug is None else np.max(self.dose_drug) + 1
+        return 0 if self.dose_drug is None else int(np.max(self.dose_drug) + 1)
 
     @property
+    @typecheck
     def n_doses(self) -> int:
         """Number of drug doses that are referenced in the dataset."""
         return 0 if self.dose is None else self.dose.shape[0]
 
     @property
+    @typecheck
     def min_time(self) -> int:
         """First time value in the dataset."""
         tmin = np.min(self.start)
         if self.dose_time is not None:
             tmin = min(tmin, np.min(self.dose_time))
-        return tmin
+        return int(tmin)
 
     @property
+    @typecheck
     def max_time(self) -> int:
         """Last time value in the dataset."""
         tmax = np.max(self.stop)
         if self.dose_time is not None:
             tmax = max(tmax, np.max(self.dose_time))
-        return tmax
+        return int(tmax)
 
-    def to_img(self, pixel_size: int=1):
+    @typecheck
+    def to_img(self, pixel_size: int = 1) -> UInt8Array["H W 3"]:
         """Return a graphical representation of the dataset as a (H, W, 3) RGB uint8 array."""
         total_covariates = self.n_covariates + self.n_drugs
         min_time = self.min_time
         max_time = self.max_time
 
-        margin = 2
+        margin = 4
 
-        colors = ["Purples", "Blues", "Greens", "Oranges", "Reds"][::-1]
+        # colors = ["Purples", "Blues", "Greens", "Oranges", "Reds"]
+        colors = ["Blues"]
         covar_maps = [
             plt.get_cmap(colors[i % len(colors)]) for i in range(self.n_covariates)
         ]
         drug_maps = [plt.get_cmap(colors[i % len(colors)]) for i in range(self.n_drugs)]
 
         # Normalize the covariates.
-        covariates = self.covariates.copy()
-        covariates -= covariates.min(axis=0)
-        max_cov = covariates.max(axis=0)
-        max_cov[max_cov == 0] = 1
-        covariates /= max_cov
-        # Rescale the covariates to [0.2, 0.8] to have nice pastel colors:
-        covariates = 0.2 + 0.6 * covariates
+        if self.covariates is None:
+            covariates = None
+        else:
+            covariates = self.covariates.copy()
+            covariates -= covariates.min(axis=0)
+            max_cov = covariates.max(axis=0)
+            max_cov[max_cov == 0] = 1
+            covariates /= max_cov
+
+            # covariates >= 0.2 to ensure that we never blend with the white background.
+            covariates = 0.2 + 0.8 * covariates
 
         # The patients are stacked vertically, with a margin of 2 pixels between them.
         # We add an extra column to account for the "death bar" of the last patient:
         img = 255 * np.ones(
             (
-                self.n_patients * (total_covariates + margin),
+                margin + self.n_patients * (total_covariates + margin),
                 2 + max_time - min_time,
                 3,
             ),
@@ -192,7 +207,7 @@ class SurvivalDataset:
             stop = self.stop[i]
             patient = i if self.patient is None else self.patient[i]
 
-            offset_y = patient * (total_covariates + margin)
+            offset_y = margin + patient * (total_covariates + margin)
             # The intervals are always of the form )start, stop],
             # so we need to add 1 to the start.
             offset_x = 1 + start - min_time
@@ -200,21 +215,26 @@ class SurvivalDataset:
             # Paint the covariates on )start, stop]:
             for j in range(self.n_covariates):
                 covar = covariates[i, j]
-                img[offset_y + j, offset_x : 1 + stop - min_time, :] = covar_maps[j](covar, bytes=True)[
-                    :3
-                ]
+                img[offset_y + j, offset_x : 1 + stop - min_time, :] = covar_maps[j](
+                    covar, bytes=True
+                )[:3]
 
             # Paint a gray background for the doses on )start, stop]:
-            img[
-                offset_y + self.n_covariates : offset_y + total_covariates,
-                offset_x : 1 + stop - min_time,
-                :,
-            ] = 200
+            if False:
+                img[
+                    offset_y + self.n_covariates : offset_y + total_covariates,
+                    offset_x : 1 + stop - min_time,
+                    :,
+                ] = 200
 
-            # Paint the death events as a black line at stop+1:
+            # Paint the death events as a red line at stop+1:
             # N.B.: self.event is None => event = 1 for all intervals.
             if self.event is None or self.event[i] == 1:
-                img[offset_y : offset_y + total_covariates, 1 + stop - min_time, :] = 0
+                img[
+                    offset_y - 1 : 1 + offset_y + total_covariates,
+                    1 + stop - min_time,
+                    1:,
+                ] = 0
 
         # Paint the doses:
         for i in range(self.n_doses):
@@ -224,7 +244,12 @@ class SurvivalDataset:
             # N.B.: self.dose_drug is None => drug = 0 for all doses.
             drug = 0 if self.dose_drug is None else self.dose_drug[i]
 
-            offset_y = patient * (total_covariates + margin) + self.n_covariates + drug
+            offset_y = (
+                margin
+                + patient * (total_covariates + margin)
+                + self.n_covariates
+                + drug
+            )
             offset_x = time - min_time
 
             img[offset_y, offset_x, :] = drug_maps[drug](dose, bytes=True)[:3]
@@ -233,6 +258,54 @@ class SurvivalDataset:
 
 
 # Virtual dataset ========================================================================
+
+
+@typecheck
+def death_condition(
+    *,
+    start: Int,
+    stop: Int,
+    covariates: Optional[Float64Array["covariates"]],
+    dose: Optional[Float64Array["doses"]],
+    dose_time: Optional[Int64Array["doses"]],
+    dose_drug: Optional[Int64Array["doses"]],
+):
+    # Condition for death: either no covariate, or covariate[0] >= 0.5
+    at_risk = (covariates is None or covariates[0] >= 0.5)
+
+    if dose is None:
+        if covariates is None:
+            raise ValueError("Either dose or covariates must be provided.")
+        return at_risk, stop
+
+    if not at_risk:
+        return False, stop
+
+    # We only focus on the first drug:
+    doses = dose[dose_drug == 0]
+    times = dose_time[dose_drug == 0]
+
+    # Condition for death: at least two doses for the drug of interest
+    if not (len(doses) >= 2):
+        return False, stop
+
+    # Condition for death: two consecutive doses
+    consecutive = times[1:] == times[:-1] + 1
+
+    # Condition for death: the two consecutive doses are above 0.5
+    min_dose = 0
+    thresh = (doses[:-1] >= min_dose) & (doses[1:] >= min_dose)
+
+    # Condition for death: the 2nd dose is observed after the start of the time interval
+    after_start = times[1:] > start
+
+    candidates = consecutive & thresh & after_start
+    if not np.any(candidates):
+        return False, stop
+    else:
+        premature_stop = times[1:][candidates][0]
+        return True, premature_stop
+
 
 # Random doses, with a simple risk model: -----------------------------------------------
 @typecheck
@@ -244,6 +317,7 @@ def load_drugs(
     max_duration: int = 1,
     max_offset: int = 0,
     seed: Optional[int] = None,
+    risk_model: Callable = death_condition,
 ) -> SurvivalDataset:
     """Create a virtual dataset for testing using a simple risk model.
 
@@ -272,7 +346,8 @@ def load_drugs(
     # Default time windows:
     start = rng.integers(low=0, high=max_offset + 1, size=n_patients)
     stop = start + rng.integers(low=1, high=max_duration + 1, size=n_patients)
-    event = rng.integers(low=0, high=2, size=n_patients)
+    # event = rng.integers(low=0, high=2, size=n_patients)
+    event = np.zeros(n_patients, dtype=np.int64)
     patient = np.arange(n_patients)
     if n_covariates > 0:
         covariates = rng.random(size=(n_patients, n_covariates))
@@ -293,13 +368,15 @@ def load_drugs(
         dose_drug = []
 
         for p in range(n_patients):
+            # Generate doses for all drugs using a simple model:
             for d in range(n_drugs):
                 t = start[p]
                 while True:
-                    t += 1 + rng.poisson(4)
+                    new_dose = rng.random()
+                    t += 1 + rng.integers(10)
                     if t > stop[p]:
                         break
-                    dose.append(rng.random())
+                    dose.append(new_dose)
                     dose_time.append(t)
                     dose_patient.append(p)
                     dose_drug.append(d)
@@ -309,6 +386,44 @@ def load_drugs(
         dose_time = np.array(dose_time, dtype=np.int64)
         dose_patient = np.array(dose_patient, dtype=np.int64)
         dose_drug = np.array(dose_drug, dtype=np.int64)
+
+        # Generate an index array to slice the doses by patient:
+        n_doses = np.bincount(dose_patient, minlength=n_patients)
+        assert n_doses.shape == (n_patients,)
+
+        # N.B.: Append a zero to make the slicing easier:
+        dose_indices = np.cumsum(n_doses)
+        dose_indices = np.concatenate([[0], dose_indices])
+        assert dose_indices.shape == (n_patients + 1,)
+        assert dose_indices[-1] == len(dose)
+
+    # Use an arbitrary risk model to decide if and when the patient dies:
+    for p in range(n_patients):
+        if covariates is None:
+            covariates_p = None
+        else:
+            covariates_p = covariates[p]
+
+        if dose is None:
+            dose_p = None
+            dose_time_p = None
+            dose_drug_p = None
+        else:
+            s, e = dose_indices[p], dose_indices[p + 1]
+            dose_p = dose[s:e]
+            dose_time_p = dose_time[s:e]
+            dose_drug_p = dose_drug[s:e]
+
+        death, t = risk_model(
+            start=start[p],
+            stop=stop[p],
+            covariates=covariates_p,
+            dose=dose_p,
+            dose_time=dose_time_p,
+            dose_drug=dose_drug_p,
+        )
+        event[p] = death
+        stop[p] = t
 
     return SurvivalDataset(
         start=start,
@@ -324,9 +439,23 @@ def load_drugs(
 
 
 if __name__ == "__main__":
+    import time
     import imageio
 
     ds = load_drugs(
-        n_covariates=10, n_drugs=5, n_patients=10, max_duration=100, max_offset=50
+        n_covariates=1, n_drugs=1, n_patients=10, max_duration=100, max_offset=50
     )
     imageio.imwrite("output_test_dataset.png", ds.to_img(pixel_size=10))
+
+    for n_patients in [10, 100, 1000, 10000]:
+        clock = time.time()
+        ds = load_drugs(
+            n_covariates=2,
+            n_drugs=1,
+            n_patients=n_patients,
+            max_duration=365,
+            max_offset=3650,
+        )
+        print(
+            f"Generated a dataset with {n_patients:8,} patients in {time.time() - clock:6.2f} seconds."
+        )
