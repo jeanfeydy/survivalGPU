@@ -26,7 +26,7 @@ drugdata <- WCE::drugdata
 
 Bootstrap with :  
 - survival::coxph  
-- survival.GPU.R::coxphGPU
+- survivalGPU::coxphGPU
 
 
 # Functions

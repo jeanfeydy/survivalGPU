@@ -5,21 +5,9 @@
 \alias{summary.coxphGPU}
 \title{Fast Cox Proportional Hazards Regression Model}
 \usage{
-coxphGPU(
-  formula,
-  data,
-  ties = c("efron", "breslow"),
-  bootstrap = 1,
-  batchsize = 0,
-  all.results = FALSE,
-  na.action,
-  control,
-  singular.ok = TRUE,
-  model = FALSE,
-  x = FALSE,
-  y = TRUE,
-  ...
-)
+coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
+         batchsize = 0, all.results = FALSE, na.action, control,
+         singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
 
 \method{summary}{coxphGPU}(object, ..., conf.int = 0.95, scale = 1)
 }

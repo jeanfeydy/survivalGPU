@@ -4,6 +4,11 @@
 #'   to use (or not) your GPU to speed up calculations, in particular for
 #'   bootstrap.
 #'
+#' @usage
+#' coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
+#'          batchsize = 0, all.results = FALSE, na.action, control,
+#'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
+#'
 #' @param formula a formula object, with the response on the left of a ~
 #'   operator, and the terms on the right. The response must be a survival
 #'   object as returned by the `survival::Surv` function. For the moment,

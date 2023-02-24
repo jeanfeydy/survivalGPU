@@ -5,6 +5,12 @@
 #'   work with large datasets.
 #'
 #'   Use `summary()` and `plot()` methods to see results and risk function.
+#'
+#' @usage
+#' wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
+#'        event, start, stop, expos, covariates = NULL, nbootstraps = 1,
+#'        batchsize = 0, confint = 0.95, controls = NULL, ...)
+#'
 #' @param data A data frame in an interval (long) format, in which each line
 #'   corresponds to one and only one time unit for a given individual.
 #' @param nknots Corresponds to the number(s) of interior knots for the cubic
@@ -83,7 +89,8 @@
 #' # See estimated weight function
 #' plot(wce_gpu)
 #'
-#' # WCE model with bootstrap (example with 20 bootstraps)
+#' # WCE model with bootstrap (example with 20 bootstraps, but normally
+#' nbootstraps > 500)
 #' wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = 90,
 #'                             id = "Id", event = "Event", start = "Start",
 #'                             stop = "Stop", expos = "dose",
