@@ -153,7 +153,7 @@ class SurvivalDataset:
     def min_time(self) -> int:
         """First time value in the dataset."""
         tmin = np.min(self.start)
-        if self.dose_time is not None:
+        if self.dose_time is not None and len(self.dose_time) > 0:
             tmin = min(tmin, np.min(self.dose_time))
         return int(tmin)
 
@@ -162,7 +162,7 @@ class SurvivalDataset:
     def max_time(self) -> int:
         """Last time value in the dataset."""
         tmax = np.max(self.stop)
-        if self.dose_time is not None:
+        if self.dose_time is not None and len(self.dose_time) > 0:
             tmax = max(tmax, np.max(self.dose_time))
         return int(tmax)
 
