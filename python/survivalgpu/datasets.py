@@ -17,8 +17,32 @@ def contains_duplicates(X):
 class SurvivalDataset:
     """A dataset for survival analysis.
 
+    We observe I intervals: 
+    - if `patient is None`, we assume that each patient is observed with a single interval.
+    - if `patient` is provided as an integer array of shape (I,), 
+      we assume that the i-th interval correspond to the `patient[i]`-th patient.
+
+    For each interval, we may also observe C covariates: these may correspond to
+    constant features if the interval is observed for a single patient, or to
+    time-varying features if multiple intervals are used to describe a single patient.
+
+    Finally, we may observe D drug intakes at arbitrary time points.
+    These are represented using:
+    - `dose`: the dose of the drug at time `dose_time`.
+    - `dose_time`: the time at which the dose was taken.
+    - `dose_patient`: the patient to which the dose belongs, as an integer label.
+    - `dose_drug`: the drug to which the dose belongs, as an integer label.
+
     Attributes:
-        doses (Optional[RealArray["drugs", "patients", "times"]]): doses of drugs.
+        stop (int64 (I,) array): the end time of each interval.
+        start (int64 (I,) array): the start time of each interval.
+        event (int64 (I,) array): the event type at the end of each interval.
+        patient (int64 (I,) array): the patient to which each interval belongs.
+        covariates (float64 (I,C) array): the covariates of each interval.
+        dose (float64 (D,) array): the dose of each drug.
+        dose_time (int64 (D,) array): the time at which each dose was taken.
+        dose_patient (int64 (D,) array): the patient to which each dose belongs.
+        dose_drug (int64 (D,) array): the drug to which each dose belongs.
     """
 
     @typecheck
@@ -97,6 +121,21 @@ class SurvivalDataset:
             # In our example: [False, False, True] -> we raise an error.
             if np.any(overlap & same_patient):
                 raise ValueError("Overlapping intervals for the same patient.")
+
+            # We must also check that there is at most one event per patient,
+            # and that the event is the last interval for that patient.
+            sorted_event = event[order]
+            # In our example: [False, True, False]
+            last_per_patient = sorted_patient[1:] != sorted_patient[:-1]
+            # The last interval of the list always counts as the last interval 
+            # of the last patient:
+            last_per_patient = np.concatenate((last_per_patient, [True]))
+
+            if np.any(sorted_event & ~last_per_patient):
+                raise ValueError(
+                    "Events can only occur for the last interval of a patient."
+                )
+
 
         # TODO: decide what to do with missing values in the covariates.
 
