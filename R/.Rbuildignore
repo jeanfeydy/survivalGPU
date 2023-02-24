@@ -4,3 +4,6 @@
 ^doc$
 ^Meta$
 ^benchmarks$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$

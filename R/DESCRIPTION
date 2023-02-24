@@ -25,6 +25,6 @@ Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 VignetteBuilder: knitr
-SystemRequirements: python, TensorFlow, pytorch, pytorch-scatter, pykeops
+SystemRequirements: python, pytorch, pytorch-scatter, pykeops
 URL: https://github.com/jeanfeydy/survivalGPU
 BugReports: https://github.com/jeanfeydy/survivalGPU/issues

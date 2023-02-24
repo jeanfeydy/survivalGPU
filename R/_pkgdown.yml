@@ -1,0 +1,19 @@
+url: ~
+template:
+  bootstrap: 5
+  bootswatch: cosmo
+
+reference:
+  - title: CoxPH
+    contents:
+    - contains("cox")
+
+  - title: WCE
+    contents:
+    - contains("wce")
+    - HR
+
+  - title: Utils
+    contents:
+    - use_cuda
+    - survivalGPU-package

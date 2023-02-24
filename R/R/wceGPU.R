@@ -90,7 +90,7 @@
 #' plot(wce_gpu)
 #'
 #' # WCE model with bootstrap (example with 20 bootstraps, but normally
-#' nbootstraps > 500)
+#' # nbootstraps > 500)
 #' wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = 90,
 #'                             id = "Id", event = "Event", start = "Start",
 #'                             stop = "Stop", expos = "dose",
