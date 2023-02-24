@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from .typecheck import typecheck, Optional, Callable
-from .typecheck import Int
+from .typecheck import typecheck, Optional, Callable, Union
+from .typecheck import Int, Real
 from .typecheck import UInt8Array, Int64Array, Float64Array
 
 
@@ -135,7 +135,12 @@ class SurvivalDataset:
     @typecheck
     def n_drugs(self) -> int:
         """Number of drugs that are referenced in the dataset."""
-        return 0 if self.dose_drug is None else int(np.max(self.dose_drug) + 1)
+        if self.dose_drug is None:
+            return 0
+        elif len(self.dose_drug) == 0:
+            return 0
+        else:
+            return int(np.max(self.dose_drug) + 1)
 
     @property
     @typecheck
@@ -261,7 +266,7 @@ class SurvivalDataset:
 
 
 @typecheck
-def death_condition(
+def consecutive_doses(
     *,
     start: Int,
     stop: Int,
@@ -269,9 +274,27 @@ def death_condition(
     dose: Optional[Float64Array["doses"]],
     dose_time: Optional[Int64Array["doses"]],
     dose_drug: Optional[Int64Array["doses"]],
+    poison_covariates: Union[Real, Float64Array["covariates"]] = 0.5,
+    poison_dose: Real = 0.5,
+    poison_time: Int = 1,
 ):
-    # Condition for death: either no covariate, or covariate[0] >= 0.5
-    at_risk = (covariates is None or covariates[0] >= 0.5)
+    """Simple risk model for a drug that kills with two consecutive doses.
+
+    The signature of this function corresponds to what is expected by `load_drugs`.
+    Given the medical record of a patient, this function returns a premature death
+    at time t if:
+    - All the `covariates` are >= the `poison_covariates` threshold (True if `covariates` is None).
+    - The patient has received at least two doses of the drug of interest,
+      that corresponds to `dose_drug == 0` (the other drugs have no influence on the risk).
+    - The patient has received a `dose >= poison_dose` at time t.
+    - The previous `dose` received was also `>= poison_dose`, and received in the
+      interval `[t - poison_time, t)`.
+    """
+    # Condition for death: either no covariate, or all covariates >= covariates_threshold.
+    if covariates is None:
+        at_risk = True
+    else:
+        at_risk = np.all(covariates >= poison_covariates)
 
     if dose is None:
         if covariates is None:
@@ -290,11 +313,10 @@ def death_condition(
         return False, stop
 
     # Condition for death: two consecutive doses
-    consecutive = times[1:] == times[:-1] + 1
+    consecutive = times[1:] <= times[:-1] + poison_time
 
-    # Condition for death: the two consecutive doses are above 0.5
-    min_dose = 0
-    thresh = (doses[:-1] >= min_dose) & (doses[1:] >= min_dose)
+    # Condition for death: the two consecutive doses are above a threshold
+    thresh = (doses[:-1] >= poison_dose) & (doses[1:] >= poison_dose)
 
     # Condition for death: the 2nd dose is observed after the start of the time interval
     after_start = times[1:] > start
@@ -317,7 +339,7 @@ def load_drugs(
     max_duration: int = 1,
     max_offset: int = 0,
     seed: Optional[int] = None,
-    risk_model: Callable = death_condition,
+    risk_model: Callable = consecutive_doses,
 ) -> SurvivalDataset:
     """Create a virtual dataset for testing using a simple risk model.
 
@@ -325,20 +347,29 @@ def load_drugs(
         n_covariates (int, optional): number of constant covariates. Defaults to 0.
         n_drugs (int, optional): number of drugs to test. Defaults to 1.
         n_patients (int, optional): number of patients. Defaults to 1.
-        n_times (int, optional): number of sampling times. Defaults to 1.
+        max_duration (int, optional): max size of the time interval per subject. Defaults to 1.
+        max_offset (int, optional): max offset of the time interval window per subject. Defaults to 0.
+        seed (int, optional): random seed that can be specified explicitly for the sake
+            of reproducibility. Defaults to None: a new seed is generated at each call.
+        risk_model (Callable, optional): function that is applied to the covariates
+            and drug consumption history of each patient to decide whether or not
+            "death" (= the event of interest) happened, and at which time.
+            This function that takes as input:
+            - start (int): the start of the time interval.
+            - stop (int): the suggested end of the time interval.
+            - covariates: a float64 (n_covariates,) array of covariates.
+            - dose: a float64 (n_doses,) array of doses.
+            - dose_time: a int64 (n_doses,) array of dose times.
+            - dose_drug: a int64 (n_doses,) array of dose drugs.
+            and returns:
+            - event: a boolean indicating whether the patient died in this interval.
+            - premature_stop: the time at which the patient died, or the end of the interval
+                if the patient did not die.
+            Defaults to `consecutive_doses`.
+
 
     Returns:
-        SurvivalDataset: contains arrays that describe a drug consumption dataset with:
-            - doses: a (Drugs, Patients, Times) float32 Tensor.
-            - times: a (Times,) int32 Tensor with the sampling times.
-            - events: a (Patients, Times) int32 Tensor whose values are equal to
-                0 if everything is all right, i.e. the patient is still "alive",
-                1 if the patient is "dying" at this exact moment,
-                2+ if this consumption happened after the event of interest,
-                   and should therefore be removed from the survival analysis.
-
-              Note that we deliberately include drug consumption data "after death"
-              as these may be relevant to a permutation test.
+        SurvivalDataset: contains arrays that describe a drug consumption dataset.
     """
 
     rng = np.random.default_rng(seed)
@@ -443,7 +474,7 @@ if __name__ == "__main__":
     import imageio
 
     ds = load_drugs(
-        n_covariates=1, n_drugs=1, n_patients=10, max_duration=100, max_offset=50
+        n_covariates=1, n_drugs=1, n_patients=20, max_duration=100, max_offset=50
     )
     imageio.imwrite("output_test_dataset.png", ds.to_img(pixel_size=10))
 
