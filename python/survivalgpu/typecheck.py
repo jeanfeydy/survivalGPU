@@ -12,6 +12,7 @@ def typecheck(func):
 
 
 Array = np.ndarray
+Bool = Union[bool, np.bool_]
 Int = Union[int, np.integer]
 Float = Union[float, np.floating]
 Real = Union[Int, Float]

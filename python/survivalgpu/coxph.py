@@ -24,6 +24,82 @@ from .optimizers import newton
 from .utils import numpy
 from .utils import use_cuda, device, float32, int32, int64
 
+from .typecheck import typecheck, Optional, Callable, Union
+from .typecheck import Int, Real, Bool
+from .typecheck import Int64Array, Float64Array
+
+from .datasets import SurvivalDataset
+
+
+class CoxPHSurvivalAnalysis:
+    """Cox Proportional Hazards model.
+
+    The API of this object is loosely based on scikit-survival.
+
+    Args:
+        alpha (float): L2 regularization parameter.
+        ties (str): Ties handling method. One of "efron", "breslow".
+        backend (str): Backend to use. One of "numpy", "csr", "torch".
+        bootstrap (int): Number of bootstrap samples to use.
+        batchsize (int): Number of bootstrap samples to process in parallel.
+        maxiter (int): Maximum number of Newton iterations.
+        eps (float): Convergence tolerance.
+        doscale (bool): Whether to scale the covariates for stability.
+        verbosity (int): Verbosity level.
+    """
+
+    @typecheck
+    def __init__(
+        self,
+        alpha: Real = 0.0,
+        ties: str = "efron",
+        backend: str = "csr",
+        maxiter: Int = 20,
+        eps: Real = 1e-5,
+        doscale: Bool = False,
+        verbosity: Int = 1,
+    ):
+        self.alpha = alpha
+        self.ties = ties
+        self.backend = backend
+        self.maxiter = maxiter
+        self.eps = eps
+        self.doscale = doscale
+        self.verbosity = verbosity
+
+    @typecheck
+    def fit(
+        self,
+        covariates: Float64Array["intervals covariates"],
+        stop: Int64Array["intervals"],
+        start: Optional[Int64Array["intervals"]] = None,
+        event: Optional[Int64Array["intervals"]] = None,
+        bootstrap: Optional[Int] = None,
+        batchsize: Optional[Int] = None,
+    ):
+        """Fit the model.
+
+        Args:
+            X (array-like): Covariates.
+            y (array-like): Survival times and event indicators.
+            sample_weight (array-like): Sample weights.
+        """
+        dataset = SurvivalDataset(
+            covariates=covariates,
+            stop=stop,
+            start=start,
+            event=event,
+        )
+
+        # Our main run was in no batch mode, so we "pop" the first dimension
+        stds = coxph_output["imat"][0].diagonal(dim1=-2, dim2=-1).sqrt()
+        Hessian = coxph_output["hessian"][0]
+        Imat = coxph_output["imat"][0]
+
+        assert stds.shape == (Drugs, Features)
+        assert Hessian.shape == (Drugs, Features, Features)
+        assert Imat.shape == (Drugs, Features, Features)
+
 
 # Main function:
 def coxph_torch(
@@ -439,61 +515,3 @@ def coxph_R(
         prof.export_chrome_trace(profile)
 
     return res
-
-
-class CoxPHSurvivalAnalysis:
-    """Cox Proportional Hazards model.
-
-    The API of this object is loosely based on scikit-survival.
-
-    Args:
-        alpha (float): L2 regularization parameter.
-        ties (str): Ties handling method. One of "efron", "breslow".
-        backend (str): Backend to use. One of "numpy", "csr", "torch".
-        bootstrap (int): Number of bootstrap samples to use.
-        batchsize (int): Number of bootstrap samples to process in parallel.
-        maxiter (int): Maximum number of Newton iterations.
-        eps (float): Convergence tolerance.
-        doscale (bool): Whether to scale the covariates for stability.
-        verbosity (int): Verbosity level.
-    """
-
-    def __init__(
-        self,
-        alpha=0.0,
-        ties="efron",
-        backend="torch",
-        bootstrap=1,
-        batchsize=0,
-        maxiter=20,
-        eps=1e-5,
-        doscale=False,
-        verbosity=1,
-    ):
-        self.alpha = alpha
-        self.ties = ties
-        self.backend = backend
-        self.bootstrap = bootstrap
-        self.batchsize = batchsize
-        self.maxiter = maxiter
-        self.eps = eps
-        self.doscale = doscale
-        self.verbosity = verbosity
-
-    def fit(self, X, y, sample_weight=None):
-        """Fit the model.
-
-        Args:
-            X (array-like): Covariates.
-            y (array-like): Survival times and event indicators.
-            sample_weight (array-like): Sample weights.
-        """
-
-        # Our main run was in no batch mode, so we "pop" the first dimension
-        stds = coxph_output["imat"][0].diagonal(dim1=-2, dim2=-1).sqrt()
-        Hessian = coxph_output["hessian"][0]
-        Imat = coxph_output["imat"][0]
-
-        assert stds.shape == (Drugs, Features)
-        assert Hessian.shape == (Drugs, Features, Features)
-        assert Imat.shape == (Drugs, Features, Features)

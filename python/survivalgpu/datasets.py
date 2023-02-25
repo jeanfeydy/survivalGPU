@@ -17,9 +17,9 @@ def contains_duplicates(X):
 class SurvivalDataset:
     """A dataset for survival analysis.
 
-    We observe I intervals: 
+    We observe I intervals:
     - if `patient is None`, we assume that each patient is observed with a single interval.
-    - if `patient` is provided as an integer array of shape (I,), 
+    - if `patient` is provided as an integer array of shape (I,),
       we assume that the i-th interval correspond to the `patient[i]`-th patient.
 
     For each interval, we may also observe C covariates: these may correspond to
@@ -127,7 +127,7 @@ class SurvivalDataset:
             sorted_event = event[order]
             # In our example: [False, True, False]
             last_per_patient = sorted_patient[1:] != sorted_patient[:-1]
-            # The last interval of the list always counts as the last interval 
+            # The last interval of the list always counts as the last interval
             # of the last patient:
             last_per_patient = np.concatenate((last_per_patient, [True]))
 
@@ -135,7 +135,6 @@ class SurvivalDataset:
                 raise ValueError(
                     "Events can only occur for the last interval of a patient."
                 )
-
 
         # TODO: decide what to do with missing values in the covariates.
 
