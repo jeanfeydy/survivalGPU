@@ -22,11 +22,13 @@ coxph_objectives = {
 from .optimizers import newton
 
 from .utils import numpy
-from .utils import use_cuda, device, float32, int32, int64
+from .utils import use_cuda, float32, int32, int64
+from .utils import device as default_device
 
 from .typecheck import typecheck, Optional, Callable, Union
 from .typecheck import Int, Real, Bool
 from .typecheck import Int64Array, Float64Array
+from .typecheck import Int64Tensor, Float32Tensor
 
 from .datasets import SurvivalDataset
 
@@ -74,8 +76,12 @@ class CoxPHSurvivalAnalysis:
         stop: Int64Array["intervals"],
         start: Optional[Int64Array["intervals"]] = None,
         event: Optional[Int64Array["intervals"]] = None,
-        bootstrap: Optional[Int] = None,
-        batchsize: Optional[Int] = None,
+        strata: Optional[Int64Array["intervals"]] = None,
+        batch: Optional[Int64Array["intervals"]] = None,
+        patient: Optional[Int64Array["intervals"]] = None,
+        n_bootstraps: Optional[Int] = None,
+        batch_size: Optional[Int] = None,
+        device: Optional[str] = None,
     ):
         """Fit the model.
 
@@ -84,12 +90,68 @@ class CoxPHSurvivalAnalysis:
             y (array-like): Survival times and event indicators.
             sample_weight (array-like): Sample weights.
         """
+        if device is None:
+            device = default_device
+
+        # Create a dataset object: this enforces checks on the input data
         dataset = SurvivalDataset(
             covariates=covariates,
             stop=stop,
             start=start,
             event=event,
+            strata=strata,
+            batch=batch,
+            patient=patient,
         )
+        # Re-encode the data arrays as PyTorch tensors on the correct device,
+        # with the correct dtype (float64 -> float32)
+        dataset = dataset.to_torch(device)
+        # Re-order the input arrays by lexicographical order on (batch, strata, stop, event):
+        dataset.sort()
+        # Scale the covariates for the sake of numerical stability:
+        if self.doscale:
+            dataset.scale()
+        # Count the number of death times:
+        dataset.count_deaths()
+        # Filter out the times where no one dies:
+        dataset.filter_deaths()
+
+        # Choose the fastest implementation of the CoxPH objective:
+
+        # Case 1: all the intervals are )t-1, t] (i.e. no-interval mode),
+        # we can group times using equality conditions on the stop times.
+        # This is typically the case when using time-dependent covariates as in the WCE model.
+        if torch.all(dataset.stop == dataset.start + 1):
+            objective = coxph_objective_unit_intervals
+
+        # Case 2: all the intervals are )0, t]:
+        # this opens the door to a more efficient implementation using the cumulative hazard.
+        elif torch.all(dataset.start == 0):
+            raise NotImplementedError(
+                "Currently, we only support 'no-interval mode' where all intervals are of length 1."
+            )
+
+        # Case 3: general case )start, stop], we use two cumulative hazards:
+        else:
+            raise NotImplementedError(
+                "Currently, we only support 'no-interval mode' where all intervals are of length 1."
+            )
+
+        def loss(coef):
+            pass
+
+        for batch in dataset.batches(n_bootstraps=n_bootstraps, batch_size=batch_size):
+
+            init = torch.zeros(
+                (dataset.n_batch, dataset.n_features), dtype=float32, device=device
+            )
+            res = newton(
+                loss=loss,
+                start=init,
+                maxiter=self.maxiter,
+                eps=self.eps,
+                verbosity=self.verbosity,
+            )
 
         # Our main run was in no batch mode, so we "pop" the first dimension
         stds = coxph_output["imat"][0].diagonal(dim1=-2, dim2=-1).sqrt()
@@ -99,6 +161,14 @@ class CoxPHSurvivalAnalysis:
         assert stds.shape == (Drugs, Features)
         assert Hessian.shape == (Drugs, Features, Features)
         assert Imat.shape == (Drugs, Features, Features)
+
+    @typecheck
+    def _linear_risk_scores(
+        coef: Float32Tensor["batches covariates"],
+        X: Float32Tensor["intervals covariates"],
+    ) -> Float32Tensor["batches intervals"]:
+        """Standard function to compute risks in the CoxPH model: dot(beta, x[i])."""
+        return coef @ X.T  # (B, D) @ (D, I) -> (B, I)
 
 
 # Main function:
