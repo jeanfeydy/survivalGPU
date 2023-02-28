@@ -21,6 +21,8 @@ Real = Union[Int, Float]
 Int64 = np.int64
 Float64 = np.float64
 
+TorchDevice = Union[str, torch.device]
+
 
 class UInt8Array:
     """Numpy Array of uint8."""

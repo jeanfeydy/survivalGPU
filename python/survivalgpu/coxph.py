@@ -29,6 +29,7 @@ from .typecheck import typecheck, Optional, Callable, Union
 from .typecheck import Int, Real, Bool
 from .typecheck import Int64Array, Float64Array
 from .typecheck import Int64Tensor, Float32Tensor
+from .typecheck import TorchDevice
 
 from .datasets import SurvivalDataset
 
@@ -74,14 +75,15 @@ class CoxPHSurvivalAnalysis:
         self,
         covariates: Float64Array["intervals covariates"],
         stop: Int64Array["intervals"],
+        *,
         start: Optional[Int64Array["intervals"]] = None,
         event: Optional[Int64Array["intervals"]] = None,
-        strata: Optional[Int64Array["intervals"]] = None,
-        batch: Optional[Int64Array["intervals"]] = None,
         patient: Optional[Int64Array["intervals"]] = None,
+        strata: Optional[Int64Array["patients"]] = None,
+        batch: Optional[Int64Array["patients"]] = None,
         n_bootstraps: Optional[Int] = None,
         batch_size: Optional[Int] = None,
-        device: Optional[str] = None,
+        device: Optional[TorchDevice] = None,
     ):
         """Fit the model.
 
@@ -97,9 +99,9 @@ class CoxPHSurvivalAnalysis:
             stop=stop,
             start=start,
             event=event,
+            patient=patient,
             strata=strata,
             batch=batch,
-            patient=patient,
         )
         # Re-encode the data arrays as PyTorch tensors on the correct device,
         # with the correct dtype (float64 -> float32)

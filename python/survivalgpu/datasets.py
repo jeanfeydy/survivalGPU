@@ -1,8 +1,13 @@
 import numpy as np
+import torch
+
 from matplotlib import pyplot as plt
 from .typecheck import typecheck, Optional, Callable, Union
 from .typecheck import Int, Real
 from .typecheck import UInt8Array, Int64Array, Float64Array
+from .typecheck import TorchDevice
+
+from .torch_datasets import TorchSurvivalDataset
 
 
 def contains_duplicates(X):
@@ -18,7 +23,8 @@ class SurvivalDataset:
     """A dataset for survival analysis.
 
     We observe I intervals:
-    - if `patient is None`, we assume that each patient is observed with a single interval.
+    - if `patient is None`, we assume that each patient is observed with a single interval,
+      i.e. patient = [0, 1, ..., I-1].
     - if `patient` is provided as an integer array of shape (I,),
       we assume that the i-th interval correspond to the `patient[i]`-th patient.
 
@@ -33,11 +39,25 @@ class SurvivalDataset:
     - `dose_patient`: the patient to which the dose belongs, as an integer label.
     - `dose_drug`: the drug to which the dose belongs, as an integer label.
 
+    Please note that the optional "strata" and "batch" attributes can be used to
+    split the dataset into multiple groups: these arrays of shape
+    (n_patients,) contain group labels for each patient.
+    More precisely:
+    - batches are used to split the dataset into multiple disjoint subsets.
+      These do not interact with each other: we train a separate model for each batch.
+    - within a batch, we may split the dataset into multiple strata.
+      These sub-groups contribute to separate terms in e.g. the Cox PH likelihood.
+      Patients that belong to one strata are never compared to patients that belong
+      to another strata, but a trained model will try to get the best possible
+      performance on all strata that belong to a batch.
+
     Attributes:
         stop (int64 (I,) array): the end time of each interval.
         start (int64 (I,) array): the start time of each interval.
         event (int64 (I,) array): the event type at the end of each interval.
         patient (int64 (I,) array): the patient to which each interval belongs.
+        strata (int64 (P,) array): the strata to which each patient belongs.
+        batch (int64 (P,) array): the batch to which each patient belongs.
         covariates (float64 (I,C) array): the covariates of each interval.
         dose (float64 (D,) array): the dose of each drug.
         dose_time (int64 (D,) array): the time at which each dose was taken.
@@ -48,10 +68,13 @@ class SurvivalDataset:
     @typecheck
     def __init__(
         self,
+        *,
         stop: Int64Array["intervals"],
         start: Optional[Int64Array["intervals"]] = None,
         event: Optional[Int64Array["intervals"]] = None,
         patient: Optional[Int64Array["intervals"]] = None,
+        strata: Optional[Int64Array["patients"]] = None,
+        batch: Optional[Int64Array["patients"]] = None,
         covariates: Optional[Float64Array["intervals covariates"]] = None,
         dose: Optional[Float64Array["doses"]] = None,
         dose_time: Optional[Int64Array["doses"]] = None,
@@ -150,6 +173,56 @@ class SurvivalDataset:
         self.dose_time = dose_time
         self.dose_patient = dose_patient
         self.dose_drug = dose_drug
+
+        # N.B.: we check for strata and batch once "self.patient" has been set.
+        # Checks for strata -------------------------------------------------------------
+        # Default value for strata is [0, 0, 0, ...]: all patients belong to the same stratum.
+        if strata is None:
+            strata = np.zeros_like(patient)
+
+        if strata.shape != (self.n_patients,):
+            raise ValueError(
+                "Strata must be a vector of length n_patients = max(patient) + 1. "
+                f"Got {strata.shape} instead of {self.n_patients}."
+            )
+
+        # Checks for batch --------------------------------------------------------------
+        # Default value for batch is [0, 0, 0, ...]: all patients belong to the same batch.
+        if batch is None:
+            batch = np.zeros_like(patient)
+
+        if batch.shape != (self.n_patients,):
+            raise ValueError(
+                "Batch must be a vector of length n_patients = max(patient) + 1. "
+                f"Got {batch.shape} instead of {self.n_patients}."
+            )
+
+        self.strata = strata
+        self.batch = batch
+
+    @typecheck
+    def to_torch(self, device: TorchDevice) -> TorchSurvivalDataset:
+        """Converts the dataset to a TorchSurvivalDataset.
+
+        This new representation is meant to be used internally by the library,
+        with e.g. faster sorting on the GPU.
+        """
+
+        def to_int(x):
+            return torch.tensor(x, dtype=torch.int64, device=device)
+
+        def to_float(x):
+            return torch.tensor(x, dtype=torch.float32, device=device)
+
+        return TorchSurvivalDataset(
+            stop=to_int(self.stop),
+            start=to_int(self.start),
+            event=to_int(self.event),
+            patient=to_int(self.patient),
+            strata=to_int(self.strata),
+            batch=to_int(self.batch),
+            covariates=to_float(self.covariates),
+        )
 
     @property
     @typecheck
