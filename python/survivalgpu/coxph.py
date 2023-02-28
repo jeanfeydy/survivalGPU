@@ -110,13 +110,17 @@ class CoxPHSurvivalAnalysis:
         dataset.sort()
         # Scale the covariates for the sake of numerical stability:
         if self.doscale:
-            dataset.scale()
+            means, scales = dataset.scale()
+        else:
+            means, scales = None, None
+
         # Count the number of death times:
         dataset.count_deaths()
         # Filter out the times where no one dies:
         dataset.filter_deaths()
 
-        # Choose the fastest implementation of the CoxPH objective:
+        # Choose the fastest implementation of the CoxPH objective,
+        # i.e. the partial neg-log-likelihood of the CoxPH model.
 
         # Case 1: all the intervals are )t-1, t] (i.e. no-interval mode),
         # we can group times using equality conditions on the stop times.
@@ -137,30 +141,72 @@ class CoxPHSurvivalAnalysis:
                 "Currently, we only support 'no-interval mode' where all intervals are of length 1."
             )
 
-        def loss(coef):
-            pass
+        # Define the loss function:
+        def loss(coef, batch=None):
+            """Our loss function, including the L2 regularization term."""
+            obj = objective(coef=coef, dataset=dataset, batch=batch)
+            reg = self.alpha * (coef**2).sum(dim=1)
+            return obj + reg
 
-        for batch in dataset.batches(n_bootstraps=n_bootstraps, batch_size=batch_size):
+        # Run the Newton optimizer:
+        init = torch.zeros(
+            (dataset.n_batch, dataset.n_features), dtype=float32, device=device
+        )
+        res = newton(
+            loss=loss,
+            start=init,
+            maxiter=self.maxiter,
+            eps=self.eps,
+            verbosity=self.verbosity,
+        )
 
-            init = torch.zeros(
-                (dataset.n_batch, dataset.n_features), dtype=float32, device=device
-            )
-            res = newton(
-                loss=loss,
-                start=init,
-                maxiter=self.maxiter,
-                eps=self.eps,
-                verbosity=self.verbosity,
-            )
+        # Extract the results:
+        self.means_ = means
+        self.coef_ = res.pop("x")
+        self.u_ = -res.pop("grad")
+        self.sctest_init_ = res.pop("score test init")
+        self.loglik_init_ = -loss(init)
+        self.loglik_ = -res.pop("fun")
+        self.hessian_ = res.pop("hessian")
+        # N.B.: using cholesky_inverse guarantees the symmetry of the result:
+        if False:
+            self.imat_ = torch.cholesky_inverse(torch.linalg.cholesky(self.hessian_))
+        else:
+            self.imat_ = torch.inverse(self.hessian_)
+            self.imat_ = (self.imat_ + self.imat_.transpose(-1, -2)) / 2
 
         # Our main run was in no batch mode, so we "pop" the first dimension
-        stds = coxph_output["imat"][0].diagonal(dim1=-2, dim2=-1).sqrt()
-        Hessian = coxph_output["hessian"][0]
-        Imat = coxph_output["imat"][0]
+        stds = res["imat"][0].diagonal(dim1=-2, dim2=-1).sqrt()
+        Hessian = res["hessian"][0]
+        Imat = res["imat"][0]
 
         assert stds.shape == (Drugs, Features)
         assert Hessian.shape == (Drugs, Features, Features)
         assert Imat.shape == (Drugs, Features, Features)
+
+        # Compute a distribution of the coefficients using bootstrap:
+        if n_bootstraps is not None:
+            for batch in dataset.batches(
+                n_bootstraps=n_bootstraps, batch_size=batch_size
+            ):
+
+                init = torch.zeros(
+                    (dataset.n_batch, dataset.n_features), dtype=float32, device=device
+                )
+                res = newton(
+                    loss=loss,
+                    start=init,
+                    maxiter=self.maxiter,
+                    eps=self.eps,
+                    verbosity=self.verbosity,
+                )
+
+        # If the covariates have been normalized for the sake of stability,
+        # we shouldn't forget to "de-normalize" the results:
+        self.rescale(scales)
+
+        # And finally, convert all the attributes to NumPy arrays:
+        self.to_numpy()
 
     @typecheck
     def _linear_risk_scores(
@@ -531,6 +577,7 @@ def coxph_numpy(
     deaths,
     **kwargs,
 ):
+    device = default_device
     x = torch.tensor(x, dtype=float32, device=device)
     times = torch.tensor(times, dtype=int32, device=device)
     deaths = torch.tensor(deaths, dtype=int32, device=device)
