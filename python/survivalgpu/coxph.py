@@ -90,9 +90,7 @@ class CoxPHSurvivalAnalysis:
             y (array-like): Survival times and event indicators.
             sample_weight (array-like): Sample weights.
         """
-        if device is None:
-            device = default_device
-
+        # Pre-process the input data: ----------------------------------------------------
         # Create a dataset object: this enforces checks on the input data
         dataset = SurvivalDataset(
             covariates=covariates,
@@ -105,9 +103,13 @@ class CoxPHSurvivalAnalysis:
         )
         # Re-encode the data arrays as PyTorch tensors on the correct device,
         # with the correct dtype (float64 -> float32)
+        if device is None:
+            device = default_device
         dataset = dataset.to_torch(device)
+
         # Re-order the input arrays by lexicographical order on (batch, strata, stop, event):
         dataset.sort()
+
         # Scale the covariates for the sake of numerical stability:
         if self.doscale:
             means, scales = dataset.scale()
@@ -116,10 +118,13 @@ class CoxPHSurvivalAnalysis:
 
         # Count the number of death times:
         dataset.count_deaths()
+
         # Filter out the times where no one dies:
         dataset.filter_deaths()
 
-        # Choose the fastest implementation of the CoxPH objective,
+        n_batch, n_features = dataset.n_batch, dataset.n_features
+
+        # Choose the fastest implementation of the CoxPH objective, ----------------------
         # i.e. the partial neg-log-likelihood of the CoxPH model.
 
         # Case 1: all the intervals are )t-1, t] (i.e. no-interval mode),
@@ -148,10 +153,8 @@ class CoxPHSurvivalAnalysis:
             reg = self.alpha * (coef**2).sum(dim=1)
             return obj + reg
 
-        # Run the Newton optimizer:
-        init = torch.zeros(
-            (dataset.n_batch, dataset.n_features), dtype=float32, device=device
-        )
+        # Run the Newton optimizer: ------------------------------------------------------
+        init = torch.zeros((n_batch, n_features), dtype=float32, device=device)
         res = newton(
             loss=loss,
             start=init,
@@ -160,39 +163,36 @@ class CoxPHSurvivalAnalysis:
             verbosity=self.verbosity,
         )
 
-        # Extract the results:
+        # Extract the results: -----------------------------------------------------------
+
+        # Coef is the truly important result:
+        self.coef_ = res.x
+
+        # We also include information to ensure compatibility with the R survival package:
         self.means_ = means
-        self.coef_ = res.pop("x")
-        self.u_ = -res.pop("grad")
-        self.sctest_init_ = res.pop("score test init")
-        self.loglik_init_ = -loss(init)
-        self.loglik_ = -res.pop("fun")
-        self.hessian_ = res.pop("hessian")
-        # N.B.: using cholesky_inverse guarantees the symmetry of the result:
-        if False:
-            self.imat_ = torch.cholesky_inverse(torch.linalg.cholesky(self.hessian_))
-        else:
-            self.imat_ = torch.inverse(self.hessian_)
-            self.imat_ = (self.imat_ + self.imat_.transpose(-1, -2)) / 2
+        # Gradient of the log-likehood at the optimum:
+        self.score_ = -res.jac
+        # Score test statistics (= dot(step, gradient)) at iteration 0:
+        self.sctest_init_ = res.score_test_init
+        # Log-likelihood at iteration 0:
+        self.loglik_init_ = -res.fun_init
+        # Log-likelihood at the optimum:
+        self.loglik_ = -res.fun
+        # Hessian of the log-likelihood at the optimum:
+        self.hessian_ = res.hess
+        # Inverse of the Hessian at the optimum:
+        self.imat_ = res.imat
+        # Estimate for the standard errors of the coefficients:
+        self.std_ = res.std
 
-        # Our main run was in no batch mode, so we "pop" the first dimension
-        stds = res["imat"][0].diagonal(dim1=-2, dim2=-1).sqrt()
-        Hessian = res["hessian"][0]
-        Imat = res["imat"][0]
-
-        assert stds.shape == (Drugs, Features)
-        assert Hessian.shape == (Drugs, Features, Features)
-        assert Imat.shape == (Drugs, Features, Features)
-
-        # Compute a distribution of the coefficients using bootstrap:
+        # If required, compute a distribution of the coefficients using bootstrap: -------
         if n_bootstraps is not None:
+            bootstrap_coef = []
             for batch in dataset.batches(
                 n_bootstraps=n_bootstraps, batch_size=batch_size
             ):
 
-                init = torch.zeros(
-                    (dataset.n_batch, dataset.n_features), dtype=float32, device=device
-                )
+                init = torch.zeros((n_batch, n_features), dtype=float32, device=device)
                 res = newton(
                     loss=loss,
                     start=init,
@@ -201,12 +201,34 @@ class CoxPHSurvivalAnalysis:
                     verbosity=self.verbosity,
                 )
 
+            self.bootstrap_coef_ = torch.stack(bootstrap_coef)
+
         # If the covariates have been normalized for the sake of stability,
         # we shouldn't forget to "de-normalize" the results:
-        self.rescale(scales)
+        self._rescale(scales)
 
-        # And finally, convert all the attributes to NumPy arrays:
+        # And convert all the attributes to NumPy float64 arrays:
         self.to_numpy()
+
+        # Finally, check the shapes of the results: --------------------------------------
+        loglik_shape = (n_batch,)
+        coef_shape = (n_batch, n_features)
+        hessian_shape = (n_batch, n_features, n_features)
+
+        assert self.means_.shape == coef_shape
+        assert self.coef_.shape == coef_shape
+        assert self.std_.shape == coef_shape
+        assert self.score_.shape == coef_shape
+
+        assert self.sctest_init_.shape == loglik_shape
+        assert self.loglik_init_.shape == loglik_shape
+        assert self.loglik_.shape == loglik_shape
+
+        assert self.hessian_.shape == hessian_shape
+        assert self.imat_.shape == hessian_shape
+
+        if n_bootstraps is not None:
+            assert self.bootstrap_coef_.shape == (n_bootstraps, n_batch, n_features)
 
     @typecheck
     def _linear_risk_scores(
