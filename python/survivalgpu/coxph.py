@@ -113,10 +113,7 @@ class CoxPHSurvivalAnalysis:
         dataset.sort()
 
         # Scale the covariates for the sake of numerical stability:
-        if self.doscale:
-            means, scales = dataset.scale()
-        else:
-            means, scales = None, None
+        means, scales = dataset.scale(rescale=self.doscale)
 
         # Count the number of death times:
         dataset.count_deaths()
@@ -124,7 +121,7 @@ class CoxPHSurvivalAnalysis:
         # Filter out the times where no one dies:
         dataset.filter_deaths()
 
-        n_batch, n_features = dataset.n_batch, dataset.n_features
+        n_batch, n_covariates = dataset.n_batch, dataset.n_covariates
 
         # Choose the fastest implementation of the CoxPH objective, ----------------------
         # i.e. the partial neg-log-likelihood of the CoxPH model.
@@ -156,7 +153,7 @@ class CoxPHSurvivalAnalysis:
             return obj + reg
 
         # Run the Newton optimizer: ------------------------------------------------------
-        init = torch.zeros((n_batch, n_features), dtype=float32, device=device)
+        init = torch.zeros((n_batch, n_covariates), dtype=float32, device=device)
         res = newton(
             loss=loss,
             start=init,
@@ -194,7 +191,9 @@ class CoxPHSurvivalAnalysis:
                 n_bootstraps=n_bootstraps, batch_size=batch_size
             ):
 
-                init = torch.zeros((n_batch, n_features), dtype=float32, device=device)
+                init = torch.zeros(
+                    (n_batch, n_covariates), dtype=float32, device=device
+                )
                 res = newton(
                     loss=loss,
                     start=init,
@@ -214,8 +213,8 @@ class CoxPHSurvivalAnalysis:
 
         # Finally, check the shapes of the results: --------------------------------------
         loglik_shape = (n_batch,)
-        coef_shape = (n_batch, n_features)
-        hessian_shape = (n_batch, n_features, n_features)
+        coef_shape = (n_batch, n_covariates)
+        hessian_shape = (n_batch, n_covariates, n_covariates)
 
         assert self.means_.shape == coef_shape
         assert self.coef_.shape == coef_shape
@@ -230,7 +229,7 @@ class CoxPHSurvivalAnalysis:
         assert self.imat_.shape == hessian_shape
 
         if n_bootstraps is not None:
-            assert self.bootstrap_coef_.shape == (n_bootstraps, n_batch, n_features)
+            assert self.bootstrap_coef_.shape == (n_bootstraps, n_batch, n_covariates)
 
     @typecheck
     def _linear_risk_scores(

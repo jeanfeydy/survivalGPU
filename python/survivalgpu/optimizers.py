@@ -22,6 +22,7 @@ else:
 self.std_ = self.imat_.diagonal(dim1=-2, dim2=-1).sqrt()
 """
 
+
 def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):
     """Estimates optimal parameters by minimizing a convex objective function.
 
