@@ -214,3 +214,104 @@ def test_scale(n_intervals: int, n_covariates: int, rescale: bool, device: str):
             )
     else:
         assert scales is None
+
+
+@given(
+    n_covariates=small_int,
+    device=st_device,
+)
+def test_count_death_basic(n_covariates: int, device: str):
+    """Tests the cound_deaths method of TorchSurvivalDataset on a handcrafted example."""
+    stop = np.array([2, 2, 2, 2, 2, 5, 5, 6, 6, 6])
+    event = np.array([0, 0, 0, 1, 1, 0, 1, 0, 0, 1])
+    covariates = np.zeros((len(stop), n_covariates))
+    dataset = SurvivalDataset(stop=stop, event=event, covariates=covariates)
+    dataset = dataset.to_torch(device).sort().count_deaths()
+
+    assert dataset.is_sorted
+    assert torch.equal(
+        dataset.unique_groups,
+        torch.tensor(
+            [
+                [0, 0, 0],
+                [0, 0, 0],
+                [2, 5, 6],
+            ],
+            dtype=torch.int64,
+            device=device,
+        ),
+    )
+    assert dataset.n_groups == 3
+    assert torch.equal(
+        dataset.tied_deaths, torch.tensor([2, 1, 1], dtype=torch.int64, device=device)
+    )
+
+
+@given(
+    n_intervals=small_int,
+    n_covariates=small_int,
+    n_batches=small_int,
+    n_strata=small_int,
+    device=st_device,
+)
+def test_count_death(
+    n_intervals: int,
+    n_covariates: int,
+    n_batches: int,
+    n_strata: int,
+    device: str,
+):
+    """Tests the count_deaths method of TorchSurvivalDataset on a synthetic example."""
+    rng = np.random.default_rng()
+    # Create a simple dataset with 2 groups per batch and per strata:
+    stop, event, batch, strata, covariates = [], [], [], [], []
+
+    tied_deaths = []
+    # Loop over the batches and stratas:
+    for b in range(n_batches):
+        for s in range(n_strata):
+            n_total = 0  # total number of intervals for the current batch and strata
+            time = 0  # start time
+            n_groups = rng.integers(low=1, high=10)  # number of distinct stop times
+            for _ in range(n_groups):
+                # We progressively increase the time:
+                time += rng.integers(low=1, high=10)
+                n_censored = rng.integers(low=1, high=10)
+                n_death = rng.integers(low=1, high=10)
+
+                n_total += n_censored + n_death
+                stop += [
+                    time * np.ones(n_censored + n_death, dtype=np.int64),
+                ]
+                event += [
+                    np.zeros(n_censored, dtype=np.int64),
+                    np.ones(n_death, dtype=np.int64),
+                ]
+                tied_deaths += [n_death]
+
+            batch += [b * np.ones(n_total, dtype=np.int64)]
+            strata += [s * np.ones(n_total, dtype=np.int64)]
+            covariates += [np.zeros((n_total, n_covariates), dtype=np.float64)]
+
+    # Spice things up with a random permutation:
+    perm = rng.permutation(len(np.concatenate(stop)))
+
+    dataset = (
+        SurvivalDataset(
+            stop=np.concatenate(stop)[perm],
+            event=np.concatenate(event)[perm],
+            batch=np.concatenate(batch)[perm],
+            strata=np.concatenate(strata)[perm],
+            covariates=np.concatenate(covariates)[perm, :],
+        )
+        .to_torch(device=device)
+        .sort()
+        .count_deaths()
+    )
+
+    assert dataset.is_sorted
+    assert dataset.n_groups == len(tied_deaths)
+    assert torch.equal(
+        dataset.tied_deaths,
+        torch.tensor(tied_deaths, dtype=torch.int64, device=device),
+    )

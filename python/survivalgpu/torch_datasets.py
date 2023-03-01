@@ -80,6 +80,7 @@ class TorchSurvivalDataset:
 
         # N.B.: self.strata and self.batch are not re-ordered, because they are
         #       arrays of length n_patients.
+        return self
 
     @typecheck
     def scale(
@@ -113,9 +114,10 @@ class TorchSurvivalDataset:
         assert self.is_sorted, "The dataset must be sorted before counting deaths."
 
         # Count the number of death times:
-        unique_groups, self.group = torch.unique_consecutive(
+        self.unique_groups, self.group = torch.unique_consecutive(
             torch.stack((self.batch_intervals, self.strata_intervals, self.stop)),
             return_inverse=True,
+            dim=-1,
         )
         # For instance, for a simple dataset with 1 batch, 1 strata and 3 unique stop times:
         # - self.batch_intervals  = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -126,8 +128,8 @@ class TorchSurvivalDataset:
         #  [0, 0, 0],
         #  [2, 5, 6]]
         # and self.group is (I,), e.g. [0, 0, 0, 0, 0, 1, 1, 2, 2, 2]
-        assert unique_groups.shape[0] == 3
-        self.n_groups = unique_groups.shape[1]  # in our example, T = 3
+        assert self.unique_groups.shape[0] == 3
+        self.n_groups = self.unique_groups.shape[1]  # in our example, T = 3
 
         # For each group, count the number of (possibly tied) deaths:
         self.tied_deaths = torch.bincount(
@@ -135,3 +137,4 @@ class TorchSurvivalDataset:
         )
         # self.tied_deaths is (T,), e.g. [2, 1, 1]
         # if self.event == [0, 0, 0, 1, 1, 0, 1, 0, 0, 1].
+        return self
