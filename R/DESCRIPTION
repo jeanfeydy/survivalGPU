@@ -16,13 +16,12 @@ Imports:
     reticulate,
     stats,
     survival,
-    tinytest,
-    utils,
-    WCE
+    utils
 Suggests: 
     knitr,
     rmarkdown,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    WCE
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 SystemRequirements: python, pytorch, pytorch-scatter, pykeops

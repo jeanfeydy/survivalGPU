@@ -806,8 +806,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   rname <- row.names(mf)
 
-  # if (type == "right") stop("right Surv not yet implemented in coxphGPU.
-  #                          Please use `Surv(time1,time2,event)` in formaula")
+  if (type == "right") stop("right Surv not yet implemented in coxphGPU.
+                           Please use `Surv(time1,time2,event)` in formula")
 
   # from agreg.fit.R (survival) / for counting type Surv object
   nvar <- ncol(X)
@@ -967,7 +967,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   coef <- coxfit$coef
   colnames(coef) <- dimnames(X)[[2]]
-  var <- lapply(c(1:bootstrap), function(x) coxfit$imat[x, , ])
+  var <- lapply(c(1:bootstrap), function(x) matrix(coxfit$imat[x, , ],
+                                                   ncol = ncol(coef)))
 
   # fit, object to return
   if (bootstrap > 1 & !isTRUE(all.results)) {

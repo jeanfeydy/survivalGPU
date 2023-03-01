@@ -75,3 +75,16 @@ test_that("residuals", {
 #
 # right_coxph<-coxph(Surv(Stop, Event) ~ sex + age,
 #                    drugdata2)
+
+
+# snapshot
+test_that("CoxPH counting", {
+  expect_snapshot({
+    coxphGPU(Surv(Start,Stop, Event) ~ sex + age,
+             data = drugdata)
+  })
+  expect_snapshot({
+    coxphGPU(Surv(Start,Stop, Event) ~ sex,
+             data = drugdata)
+  })
+})
