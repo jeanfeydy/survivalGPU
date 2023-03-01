@@ -119,7 +119,7 @@ class CoxPHSurvivalAnalysis:
         dataset.count_deaths()
 
         # Filter out the times where no one dies:
-        dataset.filter_deaths()
+        dataset.prune()
 
         n_batch, n_covariates = dataset.n_batch, dataset.n_covariates
 

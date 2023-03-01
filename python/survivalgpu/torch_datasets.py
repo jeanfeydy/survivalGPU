@@ -138,3 +138,48 @@ class TorchSurvivalDataset:
         # self.tied_deaths is (T,), e.g. [2, 1, 1]
         # if self.event == [0, 0, 0, 1, 1, 0, 1, 0, 0, 1].
         return self
+
+    def prune(self):
+        """Filters out the intervals that have no impact on the CoxPH likelihood.
+
+        This may be a common occurence in some datasets where the raw
+        "start-stop times" sample every single month or year, including
+        times where no event occurs.
+        This optimization should have zero impact on the final result of a CoxPH fit.
+        We leave it enabled by default - but feel free to comment it out if needed.
+
+        Please note that the means and scales are not affected by this filtering pass,
+        as we stick to the conventions of the R survival package.
+        """
+        # Make sure that (batch > strata > stop > event) is lexicographically sorted:
+        assert self.is_sorted, "The dataset must be sorted before pruning."
+        # Make sure that the deaths have been counted by looking for the tied_deaths attribute:
+        assert hasattr(
+            self, "tied_deaths"
+        ), "Please apply `.count_deaths()` before pruning."
+
+        # We only implement some pruning if the start-stop times are consecutive:
+        if torch.any(self.stop != self.start + 1):
+            return self
+        # From now on, we assume that the intervals are (stop-1, stop]
+
+        # Filter out the groups that have no deaths:
+        mask = self.tied_deaths[self.group] > 0
+        assert mask.shape == self.stop.shape
+
+        # Just keep the lines that correspond to times where someone dies:
+        self.stop = self.stop[mask]
+        self.start = self.start[mask]
+        self.event = self.event[mask]
+        self.patient = self.patient[mask]
+        self.covariates = self.covariates[mask, :]
+        self.batch_intervals = self.batch_intervals[mask]
+        self.strata_intervals = self.strata_intervals[mask]
+
+        # Don't forget to re-count the deaths:
+        self.count_deaths()
+        # This updates self.group, self.unique_groups, self.n_groups and self.tied_deaths
+        # We can now check that the filtering worked as expected:
+        assert (self.tied_deaths > 0).all()
+
+        return self

@@ -132,7 +132,7 @@ def test_sort(
     max_time: int,
     device: str,
 ):
-    """Tests the scale method of TorchSurvivalDataset."""
+    """Tests the `.sort()` method of TorchSurvivalDataset."""
 
     # N.B.: For the sake of simplicity, we assume one interval per patient:
     n_patients = n_intervals
@@ -172,7 +172,7 @@ def test_sort(
     device=st_device,
 )
 def test_scale(n_intervals: int, n_covariates: int, rescale: bool, device: str):
-    """Tests the rescaling method of TorchSurvivalDataset."""
+    """Tests the `.scale()` method of TorchSurvivalDataset."""
 
     # Create a minimal random dataset:
     rng = np.random.default_rng()
@@ -220,8 +220,8 @@ def test_scale(n_intervals: int, n_covariates: int, rescale: bool, device: str):
     n_covariates=small_int,
     device=st_device,
 )
-def test_count_death_basic(n_covariates: int, device: str):
-    """Tests the cound_deaths method of TorchSurvivalDataset on a handcrafted example."""
+def test_count_death_simple(n_covariates: int, device: str):
+    """Tests the `.count_deaths()` method of TorchSurvivalDataset on a handcrafted example."""
     stop = np.array([2, 2, 2, 2, 2, 5, 5, 6, 6, 6])
     event = np.array([0, 0, 0, 1, 1, 0, 1, 0, 0, 1])
     covariates = np.zeros((len(stop), n_covariates))
@@ -261,7 +261,7 @@ def test_count_death(
     n_strata: int,
     device: str,
 ):
-    """Tests the count_deaths method of TorchSurvivalDataset on a synthetic example."""
+    """Tests the `.count_deaths()` method of TorchSurvivalDataset on a synthetic example."""
     rng = np.random.default_rng()
     # Create a simple dataset with 2 groups per batch and per strata:
     stop, event, batch, strata, covariates = [], [], [], [], []
@@ -314,4 +314,43 @@ def test_count_death(
     assert torch.equal(
         dataset.tied_deaths,
         torch.tensor(tied_deaths, dtype=torch.int64, device=device),
+    )
+
+
+@given(
+    n_covariates=small_int,
+    device=st_device,
+)
+def test_prune_simple(n_covariates: int, device: str):
+    """Tests the `.prune()` method of TorchSurvivalDataset on a handcrafted example."""
+
+    # Simple example with a dummy group at time 3
+    stop = np.array([1, 1, 1, 3, 3, 4, 4, 6, 6, 6, 7])
+    event = np.array([0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1])
+    covariates = np.zeros((len(stop), n_covariates))
+    dataset = SurvivalDataset(
+        start=stop - 1, stop=stop, event=event, covariates=covariates
+    )
+    dataset = dataset.to_torch(device).sort().count_deaths()
+
+    # Apply the .prune() method to remove the dummy group:
+    dataset = dataset.prune()
+
+    assert dataset.is_sorted
+    assert torch.equal(
+        dataset.unique_groups,
+        torch.tensor(
+            [
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [1, 4, 6, 7],
+            ],
+            dtype=torch.int64,
+            device=device,
+        ),
+    )
+    assert dataset.n_groups == 4
+    assert torch.equal(
+        dataset.tied_deaths,
+        torch.tensor([1, 2, 1, 1], dtype=torch.int64, device=device),
     )
