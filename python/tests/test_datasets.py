@@ -6,10 +6,15 @@ from hypothesis import strategies as st
 
 import torch
 import numpy as np
-from survivalgpu.datasets import load_drugs
+from survivalgpu.datasets import load_drugs, SurvivalDataset
 from survivalgpu.torch_datasets import torch_lexsort
 
 small_int = st.integers(min_value=1, max_value=10)
+
+if torch.cuda.is_available():
+    st_device = st.sampled_from(["cpu", "cuda"])
+else:
+    st_device = st.just("cpu")
 
 
 @given(
@@ -87,6 +92,7 @@ def test_dataset_to_img(*, n_covariates: int, n_drugs: int, **kwargs):
     use_cuda=st.booleans(),
 )
 def test_torch_lexsort(*, n_values: int, n_keys: int, n_vectors: int, use_cuda: bool):
+    """Tests the torch_lexsort function from torch_datasets.py."""
     # Make random float vector with duplicates to test if it handles floating point well
     a = torch.randint(0, n_values, (n_keys, n_vectors))
 
@@ -103,3 +109,54 @@ def test_torch_lexsort(*, n_values: int, n_keys: int, n_vectors: int, use_cuda: 
     #       when there are duplicates.
     # assert torch.all(ind == ind_np)
     assert torch.all(a[:, ind] == a[:, ind_np])
+
+
+@given(
+    n_intervals=small_int,
+    n_covariates=small_int,
+    rescale=st.booleans(),
+    device=st_device,
+)
+def test_scale(n_intervals: int, n_covariates: int, rescale: bool, device: str):
+    """Tests the rescaling method of TorchSurvivalDataset."""
+
+    # Create a minimal random dataset:
+    rng = np.random.default_rng()
+    stop = rng.integers(low=1, high=100, size=(n_intervals,))
+    covariates = rng.normal(loc=0, scale=1, size=(n_intervals, n_covariates))
+
+    dataset = SurvivalDataset(
+        stop=stop,
+        covariates=covariates,
+    ).to_torch(device=device)
+
+    means, scales = dataset.scale(rescale=rescale)
+
+    assert means.shape == (n_covariates,)
+    assert np.allclose(means, np.mean(covariates, axis=0), atol=1e-3)
+
+    if rescale:
+        # Check that the data has been centered:
+        assert torch.allclose(
+            dataset.covariates.mean(dim=0),
+            torch.zeros(n_covariates, dtype=torch.float32),
+            atol=1e-3,
+        )
+
+        # Check that the scales have the expected shape:
+        assert scales.shape == (n_covariates,)
+
+        # Check that the data has been rescaled:
+        if n_intervals > 1:
+            assert torch.allclose(
+                dataset.covariates.abs().sum(dim=0),
+                torch.ones(n_covariates, dtype=torch.float32),
+            )
+        else:
+            assert torch.allclose(
+                dataset.covariates.abs().sum(dim=0),
+                torch.zeros(n_covariates, dtype=torch.float32),
+                atol=1e-3,
+            )
+    else:
+        assert scales is None

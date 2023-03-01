@@ -46,6 +46,8 @@ class TorchSurvivalDataset:
         assert self.batch_intervals.shape == self.stop.shape
         assert self.strata_intervals.shape == self.stop.shape
 
+        self.is_sorted = False
+
     @property
     @typecheck
     def n_batch(self) -> int:
@@ -72,6 +74,7 @@ class TorchSurvivalDataset:
         self.covariates = self.covariates[ind, :]
         self.batch_intervals = self.batch_intervals[ind]
         self.strata_intervals = self.strata_intervals[ind]
+        self.is_sorted = True
 
         # N.B.: self.strata and self.batch are not re-ordered, because they are
         #       arrays of length n_patients.
@@ -100,3 +103,32 @@ class TorchSurvivalDataset:
             scales = 1 / scales
             self.covariates = self.covariates * scales.view(1, D)
             return means, scales
+
+    def count_deaths(self):
+        """Compute basic statistics for each 'at risk' set: labels and number of deaths."""
+
+        # Make sure that (batch > strata > stop > event) is lexicographically sorted:
+        assert self.is_sorted, "The dataset must be sorted before counting deaths."
+
+        # Count the number of death times:
+        unique_groups, self.group = torch.unique_consecutive(
+            torch.stack((self.batch, self.strata, self.stop)), return_inverse=True
+        )
+        # For instance, for a simple dataset with 1 batch, 1 strata and 3 unique stop times:
+        # - self.batch  = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        # - self.strata = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        # - self.stop   = [2, 2, 2, 2, 2, 5, 5, 6, 6, 6],
+        # unique_groups is (3,T), e.g.
+        # [[0, 0, 0],
+        #  [0, 0, 0],
+        #  [2, 5, 6]]
+        # and self.group is (I,), e.g. [0, 0, 0, 0, 0, 1, 1, 2, 2, 2]
+        assert unique_groups.shape[0] == 3
+        self.n_groups = unique_groups.shape[1]  # in our example, T = 3
+
+        # For each group, count the number of (possibly tied) deaths:
+        self.tied_deaths = torch.bincount(
+            self.group[self.event == 1], minlength=self.n_groups
+        )
+        # self.tied_deaths is (T,), e.g. [2, 1, 1]
+        # if self.event == [0, 0, 0, 1, 1, 0, 1, 0, 0, 1].
