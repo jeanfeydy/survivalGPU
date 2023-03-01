@@ -99,5 +99,7 @@ def test_torch_lexsort(*, n_values: int, n_keys: int, n_vectors: int, use_cuda: 
     if use_cuda and torch.cuda.is_available():
         ind_np = ind_np.cuda()
 
-    assert torch.all(ind == ind_np)
+    # N.B.: We cannot check equality for the indices because their values are ill-defined
+    #       when there are duplicates.
+    # assert torch.all(ind == ind_np)
     assert torch.all(a[:, ind] == a[:, ind_np])
