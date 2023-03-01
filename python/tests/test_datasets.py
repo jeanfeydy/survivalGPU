@@ -16,6 +16,8 @@ if torch.cuda.is_available():
 else:
     st_device = st.just("cpu")
 
+# Test the front-end "NumPy" SurvivalDataset class =======================================
+
 
 @given(
     n_covariates=st.one_of(st.just(0), small_int),
@@ -85,6 +87,9 @@ def test_dataset_to_img(*, n_covariates: int, n_drugs: int, **kwargs):
     assert img.shape[-1] == 3
 
 
+# Test the back-end TorchSurvivalDataset class ===========================================
+
+
 @given(
     n_values=small_int,
     n_keys=small_int,
@@ -109,6 +114,55 @@ def test_torch_lexsort(*, n_values: int, n_keys: int, n_vectors: int, use_cuda: 
     #       when there are duplicates.
     # assert torch.all(ind == ind_np)
     assert torch.all(a[:, ind] == a[:, ind_np])
+
+
+@given(
+    n_intervals=st.integers(min_value=1, max_value=100),
+    n_covariates=small_int,
+    n_batches=small_int,
+    n_strata=small_int,
+    max_time=small_int,
+    device=st_device,
+)
+def test_sort(
+    n_intervals: int,
+    n_covariates: int,
+    n_batches: int,
+    n_strata: int,
+    max_time: int,
+    device: str,
+):
+    """Tests the scale method of TorchSurvivalDataset."""
+
+    # N.B.: For the sake of simplicity, we assume one interval per patient:
+    n_patients = n_intervals
+
+    # Create a minimal random dataset:
+    rng = np.random.default_rng()
+    stop = rng.integers(low=1, high=1 + max_time, size=(n_intervals,))
+    event = rng.integers(low=0, high=2, size=(n_intervals,))
+    batch = rng.integers(low=0, high=n_batches, size=(n_patients,))
+    strata = rng.integers(low=0, high=n_strata, size=(n_patients,))
+    covariates = rng.normal(loc=0, scale=1, size=(n_intervals, n_covariates))
+
+    dataset = SurvivalDataset(
+        stop=stop,
+        event=event,
+        batch=batch,
+        strata=strata,
+        covariates=covariates,
+    ).to_torch(device=device)
+
+    # Lexicographically sort the dataset on (batch > strata > stop > event):
+    dataset.sort()
+
+    index = (
+        dataset.event
+        + 2 * dataset.stop
+        + 2 * (1 + max_time) * dataset.strata_intervals
+        + 2 * (1 + max_time) * n_strata * dataset.batch_intervals
+    )
+    assert torch.all(index == torch.sort(index)[0])
 
 
 @given(

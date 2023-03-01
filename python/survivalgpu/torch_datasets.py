@@ -63,7 +63,9 @@ class TorchSurvivalDataset:
     def sort(self):
         """Re-orders the input arrays by lexicographical order on (batch > strata > stop > event)."""
         # N.B.: the numpy convention is to sort by the last row first.
-        keys = torch.stack((self.event, self.stop, self.strata, self.batch))
+        keys = torch.stack(
+            (self.event, self.stop, self.strata_intervals, self.batch_intervals)
+        )
         ind = torch_lexsort(keys)
 
         # Re-order the arrays of length n_intervals:
@@ -112,12 +114,13 @@ class TorchSurvivalDataset:
 
         # Count the number of death times:
         unique_groups, self.group = torch.unique_consecutive(
-            torch.stack((self.batch, self.strata, self.stop)), return_inverse=True
+            torch.stack((self.batch_intervals, self.strata_intervals, self.stop)),
+            return_inverse=True,
         )
         # For instance, for a simple dataset with 1 batch, 1 strata and 3 unique stop times:
-        # - self.batch  = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        # - self.strata = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        # - self.stop   = [2, 2, 2, 2, 2, 5, 5, 6, 6, 6],
+        # - self.batch_intervals  = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        # - self.strata_intervals = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        # - self.stop             = [2, 2, 2, 2, 2, 5, 5, 6, 6, 6],
         # unique_groups is (3,T), e.g.
         # [[0, 0, 0],
         #  [0, 0, 0],
