@@ -1,28 +1,26 @@
-# Import both the annotation and the `jaxtyped` decorator from `jaxtyping`
-from jaxtyping import Float, jaxtyped
 import numpy as np
 import torch
-from typing import Union
-from numpy.typing import ArrayLike
-
-Array = torch.Tensor  # Union[np.ndarray, torch.Tensor]
-
-# Use your favourite typechecker: usually one of the two lines below.
-from typeguard import typechecked as typechecker
-from beartype import beartype as typechecker
 
 
-def typecheck(func):
-    return jaxtyped(typechecker(func))
+def torch_lexsort(a, dim=-1):
+    assert dim == -1  # Transpose if you want differently
+    assert a.ndim == 2  # Not sure what is numpy behaviour with > 2 dim
+    # To be consistent with numpy, we flip the keys (sort by last row first)
+    a_unq, inv = torch.unique(a.flip(0), dim=dim, sorted=True, return_inverse=True)
+    return torch.argsort(inv)
 
 
-# Write your function. @jaxtyped must be applied above @typechecker!
-@typecheck
-def batch_outer_product(
-    x: Float[Array, "b c1"], y: Float[Array, "b c2"]
-) -> Float[Array, "b c1 c2"]:
-    return x[:, :, None] * y[0, None, :]
+# Make random float vector with duplicates to test if it handles floating point well
+vals = torch.arange(2)
+a = vals[(torch.rand(3, 9) * 2).long()]
 
+print(a)
+ind = torch_lexsort(a)
+ind_np = torch.from_numpy(np.lexsort(a.numpy()))
+print("Torch ind", ind)
+print("Numpy ind", ind)
 
-# Call your function with the correct types.
-batch_outer_product(torch.ones((2, 3)), torch.ones((2, 4)))
+print("Torch result")
+print(a[:, ind])
+print("Numpy result")
+print(a[:, ind_np])
