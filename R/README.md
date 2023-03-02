@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# survivalGPU
+# survivalGPU <img src="man/figures/logo.png" align="right" height="139" />
 
 <!-- badges: start -->
 <!-- badges: end -->
@@ -111,8 +111,8 @@ summary(coxphGPU_bootstrap)
 #>  ---------------- 
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>      2.5% 97.5%
-#> sex 1.484 2.351
-#> age 1.002 1.016
+#> sex 1.426 2.181
+#> age 1.004 1.019
 ```
 
 ### WCE
@@ -156,9 +156,9 @@ summary(wce_gpu_bootstrap)
 #> With bootstrap (50 bootstraps), conf.level = 0.95 :
 #> 
 #> CI of estimates :
-#>          2.5%     97.5%
-#> age 0.0031964 0.0199091
-#> sex 0.4063560 0.8810200
+#>           2.5%     97.5%
+#> age 0.00481487 0.0196821
+#> sex 0.46510100 0.8901410
 ```
 
 The risk function can be plot, and if you added bootstrap, confidence
