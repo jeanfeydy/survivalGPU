@@ -4,9 +4,14 @@ import numpy as np
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
+# We use functools.partial
+import functools
+
 # The convex CoxPH objective:
 from .coxph_likelihood import coxph_objective_torch, group_reduce
 from .coxph_likelihood_keops import coxph_objective_keops
+from .coxph_likelihood import coxph_objective_unit_intervals
+
 
 # We currently support 5 different backends,
 # and will eventually settle on the fastest one(s):
@@ -130,7 +135,12 @@ class CoxPHSurvivalAnalysis:
         # we can group times using equality conditions on the stop times.
         # This is typically the case when using time-dependent covariates as in the WCE model.
         if torch.all(dataset.stop == dataset.start + 1):
-            objective = coxph_objective_unit_intervals
+            objective = functools.partial(
+                coxph_objective_unit_intervals,
+                dataset=dataset,
+                ties=self.ties,
+                backend=self.backend,
+            )
 
         # Case 2: all the intervals are )0, t]:
         # this opens the door to a more efficient implementation using the cumulative hazard.
@@ -146,16 +156,16 @@ class CoxPHSurvivalAnalysis:
             )
 
         # Define the loss function:
-        def loss(coef, batch=None):
+        def loss(coef, bootstrap=None):
             """Our loss function, including the L2 regularization term."""
-            obj = objective(coef=coef, dataset=dataset, batch=batch)
+            obj = objective(coef=coef, dataset=dataset, bootstrap=bootstrap)
             reg = self.alpha * (coef**2).sum(dim=1)
             return obj + reg
 
         # Run the Newton optimizer: ------------------------------------------------------
         init = torch.zeros((n_batch, n_covariates), dtype=float32, device=device)
         res = newton(
-            loss=loss,
+            loss=functools.partial(loss, bootstrap=dataset.original_sample()),
             start=init,
             maxiter=self.maxiter,
             eps=self.eps,
@@ -187,20 +197,21 @@ class CoxPHSurvivalAnalysis:
         # If required, compute a distribution of the coefficients using bootstrap: -------
         if n_bootstraps is not None:
             bootstrap_coef = []
-            for batch in dataset.batches(
+            for bootstrap in dataset.bootstraps(
                 n_bootstraps=n_bootstraps, batch_size=batch_size
             ):
 
                 init = torch.zeros(
-                    (n_batch, n_covariates), dtype=float32, device=device
+                    (len(bootstrap), n_covariates), dtype=float32, device=device
                 )
                 res = newton(
-                    loss=loss,
+                    loss=functools.partial(loss, bootstrap=bootstrap),
                     start=init,
                     maxiter=self.maxiter,
                     eps=self.eps,
                     verbosity=self.verbosity,
                 )
+                bootstrap_coef.append(res.x)
 
             self.bootstrap_coef_ = torch.stack(bootstrap_coef)
 
