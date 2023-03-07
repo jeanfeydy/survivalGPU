@@ -355,4 +355,3 @@ def test_prune_simple(n_covariates: int, device: str):
         torch.tensor([1, 2, 1, 1], dtype=torch.int64, device=device),
     )
 
-print("test")
