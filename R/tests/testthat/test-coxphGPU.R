@@ -5,22 +5,26 @@ drugdata <- WCE::drugdata
 # Original Coxph model
 coxph <- coxph(
   Surv(Start, Stop, Event) ~ sex + age,
-  drugdata
+  drugdata,
+  ties = "efron"
 )
 
 # CoxphGPU
 coxphGPU <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   drugdata,
+  ties = "efron",
   bootstrap = 1
 )
 
 coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   drugdata,
+  ties = "efron",
   bootstrap = 15
 )
 
 coxphGPU_bootstrap_all_result <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   drugdata,
+  ties = "efron",
   bootstrap = 15,
   all.results = TRUE
 )
@@ -63,6 +67,28 @@ test_that("residuals", {
 })
 
 
+# Test with Breslow method
+coxph_breslow <- coxph(
+  Surv(Start, Stop, Event) ~ sex + age,
+  drugdata,
+  ties = "breslow"
+)
+
+coxphGPU_breslow <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+                             drugdata,
+                             ties = "breslow",
+                             bootstrap = 1
+)
+
+# Tests
+test_that("Coxph Coefs - Breslow", {
+  expect_equal(
+    round(as.numeric(coxph_breslow$coefficients), 5),
+    round(as.numeric(coxphGPU_breslow$coefficients), 5)
+  )
+})
+
+
 # # Right Surv on coxph with drugdata
 # drugdata2 <- drugdata %>%
 #   dplyr::arrange(Stop %>% dplyr::desc()) %>%
@@ -81,10 +107,25 @@ test_that("residuals", {
 test_that("CoxPH counting", {
   expect_snapshot({
     coxphGPU(Surv(Start,Stop, Event) ~ sex + age,
-             data = drugdata)
+             data = drugdata,
+             ties = "efron")
   })
   expect_snapshot({
     coxphGPU(Surv(Start,Stop, Event) ~ sex,
-             data = drugdata)
+             data = drugdata,
+             ties = "efron")
+  })
+})
+
+test_that("CoxPH counting - Breslow", {
+  expect_snapshot({
+    coxphGPU(Surv(Start,Stop, Event) ~ sex + age,
+             data = drugdata,
+             ties = "breslow")
+  })
+  expect_snapshot({
+    coxphGPU(Surv(Start,Stop, Event) ~ sex,
+             data = drugdata,
+             ties = "breslow")
   })
 })

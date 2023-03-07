@@ -88,3 +88,89 @@ test_that("HR", {
     round(WCE::HR.WCE(wce, exposed, unexposed)[1], 3)
   )
 })
+
+
+# snapshot
+test_that("WCE - no covariates", {
+  expect_snapshot({
+    wceGPU(
+      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+      event = "Event", start = "Start", stop = "Stop",
+      expos = "dose",
+      constrained = FALSE, aic = FALSE, confint = 0.95,
+      nbootstraps = 1, batchsize = 0
+    )
+  })
+})
+
+test_that("WCE - one covariate", {
+  expect_snapshot({
+    wceGPU(
+      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+      event = "Event", start = "Start", stop = "Stop",
+      expos = "dose", covariates = c("age"),
+      constrained = FALSE, aic = FALSE, confint = 0.95,
+      nbootstraps = 1, batchsize = 0
+    )
+  })
+})
+
+test_that("WCE - two covariates", {
+  expect_snapshot({
+    wceGPU(
+      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+      event = "Event", start = "Start", stop = "Stop",
+      expos = "dose", covariates = c("age","sex"),
+      constrained = FALSE, aic = FALSE, confint = 0.95,
+      nbootstraps = 1, batchsize = 0
+    )
+  })
+})
+
+test_that("WCE - AIC", {
+  expect_snapshot({
+    wceGPU(
+      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+      event = "Event", start = "Start", stop = "Stop",
+      expos = "dose", covariates = c("age","sex"),
+      constrained = FALSE, aic = TRUE, confint = 0.95,
+      nbootstraps = 1, batchsize = 0
+    )
+  })
+})
+
+test_that("WCE - right constraint", {
+  expect_snapshot({
+    wceGPU(
+      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+      event = "Event", start = "Start", stop = "Stop",
+      expos = "dose", covariates = c("age","sex"),
+      constrained = "R", aic = FALSE, confint = 0.95,
+      nbootstraps = 1, batchsize = 0
+    )
+  })
+})
+
+test_that("WCE - left constraint", {
+  expect_snapshot({
+    wceGPU(
+      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+      event = "Event", start = "Start", stop = "Stop",
+      expos = "dose", covariates = c("age","sex"),
+      constrained = "L", aic = FALSE, confint = 0.95,
+      nbootstraps = 1, batchsize = 0
+    )
+  })
+})
+
+test_that("WCE - 3 knots", {
+  expect_snapshot({
+    wceGPU(
+      data = drugdata, nknots = 3, cutoff = 90, id = "Id",
+      event = "Event", start = "Start", stop = "Stop",
+      expos = "dose", covariates = c("age","sex"),
+      constrained = FALSE, aic = FALSE, confint = 0.95,
+      nbootstraps = 1, batchsize = 0
+    )
+  })
+})
