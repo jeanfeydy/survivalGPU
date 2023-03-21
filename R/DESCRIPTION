@@ -11,7 +11,7 @@ Description: Allows to perform survivals analysis on GPU with coxph and WCE mode
 License: LGPL (>= 2.1)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.1
+RoxygenNote: 7.2.3
 Imports: 
     reticulate,
     stats,
