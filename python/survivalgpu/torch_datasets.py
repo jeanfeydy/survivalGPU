@@ -1,3 +1,15 @@
+"""Implements the compute-intensive parts of dataset management using PyTorch.
+
+We provide a TorchSurvivalDataset object with methods that implement:
+- The re-ordering of data by lexicographical order on (batch > strata > stop > event).
+- A re-scaling of the input covariates, for the sake of numerical stability.
+- The pre-computation of basic statistics on at-risk sets.
+- The removal of groups that do not contribute to the CoxPH objective
+  (e.g. because they do not include any death event).
+
+"""
+
+
 import torch
 import numpy as np
 from matplotlib import pyplot as plt

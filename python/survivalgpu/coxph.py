@@ -1,3 +1,14 @@
+"""Implements our main API for the Cox Proportional Hazards models.
+
+We provide:
+
+- CoxPHSurvivalAnalysis, a scikit-learn-like estimator.
+- coxph_R, a functional wrapper around CoxPHSurvivalAnalysis that is used
+  by our R survivalGPU package via reticulate.
+
+"""
+
+
 # Use NumPy for basic array manipulation:
 import numpy as np
 

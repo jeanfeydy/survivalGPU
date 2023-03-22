@@ -1,3 +1,18 @@
+"""Implements the logic related to dataset management, on the CPU side.
+
+We provide:
+
+- SurvivalDataset, a class that encapsulates observation intervals, covariates and doses.
+  It performs minor checks (e.g. that observation intervals for a patient do not overlap)
+  and provides a display routine. All expensive computations are performed once the
+  dataset has been sent to the GPU and turned into a TorchSurvivalDataset object 
+  with the .to_torch() method.
+
+- load_drugs(), a method that generates synthetic data that we use in our tutorials
+  and benchmarks.
+"""
+
+
 import numpy as np
 import torch
 
