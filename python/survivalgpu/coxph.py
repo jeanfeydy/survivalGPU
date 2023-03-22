@@ -18,8 +18,11 @@ import torch
 # We use functools.partial
 import functools
 
+# Group summation routines:
+from .group_reduction import group_reduce
+
 # The convex CoxPH objective:
-from .coxph_likelihood import coxph_objective_torch, group_reduce
+from .coxph_likelihood import coxph_objective_torch
 from .coxph_likelihood_keops import coxph_objective_keops
 from .coxph_likelihood import coxph_objective_unit_intervals
 

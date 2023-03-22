@@ -24,7 +24,7 @@ from .group_reduction import SlicedSummation, group_logsumexp
 
 from .typecheck import typecheck, Optional, Literal
 from .typecheck import Float32Tensor
-from .bootstrap import Bootstrap
+from .bootstrap import Resampling
 
 
 
@@ -35,7 +35,7 @@ def coxph_objective_unit_intervals(
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
     backend: Literal["torch", "pyg", "coo", "csr"],
-    bootstrap: Bootstrap,
+    bootstrap: Resampling,
 ) -> Float32Tensor["batches"]:
 
     # Create the arrays of offsets for ties:

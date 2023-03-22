@@ -3,7 +3,7 @@ from .typecheck import typecheck, Float32Tensor, Int64Tensor
 from .group_reduction import group_reduce
 
 
-class Bootstrap:
+class Resampling:
     @typecheck
     def __init__(
         self,
@@ -121,20 +121,25 @@ class Bootstrap:
             print("Tied dead weights:")
             print(numpy(tied_dead_weights))
             print("")
+
             
+    @classmethod
+    def bootstraps(n_bootstraps, batch_size):
+        for batch_it in range(n_bootstraps // batch_size):
+            # We simulate bootstrapping using an integer array
+            # of "weights" numbers of shape (B, N) where B is the number of bootstraps.
+            # The original sample corresponds to weights = [1, ..., 1],
+            # while other values for the vector always sum up to
+            # the number of patients.
+            bootstrap_indices = torch.randint(N, (B, N), dtype=int64, device=device)
+            # Our first line corresponds to the original sample,
+            # i.e. there is no re-sampling if bootstrap == 1:
+            if batch_it == 0:
+                bootstrap_indices[0, :] = torch.arange(N, dtype=int64, device=device)
+            # bootstrap_indices is (B,N), e.g.:
+            # [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            #  [3, 3, 1, 2, 8, 6, 0, 0, 8, 9]]
 
-for batch_it in range(bootstrap // batchsize):
-    # We simulate bootstrapping using an integer array
-    # of "weights" numbers of shape (B, N) where B is the number of bootstraps.
-    # The original sample corresponds to weights = [1, ..., 1],
-    # while other values for the vector always sum up to
-    # the number of patients.
-    bootstrap_indices = torch.randint(N, (B, N), dtype=int64, device=device)
-    # Our first line corresponds to the original sample,
-    # i.e. there is no re-sampling if bootstrap == 1:
-    if batch_it == 0:
-        bootstrap_indices[0, :] = torch.arange(N, dtype=int64, device=device)
-    # bootstrap_indices is (B,N), e.g.:
-    # [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    #  [3, 3, 1, 2, 8, 6, 0, 0, 8, 9]]
-
+    @classmethod
+    def original_sample():
+        return None
