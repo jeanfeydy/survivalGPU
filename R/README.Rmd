@@ -20,8 +20,8 @@ knitr::opts_chunk$set(
 
 The survivalGPU library allows you to perform survival analyzes using the resources of Graphic Processing Units (GPU) in order to accelerate the speed of calculations. Currently, two models have been implemented :  
 
-* Cox[^cox1] [^cox2]  
-* WCE[^wce] (Weighted Cumulative Exposure)  
+* `coxphGPU()` for Cox[^cox1] [^cox2] model  
+* `wceGPU()` for Weighted Cumulative Exposure[^wce] model  
 
 It's also possible to use the library without having Graphics Processing Units (with CPU).
 
@@ -29,22 +29,37 @@ It's also possible to use the library without having Graphics Processing Units (
 
 ### Requirements
 
+Python packages :  
+
 * pytorch
 * pytorch-scatter
 * pykeops (for WCE model)
 
+Actually, survivalGPU is not available for Windows.  
 
-You can install the development version of survivalGPU from [GitHub](https://github.com/) with:
+survivalGPU require submodules : you can install the development version of survivalGPU from [GitHub](https://github.com/) with `install_git_with_submodule()`:
 
-``` r
+```{r, eval=FALSE}
 # install.packages("devtools")
-devtools::install_github("jeanfeydy/survivalGPU",
-                         subdir = "R")
+
+install_git_with_submodule <- function(x, subdir) {
+  install_dir <- tempfile()
+  system(paste("git clone --recursive", shQuote(x), shQuote(install_dir)))
+  
+  # change name for windows install
+  file.rename(file.path(install_dir,"R/inst/python/survivalgpu"),
+              file.path(install_dir,"R/inst/python/survivalgpu_submodule"))
+  file.copy(file.path(install_dir,"python/survivalgpu"),
+            file.path(install_dir,"R/inst/python"), recursive=TRUE)
+  
+  devtools::install(file.path(file.path(install_dir,subdir)))
+}
+
+install_git_with_submodule("https://github.com/jeanfeydy/survivalGPU",
+                           subdir="R")
 ```
 
-You can build the package on tar.gz file with `devtools::build()` after git clone this repository.
-
-> **Warning**: if R offers you to install Miniconda, refuse.
+> **Warning**: survivalGPU is a package dependant of python, and it's necessary to have installed the `reticulate` R package. To manage your python or miniconda configuration, check vignette("python_connect").
 
 ## Examples
 

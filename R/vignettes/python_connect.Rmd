@@ -1,0 +1,44 @@
+---
+title: "Python Configuration"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Python Configuration}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+
+survivalGPU is a package based on a package written in python, dependant on the `reticulate` R package. To use it, it's necessary to have installed `torch`, `torch-scatter`, and `pykeops` packages in your python environment. Moreover, it's possible to check through `reticulate` the python executable, and to check if the packages mentioned above are installed.
+
+
+```{r setup}
+library(reticulate)
+```
+
+
+```{r}
+# Check your python executable
+py_config()
+py_exe()
+
+# Check installed packages in your python environment
+py_list_packages()
+```
+
+Attention, if you don't have install the `reticluate` R package, install it (with `install.packages("reticulate")`). During installation, R will offer you to install miniconda. If you accept, be careful because your python executable & pyhton home will change for your new miniconda environment by default, without torch, torch-scatter and pykeops. You can install them in miniconda, or you can change your python environment after starting a new R session. I recommend to not install miniconda to use the python environment on which we are used to working.
+
+Check the [`reticulate` R documentation](https://rstudio.github.io/reticulate/articles/versions.html) to see other options to manage your python configuration.
+
+```{r}
+# Test survivalGPU import, and the use of CUDA for GPU support
+library(survivalGPU)
+use_cuda()
+```

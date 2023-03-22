@@ -10,8 +10,8 @@ The survivalGPU library allows you to perform survival analyzes using
 the resources of Graphic Processing Units (GPU) in order to accelerate
 the speed of calculations. Currently, two models have been implemented :
 
-- Cox[^1] [^2]  
-- WCE[^3] (Weighted Cumulative Exposure)
+- `coxphGPU()` for Cox[^1] [^2] model  
+- `wceGPU()` for Weighted Cumulative Exposure[^3] model
 
 It’s also possible to use the library without having Graphics Processing
 Units (with CPU).
@@ -20,23 +20,41 @@ Units (with CPU).
 
 ### Requirements
 
+Python packages :
+
 - pytorch
 - pytorch-scatter
 - pykeops (for WCE model)
 
-You can install the development version of survivalGPU from
-[GitHub](https://github.com/) with:
+Actually, survivalGPU is not available for Windows.
+
+survivalGPU require submodules : you can install the development version
+of survivalGPU from [GitHub](https://github.com/) with
+`install_git_with_submodule()`:
 
 ``` r
 # install.packages("devtools")
-devtools::install_github("jeanfeydy/survivalGPU",
-                         subdir = "R")
+
+install_git_with_submodule <- function(x, subdir) {
+  install_dir <- tempfile()
+  system(paste("git clone --recursive", shQuote(x), shQuote(install_dir)))
+  
+  # change name for windows install
+  file.rename(file.path(install_dir,"R/inst/python/survivalgpu"),
+              file.path(install_dir,"R/inst/python/survivalgpu_submodule"))
+  file.copy(file.path(install_dir,"python/survivalgpu"),
+            file.path(install_dir,"R/inst/python"), recursive=TRUE)
+  
+  devtools::install(file.path(file.path(install_dir,subdir)))
+}
+
+install_git_with_submodule("https://github.com/jeanfeydy/survivalGPU",
+                           subdir="R")
 ```
 
-You can build the package on tar.gz file with `devtools::build()` after
-git clone this repository.
-
-> **Warning**: if R offers you to install Miniconda, refuse.
+> **Warning**: survivalGPU is a package dependant of python, and it’s
+> necessary to have installed the `reticulate` R package. To manage your
+> python or miniconda configuration, check vignette(“python_connect”).
 
 ## Examples
 
@@ -111,8 +129,8 @@ summary(coxphGPU_bootstrap)
 #>  ---------------- 
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>      2.5% 97.5%
-#> sex 1.426 2.181
-#> age 1.004 1.019
+#> sex 1.506 2.269
+#> age 1.004 1.020
 ```
 
 ### WCE
@@ -157,8 +175,8 @@ summary(wce_gpu_bootstrap)
 #> 
 #> CI of estimates :
 #>           2.5%     97.5%
-#> age 0.00481487 0.0196821
-#> sex 0.46510100 0.8901410
+#> age 0.00340716 0.0193621
+#> sex 0.44109100 0.9042010
 ```
 
 The risk function can be plot, and if you added bootstrap, confidence
