@@ -30,11 +30,8 @@
 #' @param all.results Post-processing calculations. If TRUE, coxphGPU returns
 #'   linears.predictors, wald.test, concordance for all bootstraps. Default to
 #'   FALSE if bootstrap.
-#' @param na.action a missing-data filter function. This is applied to the
-#'   model.frame after any subset argument has been used. Default is
-#'   options()\$na.action.
-#' @param control Object of class coxph.control specifying iteration limit and
-#'   other control options. Default is coxph.control(...).
+#' @param control Object of class coxph.control specifying iteration limit
+#' (iter.max argument) and other control options. Default is coxph.control(...).
 #' @param singular.ok logical value indicating how to handle collinearity in the
 #'   model matrix. If TRUE, the program will automatically skip over columns of
 #'   the X matrix that are linear combinations of earlier columns. In this case
@@ -91,7 +88,7 @@
 #' summary(coxph_bootstrap)
 #' }
 coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
-                     batchsize = 0, all.results = FALSE, na.action, control,
+                     batchsize = 0, all.results = FALSE, control,
                      singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
                      ...) {
   UseMethod("coxphGPU")
@@ -103,9 +100,9 @@ coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
 #' @exportS3Method coxphGPU default
 coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
                              bootstrap = 1, batchsize = 0, all.results = FALSE,
-                             na.action, control, singular.ok = TRUE,
-                             model = FALSE, x = FALSE, y = TRUE, ..., weights,
-                             subset, init, robust, tt, method = ties, id,
+                             control, singular.ok = TRUE, model = FALSE,
+                             x = FALSE, y = TRUE, ..., weights, subset,
+                             na.action, init, robust, tt, method = ties, id,
                              cluster, istate, statedata, nocenter = c(-1, 0, 1)) {
 
   if (!missing(weights)) stop("weights are not yet implemented in coxphGPU")
@@ -216,7 +213,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   if (indx[1] == 0) stop("A formula argument is required")
   tform <- Call[c(1, indx)]
   tform[[1L]] <- quote(stats::model.frame)
-
 
   # if the formula is a list, do the first level of processing on it.
 
@@ -934,6 +930,13 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   # Covariables
   covar <- assign
 
+  # remove NA for coxph_R
+  keep_col <- c(stop, event, colnames(X))
+  data <- as.data.frame(data)[,keep_col]
+
+  # data <- quote(options()$na.action)
+  data <- na.omit(data)
+
   # Python coxph
   survivalgpu <- use_survivalGPU()
   coxph_R <- survivalgpu$coxph_R
@@ -943,7 +946,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
                     covar,
                     ties = ties,
                     bootstrap = bootstrap,
-                    batchsize = batchsize
+                    batchsize = batchsize,
+                    maxiter = maxiter
   )
   # maxiter = maxiter (add maxiter argument in coxph_R)
   # doscale

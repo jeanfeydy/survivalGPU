@@ -402,6 +402,7 @@ def coxph_R(
     bootstrap=1,
     batchsize=0,
     ties="efron",
+    maxiter=20,
     doscale=False,
     profile=None,
 ):
@@ -429,7 +430,7 @@ def coxph_R(
             backend="csr",
             bootstrap=int(bootstrap),
             batchsize=int(batchsize),
-            maxiter=20 if profile is None else 1,
+            maxiter=int(maxiter) if profile is None else 1,
             verbosity=0,
             alpha=0.0,
             doscale=doscale,
