@@ -9,14 +9,15 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, echo=FALSE, warning=FALSE}
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 library(survival)
 library(WCE)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
-# library(parallel)
+library(parallel)
 # library(survivalGPU)
+devtools::load_all() # or devtools::load_all("path = "R") if you run from git root
 ```
 
 
@@ -25,8 +26,8 @@ drugdata <- WCE::drugdata
 ```
 
 Bootstrap with :  
-- survival::coxph  
-- survivalGPU::coxphGPU
+- `survival::coxph`  
+- `survivalGPU::coxphGPU`
 
 
 # Functions
@@ -38,69 +39,62 @@ list_df_bootstrap <- function(dataset, n_bootstrap) {
       slice_sample(prop = 1, replace = TRUE)
   })
   liste_df[[1]] <- dataset
-
+  
   return(liste_df)
 }
 ```
 
 
 ```{r coxph}
-time_cox <- function(dataset, n_bootstrap) {
-  if (n_bootstrap > 100) {
-    return(NA)
-  } else {
-    list_df <- list_df_bootstrap(
-      dataset = dataset,
-      n_bootstrap = n_bootstrap
-    )
-
+time_cox <- function(list_df) {
+    
     start_time <- Sys.time()
     lapply(list_df, function(x) {
       coxph(Surv(Start, Stop, Event) ~ sex + age,
-        data = x,
-        id = Id
+            data = x,
+            id = Id
       )
     })
     return(difftime(Sys.time(), start_time, units = "secs"))
-  }
 }
 ```
 
 
-```{r coxph parallel, eval=FALSE, include=FALSE}
-# time_cox_parallel <- function(list_df){
-#
-#   no_cores <- detectCores()
-#   clust <- makeCluster(no_cores - 1)
-#
-#   clusterEvalQ(clust, {
-#     library(survival)
-#   })
-#
-#   #clusterExport(clust,"list_df")
-#
-#   start_time<-Sys.time()
-#
-#   parLapply(clust,list_df,function(x) coxph(Surv(Start,Stop,Event) ~ sex + age,
-#                                     data = x,
-#                                     id = Id))
-#
-#   end_time <- Sys.time()
-#   stopCluster(clust)
-#
-#   return(difftime(end_time, start_time, units = "secs") )
-# }
+```{r coxph parallel, eval=FALSE}
+time_cox_parallel <- function(list_df){
+  
+  no_cores <- detectCores()
+  clust <- makeCluster(no_cores - 2)
+  
+  clusterEvalQ(clust, {
+    library(survival)
+  })
+  
+  # clusterExport(clust,"list_df")
+  
+  start_time<-Sys.time()
+  
+  parLapply(clust,list_df,function(x) coxph(Surv(Start,Stop,Event) ~ sex + age,
+                                            data = x,
+                                            id = Id))
+  
+  end_time <- Sys.time()
+  stopCluster(clust)
+  
+  return(difftime(end_time, start_time, units = "secs") )
+}
 ```
 
+no_cores : `r detectCores()`
 
-```{r coxphGPU CPU}
+```{r coxphGPU}
 time_coxphGPU <- function(dataset, n_bootstrap) {
   start_time <- Sys.time()
   coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-    data = dataset,
-    id = Id,
-    bootstrap = n_bootstrap,
-    batchsize = ifelse(n_bootstrap > 1000, 1000, 0)
+           data = dataset,
+           id = Id,
+           bootstrap = n_bootstrap,
+           batchsize = ifelse(n_bootstrap > 1000, 1000, 0)
   )
   return(difftime(Sys.time(), start_time, units = "secs"))
 }
@@ -109,8 +103,24 @@ time_coxphGPU <- function(dataset, n_bootstrap) {
 
 ```{r}
 combine_time <- function(dataset, n_bootstrap) {
+  
+  # if (n_bootstrap > 100) {
+  #   return(NA)
+  # } else {
+  #   list_df <- list_df_bootstrap(
+  #     dataset = dataset,
+  #     n_bootstrap = n_bootstrap
+  #   )
+  # }
+  
+  list_df <- list_df_bootstrap(
+    dataset = dataset,
+    n_bootstrap = n_bootstrap
+  )
+  
   return(list(
-    coxph = time_cox(dataset, n_bootstrap),
+    coxph = time_cox(list_df),
+    # coxph_parallel = time_cox_parallel(list_df),
     coxphGPU = time_coxphGPU(dataset, n_bootstrap)
   ))
 }
@@ -119,20 +129,16 @@ combine_time <- function(dataset, n_bootstrap) {
 
 # Results
 
-```{r GPU wake up, include=FALSE}
-coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-  data = drugdata,
-  id = Id,
-  bootstrap = 1
-)
+```{r GPU wake up - CUDA info, include=FALSE}
+use_cuda()
 ```
 
 
 ```{r, message=FALSE}
 if (use_cuda()) {
-  n_bootstrap <- c(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000)
+  n_bootstrap <- c(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000)
 } else {
-  n_bootstrap <- c(1, 2, 5, 10, 20, 50, 100)
+  n_bootstrap <- c(1, 2, 5, 10, 20, 50)
 }
 
 benchmark_coxph <- lapply(n_bootstrap, combine_time, dataset = drugdata)
