@@ -158,6 +158,14 @@ def coxph_torch(
 
     B = batchsize  # Number of bootstraps that we handle at a time
     results = []  # We store one output per batch
+    
+    # Vector of inital values of the Newton iteration. Zero for all
+    # variables by default.
+    if init is None:
+        init = torch.zeros(B * C, D, dtype=float32, device=device)
+    else:
+        init_tensor = torch.tensor(init, dtype=float32, device=device)
+        init = init_tensor.repeat(B * C, 1)
 
     for batch_it in range(bootstrap // batchsize):
         # We simulate bootstrapping using an integer array
@@ -291,14 +299,6 @@ def coxph_torch(
         # Step 3: Newton iterations ================================================
         # We estimate the optimal vector of parameters "beta"
         # by minimizing a convex objective function.
-        # Pre-processing: vector of inital values of the iteration. Zero for all
-        # variables by default.
-
-        if init is None:
-            init = torch.zeros(B * C, D, dtype=float32, device=device)
-        else:
-            init_tensor = torch.tensor(init, dtype=float32, device=device)
-            init = init_tensor.repeat(B*C, 1)
         
         res = newton(
             loss=loss,

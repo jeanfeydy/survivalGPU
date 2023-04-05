@@ -47,7 +47,7 @@ test_that("Coefs right - counting", {
 
 # no method cox.zph for coxphGPU objects
 # # the above verifies that the data set is correct
-# zp1 <- cox.zph(cfit1, transform="log")
+zp1 <- cox.zph(cfit1, transform="log")
 # zp2 <- cox.zph(cfit2, transform="log")
 # # everything should match but the call
 # icall <- match("Call", names(zp1))

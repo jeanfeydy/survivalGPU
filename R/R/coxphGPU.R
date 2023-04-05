@@ -6,7 +6,7 @@
 #'
 #' @usage
 #' coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
-#'          batchsize = 0, init, all.results = FALSE, na.action, control,
+#'          batchsize = 0, init, all.results = FALSE, control,
 #'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
 #'
 #' @param formula a formula object, with the response on the left of a ~
@@ -101,11 +101,12 @@ coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
 #' @method coxphGPU default
 #' @exportS3Method coxphGPU default
 coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
-                             bootstrap = 1, batchsize = 0, all.results = FALSE,
-                             control, singular.ok = TRUE, model = FALSE,
-                             x = FALSE, y = TRUE, ..., weights, subset,
-                             na.action, init, robust, tt, method = ties, id,
-                             cluster, istate, statedata, nocenter = c(-1, 0, 1)) {
+                             bootstrap = 1, batchsize = 0, init,
+                             all.results = FALSE, control, singular.ok = TRUE,
+                             model = FALSE, x = FALSE, y = TRUE, ..., weights,
+                             subset, na.action, robust, tt, method = ties, id,
+                             cluster, istate, statedata,
+                             nocenter = c(-1, 0, 1)) {
 
   if (!missing(weights)) stop("weights are not yet implemented in coxphGPU")
   if (!missing(tt)) stop("tt process is not yet implemented in coxphGPU")
