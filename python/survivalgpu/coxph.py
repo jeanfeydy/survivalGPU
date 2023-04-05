@@ -36,6 +36,7 @@ def coxph_torch(
     ties="efron",
     backend="csr",
     maxiter=20,
+    init=None,
     eps=1e-9,
     alpha=0,
     verbosity=0,
@@ -290,8 +291,15 @@ def coxph_torch(
         # Step 3: Newton iterations ================================================
         # We estimate the optimal vector of parameters "beta"
         # by minimizing a convex objective function.
+        # Pre-processing: vector of inital values of the iteration. Zero for all
+        # variables by default.
 
-        init = torch.zeros(B * C, D, dtype=float32, device=device)
+        if init is None:
+            init = torch.zeros(B * C, D, dtype=float32, device=device)
+        else:
+            init_tensor = torch.tensor(init, dtype=float32, device=device)
+            init = init_tensor.repeat(B*C, 1)
+        
         res = newton(
             loss=loss,
             start=init,
@@ -403,6 +411,7 @@ def coxph_R(
     batchsize=0,
     ties="efron",
     maxiter=20,
+    init=None,
     doscale=False,
     profile=None,
 ):
@@ -431,6 +440,7 @@ def coxph_R(
             bootstrap=int(bootstrap),
             batchsize=int(batchsize),
             maxiter=int(maxiter) if profile is None else 1,
+            init=init,
             verbosity=0,
             alpha=0.0,
             doscale=doscale,

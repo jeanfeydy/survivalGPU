@@ -27,6 +27,8 @@
 #' @param batchsize Number of bootstrap copies that should be handled at a time.
 #'   Defaults to 0, which means that we handle all copies at once. If you run
 #'   into out of memory errors, please consider using batchsize=100, 10 or 1.
+#' @param init Vector of initial values of the iteration. Default initial value
+#' is zero for all variables.
 #' @param all.results Post-processing calculations. If TRUE, coxphGPU returns
 #'   linears.predictors, wald.test, concordance for all bootstraps. Default to
 #'   FALSE if bootstrap.
@@ -88,7 +90,7 @@
 #' summary(coxph_bootstrap)
 #' }
 coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
-                     batchsize = 0, all.results = FALSE, control,
+                     batchsize = 0, init, all.results = FALSE, control,
                      singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
                      ...) {
   UseMethod("coxphGPU")
@@ -106,7 +108,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
                              cluster, istate, statedata, nocenter = c(-1, 0, 1)) {
 
   if (!missing(weights)) stop("weights are not yet implemented in coxphGPU")
-  if (!missing(init)) stop("init is not yet implemented in coxphGPU")
   if (!missing(tt)) stop("tt process is not yet implemented in coxphGPU")
 
   ##############################################################################
@@ -869,8 +870,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     nullmodel <- FALSE
     maxiter <- control$iter.max
 
-    if (is.null(init)) init <- rep(0., nvar)
-    if (length(init) != nvar) stop("Wrong length for inital values")
+    # In commentary below because Null value for coxph_R
+    #if (is.null(init)) init <- rep(0., nvar)
+    #if (length(init) != nvar) stop("Wrong length for inital values")
   }
 
   # 2021 change: pass in per covariate centering.  This gives
@@ -947,7 +949,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
                     ties = ties,
                     bootstrap = bootstrap,
                     batchsize = batchsize,
-                    maxiter = maxiter
+                    maxiter = maxiter,
+                    init = init
   )
   # maxiter = maxiter (add maxiter argument in coxph_R)
   # doscale
