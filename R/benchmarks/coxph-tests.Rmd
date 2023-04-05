@@ -1,0 +1,99 @@
+---
+title: "Coxph tests"
+author: "Alexis van STRAATEN"
+output:
+  rmdformats::readthedown
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# html file to visualize some tests
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(survival)
+library(testthat)
+library(dplyr)
+# library(survivalGPU)
+devtools::load_all() # or devtools::load_all("path = "R") if you run from git root
+```
+
+# Comparison `survival` - `survivalGPU` of Cox model
+
+```{r}
+drugdata <- WCE::drugdata
+head(drugdata, 15)
+```
+
+
+## Efron
+
+```{r}
+# Coxph model from survival
+coxph <- coxph(Surv(Start, Stop, Event) ~ sex + age,
+               drugdata,
+               ties = "efron")
+
+# Coxph model from survivalGPU
+coxphGPU <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+                     drugdata,
+                     ties = "efron",
+                     bootstrap = 1)
+```
+
+```{r}
+summary(coxph)
+summary(coxphGPU)
+```
+
+
+## Breslow
+
+```{r}
+coxph_breslow <- coxph(Surv(Start, Stop, Event) ~ sex + age,
+                       drugdata,
+                       ties = "breslow")
+
+coxphGPU_breslow <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+                             drugdata,
+                             ties = "breslow",
+                             bootstrap = 1)
+```
+
+
+```{r}
+summary(coxph_breslow)
+summary(coxphGPU_breslow)
+```
+
+
+# Comparison Right - counting process
+
+- right process : one time with censored/event status  
+- counting process : time-dependent model  
+
+
+```{r}
+dtime <- lung$time[lung$status==2]
+lung2 <- survSplit(Surv(time, status) ~ ., lung, cut=dtime)
+
+head(lung %>% select(time, status, ph.ecog, ph.karno, pat.karno, wt.loss), 8)
+head(lung2 %>% select(tstart, time, status, ph.ecog, ph.karno, pat.karno, wt.loss), 8)
+```
+
+```{r}
+cfit1 <-coxph(Surv(time, status) ~ ph.ecog + ph.karno + pat.karno + wt.loss,
+              lung)
+
+# cfit2 <-coxph(Surv(tstart, time, status) ~ ph.ecog + ph.karno + pat.karno +
+#                 wt.loss, lung2)
+
+cfit2_gpu <-coxphGPU(Surv(tstart, time, status) ~ ph.ecog + ph.karno +
+                       pat.karno + wt.loss,
+                     lung2)
+```
+
+```{r}
+summary(cfit1)
+summary(cfit2_gpu)
+```

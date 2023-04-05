@@ -6,7 +6,7 @@
 #'
 #' @usage
 #' coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
-#'          batchsize = 0, all.results = FALSE, na.action, control,
+#'          batchsize = 0, init, all.results = FALSE, na.action, control,
 #'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
 #'
 #' @param formula a formula object, with the response on the left of a ~
