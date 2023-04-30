@@ -27,16 +27,42 @@ from .typecheck import Float32Tensor
 from .bootstrap import Resampling
 
 
-
 @typecheck
 def coxph_objective_unit_intervals(
-    coef: Float32Tensor["batches intervals"],
     *,
+    coef: Float32Tensor["batches intervals"],
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
     backend: Literal["torch", "pyg", "coo", "csr"],
     bootstrap: Resampling,
 ) -> Float32Tensor["batches"]:
+    # Step 3: Aggregate the "total weights for dead samples" at each time point ------
+    # These are required as multiplicative factors by the Efron and Breslow rules
+
+    # Compute the total weight of dead samples for every event time:
+    dead_weights = bootstrap.interval_weights[:, event == 1]
+    # dead_weights is (B, Ndeads), e.g.
+    # [[1, 1, 1, 1],
+    #  [2, 0, 1, 1]]
+    dead_cluster_indices = cluster_indices[event == 1].repeat(B, 1)
+    # dead_cluster_indices is (B, Ndeads), e.g.
+    # [[0, 0, 1, 2],
+    #  [0, 0, 1, 2]]
+    tied_dead_weights = group_reduce(
+        values=dead_weights,
+        groups=dead_cluster_indices.long(),
+        reduction="sum",
+        output_size=T,
+        backend="pyg",
+    )
+    # Equivalent to:
+    # tied_dead_weights = torch.bincount(cluster_indices[deaths == 1],
+    #                     weights=weights.view(-1)[deaths == 1],
+    #                     minlength=T)
+    #
+    # tied_dead_weights is (B,T), e.g.
+    # [[2, 1, 1],
+    #  [2, 1, 1]]
 
     # Create the arrays of offsets for ties:
     if ties == "breslow":

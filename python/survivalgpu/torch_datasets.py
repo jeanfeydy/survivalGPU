@@ -13,9 +13,10 @@ We provide a TorchSurvivalDataset object with methods that implement:
 import torch
 import numpy as np
 from matplotlib import pyplot as plt
-from .typecheck import typecheck, Optional, Callable, Union, Tuple
+from .typecheck import typecheck, Optional, Callable, Union, Tuple, TorchDevice
 from .typecheck import Int, Real
 from .typecheck import Int64Tensor, Float32Tensor
+from .bootstrap import Resampling
 
 
 @typecheck
@@ -59,6 +60,18 @@ class TorchSurvivalDataset:
         assert self.strata_intervals.shape == self.stop.shape
 
         self.is_sorted = False
+
+    @property
+    @typecheck
+    def device(self) -> TorchDevice:
+        """Torch device (cpu, cuda...) where the data is stored."""
+        return self.event.device
+
+    @property
+    @typecheck
+    def n_patients(self) -> int:
+        """Number of patients that are referenced in the dataset."""
+        return int(self.patient.max() + 1)
 
     @property
     @typecheck
@@ -195,3 +208,33 @@ class TorchSurvivalDataset:
         assert (self.tied_deaths > 0).all()
 
         return self
+
+    @typecheck
+    def original_sample(self) -> Resampling:
+        indices = torch.arange(
+            self.n_patients,
+            dtype=torch.int64,
+            device=self.device,
+        )
+        indices = indices.view(1, -1)
+        return Resampling(
+            indices=indices,
+            event=self.event,
+            patient=self.patient,
+        )
+
+    def bootstraps(self, n_bootstraps, batch_size):
+        for batch_it in range(n_bootstraps // batch_size):
+            # We simulate bootstrapping using an integer array
+            # of "weights" numbers of shape (B, N) where B is the number of bootstraps.
+            # The original sample corresponds to weights = [1, ..., 1],
+            # while other values for the vector always sum up to
+            # the number of patients.
+            bootstrap_indices = torch.randint(N, (B, N), dtype=int64, device=device)
+            # Our first line corresponds to the original sample,
+            # i.e. there is no re-sampling if bootstrap == 1:
+            if batch_it == 0:
+                bootstrap_indices[0, :] = torch.arange(N, dtype=int64, device=device)
+            # bootstrap_indices is (B,N), e.g.:
+            # [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            #  [3, 3, 1, 2, 8, 6, 0, 0, 8, 9]]

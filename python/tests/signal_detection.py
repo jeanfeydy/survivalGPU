@@ -42,7 +42,6 @@ Permutations, Bootstraps = 100, 1000
 
 
 def permutation_test(*, exposures, times, events, areas, permutations):
-
     Drugs, Patients, Times, Features = exposures.shape
     permutation_risks = torch.zeros(permutations, Drugs, device=exposures.device)
 

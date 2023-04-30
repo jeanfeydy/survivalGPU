@@ -241,7 +241,6 @@ class WCESurvivalAnalysis:
         return exposures
 
     def fit(self, *, doses, times, events, covariates=None):
-
         exposures = self._wce_features(doses=doses, times=times)
 
     # Read-only properties ===============================================================
@@ -259,7 +258,7 @@ class WCESurvivalAnalysis:
 
     @property
     def drug_total_risks(self):
-        """Returns the mean and std of the total risk area for each drug.
+        r"""Returns the mean and std of the total risk area for each drug.
 
         The total risk area is the area under the curve of the risk function.
         It corresponds to the logarithm of the Hazard Ratio that is associated
@@ -297,7 +296,6 @@ class WCESurvivalAnalysis:
 
     @property
     def drug_coeff_ci_95(self):
-
         # ci_95 = 1.96 / np.sqrt(coefs.shape[-1])
 
         # (Drugs, Features, Features) @ (Features,)
@@ -307,7 +305,6 @@ class WCESurvivalAnalysis:
         assert ci_95 @ areas == 1.96 * risk_stds
 
     def display_atoms(self, ax=None):
-
         ax = plt.gca() if ax is None else ax
         ax.title("B-Spline atoms")
         for i, f in enumerate(atoms.t()):
@@ -315,7 +312,6 @@ class WCESurvivalAnalysis:
         ax.legend()
 
     def display_risk_functions(self, ax=None):
-
         ax = plt.gca() if ax is None else ax
         ax.title("Estimated risk functions, with 95% CI for the total risk area")
         for i, (coef, ci) in enumerate(zip(coefs, ci_95)):
@@ -326,7 +322,6 @@ class WCESurvivalAnalysis:
         ax.legend()
 
     def display_risk_distribution(self, *, drug, ax=None):
-
         ax = plt.gca() if ax is None else ax
         ax.title(f"Distribution of the total risk for drug {drug}")
 
@@ -393,7 +388,6 @@ def wce_torch(
     batchsize=0,
     verbosity=1,
 ):
-
     # Just in case the user provided float numbers (super easy with R...):
     nknots = int(nknots)
     order = int(order)
@@ -500,7 +494,6 @@ def wce_numpy(
     with torch.autograd.profiler.profile(
         use_cuda=use_cuda
     ) if profile is not None else nullcontext() as prof:
-
         ids = torch.tensor(ids, dtype=int32, device=device)
         if covariates is not None:
             covariates = torch.tensor(covariates, dtype=float32, device=device)
@@ -534,7 +527,6 @@ def wce_R(
     events,
     **kwargs,
 ):
-
     ids = np.array(data[ids])
     doses = np.array(data[doses])
     times = np.array(data[stop])

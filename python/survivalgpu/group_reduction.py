@@ -92,7 +92,6 @@ class GatherCOO(torch.autograd.Function):
 
 
 def group_reduce(*, values, groups, reduction, output_size, backend):
-
     if backend == "torch":
         # Compatibility switch for PyTorch.scatter_reduce:
         if reduction == "max":
@@ -132,7 +131,6 @@ def group_reduce(*, values, groups, reduction, output_size, backend):
 
 
 def group_expand(*, values, groups, output_size, backend):
-
     if backend in ["torch", "pyg"]:
         return torch.gather(values, 1, groups)
     elif backend == "coo":

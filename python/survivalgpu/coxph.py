@@ -214,7 +214,6 @@ class CoxPHSurvivalAnalysis:
             for bootstrap in dataset.bootstraps(
                 n_bootstraps=n_bootstraps, batch_size=batch_size
             ):
-
                 init = torch.zeros(
                     (len(bootstrap), n_covariates), dtype=float32, device=device
                 )
@@ -263,6 +262,10 @@ class CoxPHSurvivalAnalysis:
     ) -> Float32Tensor["batches intervals"]:
         """Standard function to compute risks in the CoxPH model: dot(beta, x[i])."""
         return coef @ X.T  # (B, D) @ (D, I) -> (B, I)
+
+
+# The code below should be obsolete soon: ================================================
+# TODO: remove it
 
 
 # Main function:
@@ -617,6 +620,7 @@ from contextlib import nullcontext
 
 from time import sleep
 
+
 # NumPy wrapper:
 def coxph_numpy(
     *,
@@ -646,7 +650,6 @@ def coxph_R(
     doscale=False,
     profile=None,
 ):
-
     if profile is not None:
         print("Profile trace:", profile)
         print("use_cuda:", use_cuda)
@@ -654,7 +657,6 @@ def coxph_R(
     with torch.autograd.profiler.profile(
         use_cuda=use_cuda
     ) if profile is not None else nullcontext() as prof:
-
         times = np.array(data[stop])
         deaths = np.array(data[death])
         N = len(times)
