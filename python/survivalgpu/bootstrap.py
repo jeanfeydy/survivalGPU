@@ -39,7 +39,6 @@ class Resampling:
         self,
         *,
         indices: Int64Tensor["bootstraps samples"],
-        event: Int64Tensor["intervals"],
         patient: Int64Tensor["intervals"],
     ):
         """
@@ -80,12 +79,16 @@ class Resampling:
         """
         B, S = indices.shape
         P = patient.max() + 1
-        I = event.shape[0]
+        I = patient.shape[0]
 
         # Step 1: compute the patient weights --------------------------------------------
         # Compute the numbers of occurrences of each patient index in the
         # rows of bootstrap_indices:
-        sample_weights = torch.ones(B, P, dtype=torch.float32, device=indices.device)
+        sample_weights = torch.ones(B, S, dtype=torch.float32, device=indices.device)
+
+        # sample_weights is (B, S),
+        # indices is (B, S) with values in [0, P-1]
+        # -> patient weights is (B, P)
         self.patient_weights = group_reduce(
             values=sample_weights,
             groups=indices,
@@ -115,8 +118,12 @@ class Resampling:
         assert self.patient_log_weights.shape == (B, P)
 
         # Step 2: compute the interval weights -------------------------------------------
-        self.interval_weights = self.patient_weights[:, indices]
+        self.interval_weights = self.patient_weights[:, patient]
         self.interval_log_weights = stable_log(self.interval_weights)
 
         assert self.interval_weights.shape == (B, I)
         assert self.interval_log_weights.shape == (B, I)
+
+    @typecheck
+    def __len__(self) -> int:
+        return self.patient_weights.shape[0]

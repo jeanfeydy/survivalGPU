@@ -1,6 +1,6 @@
 from beartype import beartype as typechecker
 import jaxtyping as jxt
-from typing import Optional, Callable, Union, Tuple, Literal
+from typing import Optional, Callable, Union, List, Tuple, Literal
 
 
 import torch

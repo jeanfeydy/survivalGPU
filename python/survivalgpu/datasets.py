@@ -193,7 +193,7 @@ class SurvivalDataset:
         # Checks for strata -------------------------------------------------------------
         # Default value for strata is [0, 0, 0, ...]: all patients belong to the same stratum.
         if strata is None:
-            strata = np.zeros_like(patient)
+            strata = np.zeros((self.n_patients,), dtype=np.int64)
 
         if strata.shape != (self.n_patients,):
             raise ValueError(
@@ -204,7 +204,7 @@ class SurvivalDataset:
         # Checks for batch --------------------------------------------------------------
         # Default value for batch is [0, 0, 0, ...]: all patients belong to the same batch.
         if batch is None:
-            batch = np.zeros_like(patient)
+            batch = np.zeros((self.n_patients,), dtype=np.int64)
 
         if batch.shape != (self.n_patients,):
             raise ValueError(

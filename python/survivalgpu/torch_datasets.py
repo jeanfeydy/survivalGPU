@@ -13,7 +13,7 @@ We provide a TorchSurvivalDataset object with methods that implement:
 import torch
 import numpy as np
 from matplotlib import pyplot as plt
-from .typecheck import typecheck, Optional, Callable, Union, Tuple, TorchDevice
+from .typecheck import typecheck, Optional, Callable, Union, List, Tuple, TorchDevice
 from .typecheck import Int, Real
 from .typecheck import Int64Tensor, Float32Tensor
 from .bootstrap import Resampling
@@ -219,22 +219,25 @@ class TorchSurvivalDataset:
         indices = indices.view(1, -1)
         return Resampling(
             indices=indices,
-            event=self.event,
             patient=self.patient,
         )
 
-    def bootstraps(self, n_bootstraps, batch_size):
-        for batch_it in range(n_bootstraps // batch_size):
-            # We simulate bootstrapping using an integer array
-            # of "weights" numbers of shape (B, N) where B is the number of bootstraps.
-            # The original sample corresponds to weights = [1, ..., 1],
-            # while other values for the vector always sum up to
-            # the number of patients.
-            bootstrap_indices = torch.randint(N, (B, N), dtype=int64, device=device)
-            # Our first line corresponds to the original sample,
-            # i.e. there is no re-sampling if bootstrap == 1:
-            if batch_it == 0:
-                bootstrap_indices[0, :] = torch.arange(N, dtype=int64, device=device)
-            # bootstrap_indices is (B,N), e.g.:
-            # [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-            #  [3, 3, 1, 2, 8, 6, 0, 0, 8, 9]]
+    @typecheck
+    def bootstraps(self, *, n_bootstraps: int, batch_size: int) -> List[Resampling]:
+        P = self.n_patients
+        bootstrap_list = []
+        for s in range(0, n_bootstraps, batch_size):
+            B = min(batch_size, n_bootstraps - s)
+            bootstrap_indices = torch.randint(
+                P,
+                (B, P),
+                dtype=torch.int64,
+                device=self.device,
+            )
+            bootstrap_list.append(
+                Resampling(
+                    indices=bootstrap_indices,
+                    patient=self.patient,
+                )
+            )
+        return bootstrap_list
