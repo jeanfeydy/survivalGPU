@@ -215,7 +215,9 @@ class CoxPHSurvivalAnalysis:
                 n_bootstraps=n_bootstraps, batch_size=batch_size
             ):
                 init = torch.zeros(
-                    (len(bootstrap) * n_batch, n_covariates), dtype=float32, device=device
+                    (len(bootstrap) * n_batch, n_covariates),
+                    dtype=float32,
+                    device=device,
                 )
                 res = newton(
                     loss=functools.partial(loss, bootstrap=bootstrap),

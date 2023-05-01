@@ -34,7 +34,7 @@ def torch_lexsort(a: Int64Tensor["keys indices"]) -> Int64Tensor["indices"]:
 
 class TorchSurvivalDataset:
     """Object that holds data for the compute-intensive parts of the CoxPH solvers.
-    
+
     Attributes:
         stop ((I,) int64 Tensor): stop times for the intervals.
         start ((I,) int64 Tensor): start times for the intervals.
@@ -57,6 +57,7 @@ class TorchSurvivalDataset:
           These correspond to the group indices defined above.
         tied_deaths ((n_groups,) int64 Tensor): number of tied deaths for each group.
     """
+
     @typecheck
     def __init__(
         self,
@@ -248,16 +249,22 @@ class TorchSurvivalDataset:
         )
 
     @typecheck
-    def bootstraps(self, *, n_bootstraps: int, batch_size: int, stratify: bool=True,) -> List[Resampling]:
+    def bootstraps(
+        self,
+        *,
+        n_bootstraps: int,
+        batch_size: int,
+        stratify: bool = True,
+    ) -> List[Resampling]:
         """Returns a list of Resampling objects that correspond to bootstrap samples.
-        
+
         This method generates bootstrap sampling indices which are similar to:
         indices = torch.randint(P, (B, P)),
         where P is the number of patients and B is the batch size.
         These correspond to a random bootstrap sample, e.g.
             [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],  -> "miracle", we retrieve the original sample!
              [3, 3, 1, 2, 8, 6, 0, 0, 8, 9]]  -> "genuinely random" bootstrap sample
-        
+
         Note that we draw these indices using a random number generator
         that respects the batch and stratification constraints.
         For instance, with P=10 as above, if:
@@ -286,15 +293,17 @@ class TorchSurvivalDataset:
                 Defaults to True.
         """
         P = self.n_patients
+
+        # Step 1: create stratifications groups for the sampling =========================
         if stratify:
             strata = torch.stack((self.batch, self.strata), dim=1)
         else:
             strata = self.batch.view(-1, 1)
 
-        # At this point, strata.T looks like:
+        # At this point, strata.T may look like - with batch+strata:
         # [[0, 0, 0; 1, 1, 1, 1; 1, 1, 1],
         #  [0, 0, 0; 0, 0, 0, 0; 1, 1, 1]]
-        # or, for a more complex example:
+        # or, for a more complex example - with batch only:
         # [[0, 3, 1, 0, 1, 1, 2, 0, 3]]
         strata_unique, strata_indices, strata_counts = torch.unique(
             strata,
@@ -305,7 +314,7 @@ class TorchSurvivalDataset:
         # strata_unique looks like:
         # [[0, 0], [1, 0], [1, 1]]
         # or:
-        # [0, 1, 2, 3]
+        # [0, 1, 2, 3]  (torch.unique sorts the values)
 
         # strata_indices looks like:
         # [0, 0, 0; 1, 1, 1, 1; 2, 2, 2]
@@ -317,25 +326,34 @@ class TorchSurvivalDataset:
         # or:
         # [3, 3, 1, 2]
 
-        strata_offset, strata_values = torch.sort(strata_indices)
-        # strata_offset looks like:
-        # [0, 0, 0; 1, 1, 1, 1; 2, 2, 2]
-        # or:
-        # [0, 0, 0; 1, 1, 1; 2; 3, 3]
-        strata_cumsums = strata_counts.cumsum(dim=0)
-        strata_cumsums = torch.cat((torch.zeros_like(strata_cumsums[:1]), strata_cumsums))
-        strata_offset = strata_cumsums[strata_offset]
-        # strata_offset looks like:
-        # [0, 0, 0; 3, 3, 3, 3; 7, 7, 7]
-        # or:
-        # [0, 0, 0; 3, 3, 3; 6; 7, 7]
+        # Step 2: compute the sampling offsets and cardinals =============================
+        # We group in contiguous intervals the patient indices that belong
+        # to a given strata, and store this information in strata_values:
 
+        strata_id, strata_values = torch.sort(strata_indices)
         # strata_values looks like:
         # [0, 1, 2; 3, 4, 5, 6; 7, 8, 9]
         # or:
         # [0, 3, 7; 2, 4, 5; 6; 1, 8]
 
-        strata_cardinal = strata_counts[strata_offset]
+        # strata_id looks like:
+        # [0, 0, 0; 1, 1, 1, 1; 2, 2, 2]
+        # or:
+        # [0, 0, 0; 1, 1, 1; 2; 3, 3]
+
+        # Then, we want store the cardinal of each strata in a vector strata_cardinal,
+        # as well as offsets that we use below for indexing purposes:
+        strata_cumsums = strata_counts.cumsum(dim=0)
+        strata_cumsums = torch.cat(
+            (torch.zeros_like(strata_cumsums[:1]), strata_cumsums)
+        )
+        strata_offset = strata_cumsums[strata_id]
+        # strata_offset looks like:
+        # [0, 0, 0; 3, 3, 3, 3; 7, 7, 7]
+        # or:
+        # [0, 0, 0; 3, 3, 3; 6; 7, 7]
+
+        strata_cardinal = strata_counts[strata_id]
         # strata_cardinal looks like:
         # [3, 3, 3; 4, 4, 4, 4; 3, 3, 3]
         # or:
@@ -346,6 +364,15 @@ class TorchSurvivalDataset:
         assert strata_values.shape == (P,)
         assert strata_cardinal.shape == (P,)
 
+        # Using this information, we can now generate bootstrap samples that respect
+        # the stratification by using the formula:
+        # bootstrap_indices = strata_values[strata_offset + floor(X * strata_cardinal)]
+        # where X follows a uniform distribution in [0, 1).
+        # Indeed, floor(X * strata_cardinal) will be a uniform distribution
+        # in [0, strata_cardinal - 1], so that strata_offset + floor(X * strata_cardinal)
+        # will be a uniform distribution in [strata_offset, strata_offset + strata_cardinal - 1],
+        # i.e. strata_values[...] will be a uniform distribution in the set of patient
+        # ids that belong to the strata.
 
         bootstrap_list = []
         for s in range(0, n_bootstraps, batch_size):
@@ -355,8 +382,10 @@ class TorchSurvivalDataset:
                 dtype=torch.float32,
                 device=self.device,
             )
-            bootstrap_indices = strata_values[strata_offset + (rnd * strata_cardinal).long()]
-            
+            bootstrap_indices = strata_values[
+                strata_offset + (rnd * strata_cardinal).long()
+            ]
+
             bootstrap_list.append(
                 Resampling(
                     indices=bootstrap_indices,

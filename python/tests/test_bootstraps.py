@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from survivalgpu.datasets import load_drugs, SurvivalDataset
 from survivalgpu.bootstrap import Resampling
+from survivalgpu.group_reduction import group_reduce
 
 from math import ceil
 
@@ -182,3 +183,52 @@ def test_bootstraps_simple(
             res.patient_weights.sum(dim=1),
             n_patients * torch.ones(b, device=device),
         )
+
+
+@given(
+    n_groups=small_int,
+    n_intervals=small_int,
+    n_bootstraps=small_int,
+    device=st_device,
+)
+def test_bootstraps_stratification_1(n_groups: int, n_intervals: int, n_bootstraps: int, device: str):
+    """Checks that stratification works as expected."""
+    stop = np.random.randint(1, 10, size=(n_intervals,))
+    event = np.random.randint(0, 2, size=(n_intervals,))
+    batch = np.random.randint(0, n_groups, size=(n_intervals,))
+
+    covariates = np.zeros((n_intervals, 1))
+
+    dataset = SurvivalDataset(
+        stop=stop,
+        event=event,
+        covariates=covariates,
+        batch=batch,
+    )
+    dataset = dataset.to_torch(device).sort().count_deaths()
+
+    boots = dataset.bootstraps(n_bootstraps=n_bootstraps, batch_size=n_bootstraps)[0]
+
+    assert boots.patient_weights.shape == (n_bootstraps, n_intervals)
+
+    uniform_weights = torch.ones(1, n_intervals, device=device)
+    weight_per_strata = group_reduce(
+        values=uniform_weights,
+        groups=torch.from_numpy(batch).to(device=device).view(1, -1),
+        reduction="sum",
+        output_size=n_groups,
+        backend="pyg",
+    ).tile((n_bootstraps, 1))
+
+    new_weight_per_strata = group_reduce(
+        values=boots.patient_weights,
+        groups=torch.from_numpy(batch)
+        .to(device=device)
+        .view(1, -1)
+        .tile((n_bootstraps, 1)),
+        reduction="sum",
+        output_size=n_groups,
+        backend="pyg",
+    )
+
+    assert torch.allclose(weight_per_strata, new_weight_per_strata)
