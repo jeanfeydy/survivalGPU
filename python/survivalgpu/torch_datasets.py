@@ -33,6 +33,30 @@ def torch_lexsort(a: Int64Tensor["keys indices"]) -> Int64Tensor["indices"]:
 
 
 class TorchSurvivalDataset:
+    """Object that holds data for the compute-intensive parts of the CoxPH solvers.
+    
+    Attributes:
+        stop ((I,) int64 Tensor): stop times for the intervals.
+        start ((I,) int64 Tensor): start times for the intervals.
+        event ((I,) int64 Tensor): event indicators for the intervals.
+        patient ((I,) int64 Tensor): patient indices for the intervals.
+        strata ((P,) int64 Tensor): strata indices for the patients.
+        batch ((P,) int64 Tensor): batch indices for the patients.
+        covariates ((I,D) float32 Tensor): covariates for the intervals.
+        batch_intervals ((I,) int64 Tensor): batch indices for the intervals.
+        strata_intervals ((I,) int64 Tensor): strata indices for the intervals.
+        is_sorted (bool): whether the data is sorted by lexicographical order on (batch > strata > stop > event).
+        device (torch.device or str): torch device (cpu, cuda...) where the data is stored.
+        n_patients (int): number of patients that are referenced in the dataset.
+        n_batch (int): number of batches that are referenced in the dataset.
+        n_covariates (int): number of covariates that are referenced in the dataset.
+        group ((I,) int64 Tensor): group indices for the intervals, with values in [0, n_groups-1].
+          These correspond to the T unique values of (batch, strata, stop) that are defined for the intervals.
+        n_groups (int): number of independent groups defined above.
+        unique_groups ((3,n_groups) int64 Tensor): (batch, strata,  stop) values for the groups that are referenced in the dataset.
+          These correspond to the group indices defined above.
+        tied_deaths ((n_groups,) int64 Tensor): number of tied deaths for each group.
+    """
     @typecheck
     def __init__(
         self,
@@ -211,6 +235,7 @@ class TorchSurvivalDataset:
 
     @typecheck
     def original_sample(self) -> Resampling:
+        """Returns a Resampling object that corresponds to the original sample."""
         indices = torch.arange(
             self.n_patients,
             dtype=torch.int64,
@@ -223,17 +248,115 @@ class TorchSurvivalDataset:
         )
 
     @typecheck
-    def bootstraps(self, *, n_bootstraps: int, batch_size: int) -> List[Resampling]:
+    def bootstraps(self, *, n_bootstraps: int, batch_size: int, stratify: bool=True,) -> List[Resampling]:
+        """Returns a list of Resampling objects that correspond to bootstrap samples.
+        
+        This method generates bootstrap sampling indices which are similar to:
+        indices = torch.randint(P, (B, P)),
+        where P is the number of patients and B is the batch size.
+        These correspond to a random bootstrap sample, e.g.
+            [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],  -> "miracle", we retrieve the original sample!
+             [3, 3, 1, 2, 8, 6, 0, 0, 8, 9]]  -> "genuinely random" bootstrap sample
+        
+        Note that we draw these indices using a random number generator
+        that respects the batch and stratification constraints.
+        For instance, with P=10 as above, if:
+        - batch  = [0, 0, 0, 1, 1, 1, 1, 1, 1, 1]
+        - strata = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
+        This defines three groups of patients that should not mix in the bootstrap samples:
+        - group=0: [0, 1, 2]
+        - group=1: [3, 4, 5, 6]
+        - group=2: [7, 8, 9]
+        Consequently, with B=2 bootstraps, typical indices would be:
+        - indices = [[0, 1, 2 ; 3, 4, 5, 6 ; 7, 8, 9],  -> "miracle", we retrieve the original sample!
+                     [0, 0, 1 ; 4, 6, 4, 4 ; 8, 8, 8]]  -> "genuinely random" bootstrap sample
+
+        Note that if stratify=False, we only stratify according to the `batch` vector:
+        "group=0" is separated from "group=1" and "group=2", but "group=1" and "group=2"
+        may mix together in the bootstrap samples.
+
+
+        Args:
+            n_bootstraps (int): The number of bootstrap samples to generate.
+            batch_size (int): The number of bootstrap samples that should be handled
+                simultaneously by the CoxPH optimizer.
+            stratify (bool): If True, the bootstrap samples are stratified according
+                to the values of the `batch` and `strata` vectors.
+                Otherwise, we only stratify according to the `batch` vector.
+                Defaults to True.
+        """
         P = self.n_patients
+        if stratify:
+            strata = torch.stack((self.batch, self.strata), dim=1)
+        else:
+            strata = self.batch.view(-1, 1)
+
+        # At this point, strata.T looks like:
+        # [[0, 0, 0; 1, 1, 1, 1; 1, 1, 1],
+        #  [0, 0, 0; 0, 0, 0, 0; 1, 1, 1]]
+        # or, for a more complex example:
+        # [[0, 3, 1, 0, 1, 1, 2, 0, 3]]
+        strata_unique, strata_indices, strata_counts = torch.unique(
+            strata,
+            return_inverse=True,
+            return_counts=True,
+            dim=0,
+        )
+        # strata_unique looks like:
+        # [[0, 0], [1, 0], [1, 1]]
+        # or:
+        # [0, 1, 2, 3]
+
+        # strata_indices looks like:
+        # [0, 0, 0; 1, 1, 1, 1; 2, 2, 2]
+        # or:
+        # [0, 3, 1, 0, 1, 1, 2, 0, 3]
+
+        # strata_counts looks like:
+        # [3, 4, 3]
+        # or:
+        # [3, 3, 1, 2]
+
+        strata_offset, strata_values = torch.sort(strata_indices)
+        # strata_offset looks like:
+        # [0, 0, 0; 1, 1, 1, 1; 2, 2, 2]
+        # or:
+        # [0, 0, 0; 1, 1, 1; 2; 3, 3]
+        strata_cumsums = strata_counts.cumsum(dim=0)
+        strata_cumsums = torch.cat((torch.zeros_like(strata_cumsums[:1]), strata_cumsums))
+        strata_offset = strata_cumsums[strata_offset]
+        # strata_offset looks like:
+        # [0, 0, 0; 3, 3, 3, 3; 7, 7, 7]
+        # or:
+        # [0, 0, 0; 3, 3, 3; 6; 7, 7]
+
+        # strata_values looks like:
+        # [0, 1, 2; 3, 4, 5, 6; 7, 8, 9]
+        # or:
+        # [0, 3, 7; 2, 4, 5; 6; 1, 8]
+
+        strata_cardinal = strata_counts[strata_offset]
+        # strata_cardinal looks like:
+        # [3, 3, 3; 4, 4, 4, 4; 3, 3, 3]
+        # or:
+        # [3, 3, 3; 3, 3, 3; 1; 2, 2]
+
+        assert strata_indices.shape == (P,)
+        assert strata_offset.shape == (P,)
+        assert strata_values.shape == (P,)
+        assert strata_cardinal.shape == (P,)
+
+
         bootstrap_list = []
         for s in range(0, n_bootstraps, batch_size):
             B = min(batch_size, n_bootstraps - s)
-            bootstrap_indices = torch.randint(
-                P,
+            rnd = torch.rand(
                 (B, P),
-                dtype=torch.int64,
+                dtype=torch.float32,
                 device=self.device,
             )
+            bootstrap_indices = strata_values[strata_offset + (rnd * strata_cardinal).long()]
+            
             bootstrap_list.append(
                 Resampling(
                     indices=bootstrap_indices,
