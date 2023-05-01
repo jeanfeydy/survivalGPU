@@ -167,11 +167,18 @@ def test_bootstraps_simple(
     assert len(boots) == ceil(n_bootstraps / batch_size)
     assert sum([len(b) for b in boots]) == n_bootstraps
 
-    for res in boots[:-1]:
-        assert len(res) == batch_size
-        assert res.patient_weights.shape == (batch_size, n_patients)
-        assert res.interval_weights.shape == (batch_size, len(dataset.stop))
+    for it, res in enumerate(boots):
+        if it < len(boots) - 1:
+            b = batch_size
+        else:
+            b = n_bootstraps % batch_size
+            if b == 0:
+                b = batch_size
+
+        assert len(res) == b
+        assert res.patient_weights.shape == (b, n_patients)
+        assert res.interval_weights.shape == (b, len(dataset.stop))
         assert torch.allclose(
             res.patient_weights.sum(dim=1),
-            n_patients * torch.ones(batch_size, device=device),
+            n_patients * torch.ones(b, device=device),
         )
