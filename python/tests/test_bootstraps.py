@@ -7,7 +7,7 @@ from survivalgpu.datasets import load_drugs, SurvivalDataset
 from survivalgpu.bootstrap import Resampling
 from survivalgpu.group_reduction import group_reduce
 
-from math import ceil
+from math import ceil, sqrt
 
 small_int = st.integers(min_value=1, max_value=10)
 
@@ -188,17 +188,23 @@ def test_bootstraps_simple(
 @given(
     n_groups=small_int,
     n_intervals=small_int,
-    n_bootstraps=small_int,
+    n_bootstraps=st.one_of(small_int, st.just(1000), st.just(10000)),
     device=st_device,
 )
-def test_bootstraps_stratification_1(n_groups: int, n_intervals: int, n_bootstraps: int, device: str):
+def test_bootstraps_stratification_1(
+    n_groups: int, n_intervals: int, n_bootstraps: int, device: str
+):
     """Checks that stratification works as expected."""
+
+    # Stop, event and covariates don't really matter here:
     stop = np.random.randint(1, 10, size=(n_intervals,))
     event = np.random.randint(0, 2, size=(n_intervals,))
-    batch = np.random.randint(0, n_groups, size=(n_intervals,))
-
     covariates = np.zeros((n_intervals, 1))
 
+    # Batch is a random vector that defines at most n_groups separate groups:
+    batch = np.random.randint(0, n_groups, size=(n_intervals,))
+
+    # Wrap the data in a TorchSurvivalDataset object:
     dataset = SurvivalDataset(
         stop=stop,
         event=event,
@@ -207,28 +213,45 @@ def test_bootstraps_stratification_1(n_groups: int, n_intervals: int, n_bootstra
     )
     dataset = dataset.to_torch(device).sort().count_deaths()
 
+    # Retrieve our bootstraps in a single Resampling object:
     boots = dataset.bootstraps(n_bootstraps=n_bootstraps, batch_size=n_bootstraps)[0]
 
+    # Simple check on the shapes, as in test_bootstraps_simple():
     assert boots.patient_weights.shape == (n_bootstraps, n_intervals)
 
-    uniform_weights = torch.ones(1, n_intervals, device=device)
-    weight_per_strata = group_reduce(
-        values=uniform_weights,
-        groups=torch.from_numpy(batch).to(device=device).view(1, -1),
-        reduction="sum",
-        output_size=n_groups,
-        backend="pyg",
-    ).tile((n_bootstraps, 1))
+    # Check that the total number of samples per group is preserved ----------------------
 
+    batch = torch.from_numpy(batch).to(device=device)
+    # Compute the original number of patients per strata:
+    weight_per_strata = (
+        torch.bincount(batch, minlength=n_groups).tile((n_bootstraps, 1)).float()
+    )
+
+    # Compute the total weight per strata:
     new_weight_per_strata = group_reduce(
         values=boots.patient_weights,
-        groups=torch.from_numpy(batch)
-        .to(device=device)
-        .view(1, -1)
-        .tile((n_bootstraps, 1)),
+        groups=batch.view(1, -1).tile((n_bootstraps, 1)),
         reduction="sum",
         output_size=n_groups,
         backend="pyg",
     )
 
     assert torch.allclose(weight_per_strata, new_weight_per_strata)
+
+    # Check that every patient has an equal probability of being sampled -----------------
+    if n_bootstraps >= 1000:
+        # each cell of boots.patient_weights is a random variable with expected
+        # mean value of 1 and finite variance that depends on the number of patients
+        # per group. (A patient that is alone is always going to get picked, with
+        # weight=1, whereas a patient in a more populous groups may experience
+        # a wider range of fortunes.)
+        # In any case, according to the central limit theorem,
+        # we expect that the average empirical probas over n_bootstraps will
+        # be equal to 1 + Cst * N(0,1) / sqrt(n_bootstraps)
+        probas = boots.patient_weights.mean(dim=0)  # (n_intervals,)
+
+        # We can reasonably expect that Cst ~ 1, and ask with >99% certainty
+        # that the error falls in the confidence interval +- 3/sqrt(n_boostraps):
+        assert torch.allclose(
+            probas, torch.ones_like(probas), atol=3 / sqrt(n_bootstraps)
+        )
