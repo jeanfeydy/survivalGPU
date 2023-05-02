@@ -157,7 +157,7 @@ class CoxPHSurvivalAnalysis:
             )
 
         # Case 2: all the intervals are )0, t]:
-        # this opens the door to a more efficient implementation using the cumulative hazard.
+        # this opens the door to a more efficient implementation using a cumulative hazard.
         elif torch.all(dataset.start == 0):
             raise NotImplementedError(
                 "Currently, we only support 'no-interval mode' where all intervals are of length 1."
@@ -170,7 +170,7 @@ class CoxPHSurvivalAnalysis:
             )
 
         # Define the loss function:
-        def loss(coef, bootstrap=None):
+        def loss(coef, bootstrap):
             """Our loss function, including the L2 regularization term."""
             obj = objective(coef=coef, dataset=dataset, bootstrap=bootstrap)
             reg = self.alpha * (coef**2).sum(dim=1)
@@ -228,7 +228,9 @@ class CoxPHSurvivalAnalysis:
                 )
                 bootstrap_coef.append(res.x)
 
-            self.bootstrap_coef_ = torch.stack(bootstrap_coef)
+            self.bootstrap_coef_ = torch.stack(bootstrap_coef).view(
+                n_bootstraps, n_batch, n_covariates
+            )
 
         # If the covariates have been normalized for the sake of stability,
         # we shouldn't forget to "de-normalize" the results:

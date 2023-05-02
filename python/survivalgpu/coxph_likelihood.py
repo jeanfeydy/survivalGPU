@@ -19,7 +19,7 @@ import numpy as np
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
-from .group_reduction import SlicedSummation, group_logsumexp
+from .group_reduction import group_reduce, SlicedSummation, group_logsumexp
 
 
 from .typecheck import typecheck, Optional, Literal
@@ -30,29 +30,72 @@ from .bootstrap import Resampling
 @typecheck
 def coxph_objective_unit_intervals(
     *,
-    coef: Float32Tensor["batches intervals"],
+    coef: Float32Tensor["batch_size covariates"],
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
     backend: Literal["torch", "pyg", "coo", "csr"],
     bootstrap: Resampling,
-) -> Float32Tensor["batches"]:
-    # Step 3: Aggregate the "total weights for dead samples" at each time point ------
-    # These are required as multiplicative factors by the Efron and Breslow rules
+) -> Float32Tensor["batch_size"]:
+    """Implements the CoxPH objective in the case where `stop == start + 1`.
+
+    Since we follow the survival convention and assume that all intervals are of
+    the form `(start, stop]` with integer time values for `start` and `stop`,
+    the condition above ensures that the intervals used to describe our dataset
+    overlap if and only if they share the same 'stop' time.
+
+    This simplifies some computations, compared with the general implementation of
+    coxph_objective_any_intervals().
+
+    This function evaluates `batch_size` instances of the CoxPH objective in parallel:
+    we return one scalar value per row of the `coef` Tensor.
+    We assume that `batch_size == len(bootstrap) * dataset.n_batch`:
+
+    - If `batch_size == dataset.n_batch`, the vector of coefficients `coef[i]` will be
+      associated to the subset of patients such that `dataset.batch == i`.
+    - If `batch_size == len(bootstrap) * dataset.n_batch`, the vector of coefficients
+      `coef[i]` will be associated to the subset of patients such that
+      `dataset.batch == i % dataset.n_batch`.
+      In other words, the `(batch_size, covariates)` Tensor of coefficients `coef`
+      is interpreted as a `(n_bootstraps, dataset.n_batch, covariates)` Tensor.
+    """
+
+    B, D = coef.shape
+    if B != len(bootstrap) * dataset.n_batch:
+        raise ValueError(
+            f"The number of rows {B} of the `coef` Tensor "
+            f"should be equal to the number of bootstrap samples {len(bootstrap)}"
+            f"times the number of batches {dataset.n_batch} "
+            "that are referenced in `dataset.batch`."
+        )
+
+    coef = coef.view(len(bootstrap), dataset.n_batch, D)
+
+    # Pre-processing ---------------------------------------------------------------------
+    # For each bootstrap and value of (batch, strata), aggregate the
+    # "total weights for dead samples" at each time point.
+    # These are required as multiplicative factors by the Efron and Breslow approximations.
+
+    # Recall that bootstrap.interval_weights is a (n_bootstraps, n_intervals)
+    # Tensor of int64 that records the number of occurences of each interval.
 
     # Compute the total weight of dead samples for every event time:
-    dead_weights = bootstrap.interval_weights[:, event == 1]
-    # dead_weights is (B, Ndeads), e.g.
+    dead_weights = bootstrap.interval_weights[:, dataset.event == 1]
+    # dead_weights is (n_bootstraps, n_death_intervals), e.g.
     # [[1, 1, 1, 1],
     #  [2, 0, 1, 1]]
-    dead_cluster_indices = cluster_indices[event == 1].repeat(B, 1)
-    # dead_cluster_indices is (B, Ndeads), e.g.
+
+    # Recall that dataset.group is a (n_intervals,) Tensor of int64 that records
+    # the T unique values of (batch, strata, stop):
+    dead_cluster_indices = dataset.group[dataset.event == 1].repeat(len(bootstrap), 1)
+    # dead_cluster_indices is (n_bootstraps, n_death_intervals), e.g.
     # [[0, 0, 1, 2],
     #  [0, 0, 1, 2]]
+
     tied_dead_weights = group_reduce(
         values=dead_weights,
         groups=dead_cluster_indices.long(),
         reduction="sum",
-        output_size=T,
+        output_size=dataset.n_groups,
         backend="pyg",
     )
     # Equivalent to:
@@ -60,9 +103,10 @@ def coxph_objective_unit_intervals(
     #                     weights=weights.view(-1)[deaths == 1],
     #                     minlength=T)
     #
-    # tied_dead_weights is (B,T), e.g.
+    # tied_dead_weights is (n_bootstraps,n_times), e.g.
     # [[2, 1, 1],
     #  [2, 1, 1]]
+    assert tied_dead_weights.shape == (len(bootstrap), dataset.n_groups)
 
     # Create the arrays of offsets for ties:
     if ties == "breslow":
@@ -72,29 +116,28 @@ def coxph_objective_unit_intervals(
         group = dataset.group  # (N,)
         n_groups = dataset.n_groups  # T
 
-        # TODO: BELOW!!!
-
         # With the Breslow approximation, the multiplicative factor
         # in front of the log-sum-exp term is equal to
         # (Sum_{dead at t} w[i]) = tied_dead_weights
-        weight_factor = tied_dead_weights.view(B, T)  # (B,T)
+        # weight_factor is (n_bootstraps, n_times):
+        weight_factor = tied_dead_weights.view(len(bootstrap), n_groups)
 
     elif ties == "efron":
         # The Efron approximation handles "survivors" and "dying subjects"
         # differently (in every cluster of people "at risk").
-        # To handle this, we build 2*T summation "groups":
-        group_indices = 2 * cluster_indices + deaths
-        ngroups = 2 * T
-        # If cluster_indices is equal to:
+        # To handle this, we build 2*n_times summation "groups":
+        group = 2 * dataset.group + dataset.event
+        n_groups = 2 * dataset.n_groups
+        # If dataset.group is equal to:
         # [0, 0, 0, 0, 0, 1, 1, 1, 2, 2]
-        # And if deaths is equal to:
+        # And if dataset.event is equal to:
         # [0, 0, 0, 1, 1, 0, 0, 1, 0, 1]
-        # Then group_indices is equal to:
+        # Then group is equal to:
         # [0, 0, 0, 1, 1, 2, 2, 3, 4, 5]
 
         # With the Breslow approximation and weights that come from bootstrapping,
         # the multiplicative factor in front of the log-sum-exp term is equal to 1.
-        # weight_factor = tied_dead_weights.view(B, T) # 1
+        # -> there is no need to define a weight_factor variable.
 
 
 def coxph_objective_torch(
