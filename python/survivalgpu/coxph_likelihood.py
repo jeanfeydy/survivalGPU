@@ -22,7 +22,7 @@ import torch
 from .group_reduction import group_reduce, SlicedSummation, group_logsumexp
 
 
-from .typecheck import typecheck, Optional, Literal
+from .typecheck import typecheck, Callable, Literal
 from .typecheck import Float32Tensor
 from .bootstrap import Resampling
 
@@ -30,12 +30,11 @@ from .bootstrap import Resampling
 @typecheck
 def coxph_objective_unit_intervals(
     *,
-    coef: Float32Tensor["batch_size covariates"],
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
     backend: Literal["torch", "pyg", "coo", "csr"],
     bootstrap: Resampling,
-) -> Float32Tensor["batch_size"]:
+) -> Callable[[Float32Tensor["batch_size covariates"]], Float32Tensor["batch_size"]]:
     """Implements the CoxPH objective in the case where `stop == start + 1`.
 
     Since we follow the survival convention and assume that all intervals are of
@@ -58,17 +57,6 @@ def coxph_objective_unit_intervals(
       In other words, the `(batch_size, covariates)` Tensor of coefficients `coef`
       is interpreted as a `(n_bootstraps, dataset.n_batch, covariates)` Tensor.
     """
-
-    B, D = coef.shape
-    if B != len(bootstrap) * dataset.n_batch:
-        raise ValueError(
-            f"The number of rows {B} of the `coef` Tensor "
-            f"should be equal to the number of bootstrap samples {len(bootstrap)}"
-            f"times the number of batches {dataset.n_batch} "
-            "that are referenced in `dataset.batch`."
-        )
-
-    coef = coef.view(len(bootstrap), dataset.n_batch, D)
 
     # Pre-processing ---------------------------------------------------------------------
     # For each bootstrap and value of (batch, strata), aggregate the
@@ -108,13 +96,13 @@ def coxph_objective_unit_intervals(
     #  [2, 1, 1]]
     assert tied_dead_weights.shape == (len(bootstrap), dataset.n_groups)
 
-    # Create the arrays of offsets for ties:
+    # Create the summation groups --------------------------------------------------------
     if ties == "breslow":
         # The Breslow approximation is fairly straightforward,
         # with summation groups that correspond to the time "clusters"
         # of people "at risks" at any given time:
-        group = dataset.group  # (N,)
-        n_groups = dataset.n_groups  # T
+        group = dataset.group  # (n_intervals,)
+        n_groups = dataset.n_groups  # n_times
 
         # With the Breslow approximation, the multiplicative factor
         # in front of the log-sum-exp term is equal to
@@ -138,6 +126,145 @@ def coxph_objective_unit_intervals(
         # With the Breslow approximation and weights that come from bootstrapping,
         # the multiplicative factor in front of the log-sum-exp term is equal to 1.
         # -> there is no need to define a weight_factor variable.
+
+    # Format the "group" vector as required by our backend for group-wise summations:
+    if backend in ["torch", "pyg", "coo"]:
+        group = group.repeat(len(bootstrap), 1)
+        # group is (n_bootstrap,n_intervals),
+        # and indicates the summation group that is associated to each interval e.g.
+        # [[0, 0, 0, 0, 0, 1, 1, 1, 2, 2],
+        #  [0, 0, 0, 0, 0, 1, 1, 1, 2, 2]]
+
+    elif backend == "csr":
+        # We assume that group looks like:
+        # [0, 0, 1, 1, 1, 3, 4, 4, ...]
+        assert dataset.is_sorted
+        assert (group[1:] >= group[:-1]).all()
+
+        cluster_sizes = torch.bincount(group, minlength=n_groups)
+        assert cluster_sizes.shape == (n_groups,)
+        group = torch.cat(
+            (torch.zeros_like(cluster_sizes[:1]), cluster_sizes.cumsum(dim=0))
+        )
+        group = group.view(1, n_groups + 1).repeat(len(bootstrap), 1)
+        # groups is (n_bootstraps, n_times+1) with Breslow,
+        #           (n_bootstraps, 2*n_times + 1) with Efron.
+
+    def negloglikelihood(
+        scores: Float32Tensor["batch_size intervals"],
+    ) -> Float32Tensor["batch_size"]:
+        # TODO: below!!!
+        B, D = coef.shape
+        if B != len(bootstrap) * dataset.n_batch:
+            raise ValueError(
+                f"The number of rows {B} of the `coef` Tensor "
+                f"should be equal to the number of bootstrap samples {len(bootstrap)}"
+                f"times the number of batches {dataset.n_batch} "
+                "that are referenced in `dataset.batch`."
+            )
+
+        coef = coef.view(len(bootstrap), dataset.n_batch, D)
+
+        # nonlocal weight_factor
+
+        # Compute the risk scores associated to the N feature vectors
+        # by our current estimate of the parameters.
+        # For linear scores "dot(beta, x[i])", this corresponds to
+        # scores = params @ x.T, (B,D) @ (D,N) = (B,N)
+        scores = risk_scores(params)  # (B,N)
+        # And add the logarithms of the weights, so that
+        # exp(weighted_scores) = w_i * exp(beta . x_i):
+        weighted_scores = scores + log_weights  # (B,N)
+
+        # The linear term in the CoxPH objective - (B,):
+        lin = (weights.view(B, N) * scores.view(B, N) * deaths.view(1, N)).sum(1)
+
+        if ties == "breslow":
+            # groups_scores is (B,T)
+            group_scores = group_logsumexp(
+                values=weighted_scores, groups=groups, output_size=T, backend=backend
+            )
+            # The log-sum-exp term in the CoxPH log-likelihood - (B,):
+            lse = (weight_factor * group_scores.view(B, T)).sum(1)
+
+        elif ties == "efron":
+            # groups_scores is (B,T*2)
+            group_scores = group_logsumexp(
+                values=weighted_scores,
+                groups=groups,
+                output_size=T * 2,
+                backend=backend,
+            )
+            # We reshape it as a (B,T,2) array that contains, for every batch b
+            # and every death time t, the log-sum-exp values that correspond
+            # to "survivors" (= group_scores[b,t,0]) and
+            # "tied deaths" (= group_scors[b,t,1]).
+            group_scores = group_scores.view(B, T, 2)
+
+            # To implement the Efron rule efficiently, we need to sort the B*T
+            # groups by increasing number of deaths.
+            # Please note that at this point, we mix together times that come
+            # from different batches.
+            # Please also note that since the tied_dead_weights come from bootstraps,
+            # tied deaths are extremely likely to happen.
+            order = tied_dead_weights.view(B * T).argsort()
+            sorted_dead_weights = tied_dead_weights.view(B * T)[order]  # (B*T,)
+            sorted_group_scores = group_scores.view(B * T, 2)[order, :]  # (B*T, 2)
+
+            # We compute the "slice indices" that correspond to sorted_dead_weights:
+            bincounts = torch.bincount(sorted_dead_weights.long())
+            # bincounts is (Max_tied_deaths+1,).
+            # It looks like:
+            # [4, 5, 1, 0, 3, 0, 0, 1],  (shape = (8,))
+            # i.e. there are:
+            # - 4 times where no one dies,
+            # - 5 times where there is a single death (= no ties),
+            # - 1 time with 2 tied deaths,
+            # - 3 times with 4 tied deaths,
+            # - 1 time with 7 tied deaths.
+            slice_indices = torch.cumsum(bincounts, dim=0).long()
+            # slice_indices is (Max_tied_deaths+1,).
+            # It looks like:
+            # [4, 9, 10, 10, 13, 13, 13, 14],  (shape = (8,))
+
+            # Our buffer for the time-wise values:
+            slices = [torch.zeros_like(sorted_group_scores[:, 0])]  # (B*T,)
+            for it, slice_start in enumerate(slice_indices):
+                sliced_scores = sorted_group_scores[slice_start:, :]  # (#ties > it, 2)
+                sliced_dead_weights = sorted_dead_weights[slice_start:]  # (#ties > it,)
+                # sliced_scores[:,1] = sliced_scores[:,1] + np.log(it+1) - sliced_dead_weights.log()
+                sliced_scores = torch.stack(
+                    (
+                        sliced_scores[:, 0].clamp(min=-(10**6)),
+                        sliced_scores[:, 1]
+                        + np.log(it + 1)
+                        - sliced_dead_weights.log(),
+                    ),
+                    dim=1,
+                )
+
+                new_scores = sliced_scores.logsumexp(dim=-1)
+                slices.append(new_scores)
+
+                # The PyTorch autograd engine does not support in-place operations,
+                # so we have to use a custom operator to implement the update:
+                # sorted_scores[slice_start:] = sorted_scores[slice_start:] + new_scores
+                # in a differentiable way.
+
+            sorted_scores = SlicedSummation.apply(slice_indices, *slices)
+
+            # We now need to re-sort
+            time_scores = torch.zeros_like(sorted_group_scores[:, 0])  # (B*T,)
+            time_scores[order] = sorted_scores
+
+            # The log-sum-exp term in the CoxPH log-likelihood - (B,):
+            lse = time_scores.view(B, T).sum(1)
+
+        # lin and lse are (B,)
+        ret_value = lse - lin  # (B,) values, computed in parallel
+        return ret_value
+
+    return negloglikelihood
 
 
 def coxph_objective_torch(

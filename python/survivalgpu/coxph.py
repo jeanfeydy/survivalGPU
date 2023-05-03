@@ -170,16 +170,21 @@ class CoxPHSurvivalAnalysis:
             )
 
         # Define the loss function:
-        def loss(coef, bootstrap):
+        def loss(*, bootstrap):
             """Our loss function, including the L2 regularization term."""
-            obj = objective(coef=coef, dataset=dataset, bootstrap=bootstrap)
-            reg = self.alpha * (coef**2).sum(dim=1)
-            return obj + reg
+            obj = objective(bootstrap=bootstrap)
+
+            def aux(coef):
+                scores = self._linear_risk_scores(coef=coef, X=dataset.covariates)
+                reg = self.alpha * (coef**2).sum(dim=1)
+                return obj(scores) + reg
+
+            return aux
 
         # Run the Newton optimizer: ------------------------------------------------------
         init = torch.zeros((n_batch, n_covariates), dtype=float32, device=device)
         res = newton(
-            loss=functools.partial(loss, bootstrap=dataset.original_sample()),
+            loss=loss(bootstrap=dataset.original_sample()),
             start=init,
             maxiter=self.maxiter,
             eps=self.eps,
@@ -220,7 +225,7 @@ class CoxPHSurvivalAnalysis:
                     device=device,
                 )
                 res = newton(
-                    loss=functools.partial(loss, bootstrap=bootstrap),
+                    loss=loss(bootstrap=bootstrap),
                     start=init,
                     maxiter=self.maxiter,
                     eps=self.eps,
@@ -261,6 +266,7 @@ class CoxPHSurvivalAnalysis:
 
     @typecheck
     def _linear_risk_scores(
+        *,
         coef: Float32Tensor["batches covariates"],
         X: Float32Tensor["intervals covariates"],
     ) -> Float32Tensor["batches intervals"]:
