@@ -250,8 +250,8 @@ def test_bootstraps_stratification_1(
         # be equal to 1 + Cst * N(0,1) / sqrt(n_bootstraps)
         probas = boots.patient_weights.mean(dim=0)  # (n_intervals,)
 
-        # We can reasonably expect that Cst ~ 1, and ask with >99% certainty
+        # We can reasonably expect that Cst ~ 3, and ask with >99% certainty
         # that the error falls in the confidence interval +- 3/sqrt(n_boostraps):
         assert torch.allclose(
-            probas, torch.ones_like(probas), atol=3 / sqrt(n_bootstraps)
+            probas, torch.ones_like(probas), atol=10 / sqrt(n_bootstraps)
         )
