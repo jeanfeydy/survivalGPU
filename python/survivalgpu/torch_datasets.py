@@ -100,6 +100,12 @@ class TorchSurvivalDataset:
 
     @property
     @typecheck
+    def n_intervals(self) -> int:
+        """Number of intervals that are referenced in the dataset."""
+        return self.stop.shape[0]
+
+    @property
+    @typecheck
     def n_batch(self) -> int:
         """Number of batches that are referenced in the dataset."""
         return int(self.batch.max() + 1)

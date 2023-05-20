@@ -25,6 +25,7 @@ from .group_reduction import group_reduce
 from .coxph_likelihood import coxph_objective_torch
 from .coxph_likelihood_keops import coxph_objective_keops
 from .coxph_likelihood import coxph_objective_unit_intervals
+from .bootstrap import Resampling
 
 
 # We currently support 5 different backends,
@@ -51,6 +52,7 @@ from .typecheck import Int64Tensor, Float32Tensor
 from .typecheck import TorchDevice
 
 from .datasets import SurvivalDataset
+from .torch_datasets import TorchSurvivalDataset
 
 
 class CoxPHSurvivalAnalysis:
@@ -175,7 +177,9 @@ class CoxPHSurvivalAnalysis:
             obj = objective(bootstrap=bootstrap)
 
             def aux(coef):
-                scores = self._linear_risk_scores(coef=coef, X=dataset.covariates)
+                scores = self._linear_risk_scores(
+                    coef=coef, dataset=dataset, bootstrap=bootstrap
+                )
                 reg = self.alpha * (coef**2).sum(dim=1)
                 return obj(scores) + reg
 
@@ -268,10 +272,28 @@ class CoxPHSurvivalAnalysis:
     def _linear_risk_scores(
         *,
         coef: Float32Tensor["batches covariates"],
-        X: Float32Tensor["intervals covariates"],
-    ) -> Float32Tensor["batches intervals"]:
+        dataset: TorchSurvivalDataset,
+        bootstrap: Resampling,
+    ) -> Float32Tensor["bootstraps intervals"]:
         """Standard function to compute risks in the CoxPH model: dot(beta, x[i])."""
-        return coef @ X.T  # (B, D) @ (D, I) -> (B, I)
+
+        assert coef.shape[0] == len(bootstrap) * dataset.n_batches
+
+        # coef is (n_bootstraps, n_batches, covariates):
+        coef = coef.view(len(bootstrap), dataset.n_batches, -1)
+
+        # scattered_coef is (n_bootstraps, n_intervals, covariates):
+        scattered_coef = coef[:, dataset.batch, :]  # (B, I, D)
+        assert scattered_coef.shape == (
+            len(bootstrap),
+            dataset.n_intervals,
+            dataset.n_covariates,
+        )
+
+        X = dataset.covariates  # (I, D)
+        # (B, I, D) * (1, I, D) -> (B, I, D)
+        scores = scattered_coef * X.view(1, dataset.n_intervals, dataset.n_covariates)
+        return scores.sum(-1)  # (B, I, D) -> (B, I)
 
 
 # The code below should be obsolete soon: ================================================

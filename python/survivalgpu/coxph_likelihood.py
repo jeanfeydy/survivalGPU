@@ -150,39 +150,55 @@ def coxph_objective_unit_intervals(
         # groups is (n_bootstraps, n_times+1) with Breslow,
         #           (n_bootstraps, 2*n_times + 1) with Efron.
 
+    @typecheck
     def negloglikelihood(
-        scores: Float32Tensor["batch_size intervals"],
-    ) -> Float32Tensor["batch_size"]:
-        # TODO: below!!!
-        B, D = coef.shape
-        if B != len(bootstrap) * dataset.n_batch:
+        scores: Float32Tensor["bootstraps intervals"],
+    ) -> Float32Tensor["batches"]:
+        """The CoxPH neg-log-likelihood that we try to minimize.
+
+        This function takes as input a batch of score values scores[i, j],
+        each of whom corresponds to the risk score of the j-th interval
+        according to the i-th estimate of the model parameters.
+
+        For linear scores "dot(beta[i], x[j])", this corresponds to
+        scores = beta @ x.T, (B,D) @ (D,I) = (B,I)
+
+        """
+        if scores.shape[0] != len(bootstrap):
             raise ValueError(
-                f"The number of rows {B} of the `coef` Tensor "
-                f"should be equal to the number of bootstrap samples {len(bootstrap)}"
-                f"times the number of batches {dataset.n_batch} "
-                "that are referenced in `dataset.batch`."
+                f"The number of rows {scores.shape[0]} of the `scores` Tensor "
+                f"should be equal to the number of bootstrap samples {len(bootstrap)}."
             )
 
-        coef = coef.view(len(bootstrap), dataset.n_batch, D)
+        if scores.shape[1] != dataset.n_intervals:
+            raise ValueError(
+                f"The number of columns {scores.shape[1]} of the `scores` Tensor "
+                f"should be equal to the number of intervals {dataset.n_intervals} "
+                "that are referenced in `dataset.stop`."
+            )
 
-        # nonlocal weight_factor
+        B, I = len(bootstrap), dataset.n_intervals
 
-        # Compute the risk scores associated to the N feature vectors
-        # by our current estimate of the parameters.
-        # For linear scores "dot(beta, x[i])", this corresponds to
-        # scores = params @ x.T, (B,D) @ (D,N) = (B,N)
-        scores = risk_scores(params)  # (B,N)
-        # And add the logarithms of the weights, so that
-        # exp(weighted_scores) = w_i * exp(beta . x_i):
-        weighted_scores = scores + log_weights  # (B,N)
+        # We add the logarithms of the weights to the scores, so that
+        # exp(weighted_scores[i,j]) = w[i,j] * exp(beta[i] . x[j]):
+        weighted_scores = scores + bootstrap.interval_log_weights  # (B,I)
 
         # The linear term in the CoxPH objective - (B,):
-        lin = (weights.view(B, N) * scores.view(B, N) * deaths.view(1, N)).sum(1)
+        lin = bootstrap.interval_weights.view(B, I) * scores.view(B, I) * dataset.event.view(1, I)
+        lin = group_reduce(
+            values=lin,
+            groups=dataset.batch,  # we should define groups instead...
+            reduction="sum",
+            output_size=dataset.n_batches,
+            backend=backend,
+        )
+        assert lin.shape == (B, dataset.n_batches)
 
+        # TODO: Below, think about how to handle batch and strata...
         if ties == "breslow":
-            # groups_scores is (B,T)
+            # groups_scores is (n_bootstraps,n_death_times)
             group_scores = group_logsumexp(
-                values=weighted_scores, groups=groups, output_size=T, backend=backend
+                values=weighted_scores, groups=group, output_size=n_groups, backend=backend
             )
             # The log-sum-exp term in the CoxPH log-likelihood - (B,):
             lse = (weight_factor * group_scores.view(B, T)).sum(1)
