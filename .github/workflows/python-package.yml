@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.8", "3.11"]
 
     steps:
       - uses: actions/checkout@v3
@@ -33,4 +33,6 @@ jobs:
           # ruff --format=github --target-version=py37 .
       - name: Test with pytest
         run: |
-          pytest . --cov=survivalgpu --cov-report=xml --cov-report=html
+          pytest . --cov=survivalgpu --cov-report=xml --cov-report=html --doctest-modules --color=yes
+      - name: Upload coverage reports to Codecov with GitHub Action
+        uses: codecov/codecov-action@v3
