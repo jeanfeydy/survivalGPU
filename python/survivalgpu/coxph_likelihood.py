@@ -1,11 +1,78 @@
+"""Implements the negative log-likelihood of the Cox Proportional Hazards model.
+
+This code runs several evaluations of the log-likelihood in parallel,
+that correspond to different values of the "importance weights"
+that are associated to the samples. This is to enable fast cross-validation
+with bootstrapping.
+
+We follow the exact same conventions as in the R "survival" package,
+as implemented at: https://github.com/therneau/survival/blob/master/src/coxfit6.c
+in the function coxfit6_iter(...).
+
+Namely, if:
+- b denotes the linear model's parameters, a (D,) vector.
+- x[i] denotes the features of the i-th sample, a (D,) vector.
+- w[i] denotes the importance weight of the i-th sample, a non-negative number.
+- r[i] = w[i] * exp(dot(x[i], b)) denotes the weighted risk of the i-th sample.
+
+Then, with the Breslow convention, the neg-log-likelihood is equal to:
+
+- Sum_{all dead samples} w[i] * dot(x[i], b)
++ Sum_{death times t} (
+    (Sum_{dead at t} w[i])
+    *
+    log( Sum_{observed at t} r[i] )
+    )
+
+With the Efron convention, the neg-log-likelihood is equal to:
+
+- Sum_{all dead samples} w[i] * dot(x[i], b)
++ Sum_{death times t} (
+    (Sum_{dead at t} w[i]) / {number of deaths at t}
+    *
+    Sum_{k=1}^{number of deaths at t} (
+        log(
+            Sum_{survived at t} r[i]
+            +
+            (k / {number of deaths at t})
+            *
+            Sum_{dead at t} r[i]
+            )
+        )
+    )
+
+We assume that the weights w[i] are integer numbers used for copy-free bootstrapping,
+which implies that:
+Sum_{dead at t} w[i] = {number of deaths at t}.
+
+This simplifies the Efron expression as:
+
+- Sum_{all dead samples} w[i] * dot(x[i], b)
++ Sum_{death times t} (
+    Sum_{k=1}^{Sum_{dead at t} w[i]} (
+        log(
+            Sum_{survived at t} r[i]
+            +
+            (k / {Sum_{dead at t} w[i]})
+            *
+            Sum_{dead at t} r[i]
+            )
+        )
+    )
+
+All the log-sum-exp computations are performed in a numerically stable way,
+by applying the max-factorization trick (https://en.wikipedia.org/wiki/LogSumExp)
+on the weighted scores:
+    log(r[i]) = log(w[i]) + dot(x[i], b)
+
+"""
+
 # ======================================================================================
 # ==================== CoxPH log-likelihood, PyTorch implementation ====================
 # ======================================================================================
 #
 # First implementation of the convex CoxPH objective, using either:
-# - Vanilla PyTorch - but please note that as of PyTorch 1.11, this code is
-#   not GPU-compatible (https://github.com/pytorch/pytorch/issues/74770).
-#   This will be fixed with PyTorch 1.12.
+# - Vanilla PyTorch.
 # - The PyTorch-Scatter package (https://github.com/rusty1s/pytorch_scatter)
 #   for PyTorch-Geometric (https://pytorch-geometric.readthedocs.io/).
 #   This implementation is probably the fastest one right now,
@@ -300,69 +367,6 @@ def coxph_objective_torch(
     backend="torch",  # string, either "torch", "pyg", "coo" or "csr"
 ):
     """Implements the negative log-likelihood of the Cox Proportional Hazards model.
-
-    This code runs several evaluations of the log-likelihood in parallel,
-    that correspond to different values of the "importance weights"
-    that are associated to the samples. This is to enable fast cross-validation
-    with bootstrapping.
-
-    We follow the exact same conventions as in the R "survival" package,
-    as implemented at: https://github.com/therneau/survival/blob/master/src/coxfit6.c
-    in the function coxfit6_iter(...).
-
-    Namely, if:
-    - b denotes the linear model's parameters, a (D,) vector.
-    - x[i] denotes the features of the i-th sample, a (D,) vector.
-    - w[i] denotes the importance weight of the i-th sample, a non-negative number.
-    - r[i] = w[i] * exp(dot(x[i], b)) denotes the weighted risk of the i-th sample.
-
-    Then, with the Breslow convention, the neg-log-likelihood is equal to:
-
-    - Sum_{all dead samples} w[i] * dot(x[i], b)
-    + Sum_{death times t} (
-        (Sum_{dead at t} w[i])
-        *
-        log( Sum_{observed at t} r[i] )
-        )
-
-    With the Efron convention, the neg-log-likelihood is equal to:
-
-    - Sum_{all dead samples} w[i] * dot(x[i], b)
-    + Sum_{death times t} (
-        (Sum_{dead at t} w[i]) / {number of deaths at t}
-        *
-        Sum_{k=1}^{number of deaths at t} (
-            log(
-                Sum_{survived at t} r[i]
-                +
-                (k / {number of deaths at t})
-                *
-                Sum_{dead at t} r[i]
-                )
-            )
-        )
-
-    As of today, we assume that the weights w[i] are integer numbers
-    used for copy-free bootstrapping and thus simplify the Efron expression as:
-
-    - Sum_{all dead samples} w[i] * dot(x[i], b)
-    + Sum_{death times t} (
-        Sum_{k=1}^{Sum_{dead at t} w[i]} (
-            log(
-                Sum_{survived at t} r[i]
-                +
-                (k / {Sum_{dead at t} w[i]})
-                *
-                Sum_{dead at t} r[i]
-                )
-            )
-        )
-
-    All the log-sum-exp computations are performed in a numerically stable way,
-    by applying the max-factorization trick (https://en.wikipedia.org/wiki/LogSumExp)
-    on the weighted scores:
-        log(r[i]) = log(w[i]) + dot(x[i], b)
-
 
     Args:
         N (int): number of samples.
