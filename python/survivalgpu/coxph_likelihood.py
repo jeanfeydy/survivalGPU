@@ -166,8 +166,8 @@ def coxph_objective_unit_intervals(
     # Create the summation groups --------------------------------------------------------
     if ties == "breslow":
         # The Breslow approximation is fairly straightforward,
-        # with summation groups that correspond to the time "clusters"
-        # of people "at risks" at any given time:
+        # with summation groups by value of (batch, strata, stop)
+        # that correspond to the time "clusters" of people "at risks" at any given time:
         group = dataset.group  # (n_intervals,)
         n_groups = dataset.n_groups  # n_times
 
@@ -246,30 +246,78 @@ def coxph_objective_unit_intervals(
 
         B, I = len(bootstrap), dataset.n_intervals
 
-        # We add the logarithms of the weights to the scores, so that
-        # exp(weighted_scores[i,j]) = w[i,j] * exp(beta[i] . x[j]):
-        weighted_scores = scores + bootstrap.interval_log_weights  # (B,I)
-
-        # The linear term in the CoxPH objective - (B,):
+        # The linear term in the CoxPH objective - (n_bootstraps,n_batches) ==============
+        # This is the term:
+        #
+        #   Sum_{all dead samples} w[i] * dot(x[i], b)
+        # = Sum_{all samples} w[i] * dot(x[i], b) * event[i]
+        #
+        # that we compute in parallel over:
+        # - all n_bootstrap values of the scores,
+        # - all n_batches values of the parameter vector.
+        #
+        # Note that the strata does not matter here, because we sum all contributions
+        # identically:
+        # Sum_{strata s} Sum_{all samples in strata s} ... = Sum_{all samples} ...
         lin = bootstrap.interval_weights.view(B, I) * scores.view(B, I) * dataset.event.view(1, I)
         lin = group_reduce(
             values=lin,
-            groups=dataset.batch,  # we should define groups instead...
+            groups=dataset.batch,  # we should define groups instead to support all backends...
             reduction="sum",
             output_size=dataset.n_batches,
-            backend=backend,
+            backend="pyg", #backend=backend,
         )
         assert lin.shape == (B, dataset.n_batches)
 
-        # TODO: Below, think about how to handle batch and strata...
+
+        # The log-sum-exp term in the CoxPH log-likelihood - (n_bootstrap, n_batches) ====
+
+        # We add the logarithms of the weights to the scores, so that
+        # exp(weighted_scores[i,j]) = w[i,j] * exp(beta[i] . x[j]) = r[i,j]:
+        weighted_scores = scores + bootstrap.interval_log_weights  # (B,I)
+        assert weighted_scores.shape == (B, I)
+
         if ties == "breslow":
+            # This is the term:
+            #
+            # Sum_{strata} ( Sum_{death times t} (              (***)
+            #       (Sum_{dead at t} w[i])                      (**)
+            #       *
+            #       log( Sum_{observed at t} r[i] )             (*)
+            # ))
+            # 
+            #
+            # that we compute in parallel over:
+            # - all n_bootstrap values of the scores,
+            # - all n_batches values of the parameter vector.
+
+            # (*) Log-Sum-Exp over the death times,  -------------------------------------
+            # in parallel for bootstraps, batches, strata and stop:
+            # group corresponds to the values of (batch, strata, stop).
             # groups_scores is (n_bootstraps,n_death_times)
             group_scores = group_logsumexp(
-                values=weighted_scores, groups=group, output_size=n_groups, backend=backend
+                values=weighted_scores, groups=group, output_size=n_groups, backend=backend,
             )
-            # The log-sum-exp term in the CoxPH log-likelihood - (B,):
-            lse = (weight_factor * group_scores.view(B, T)).sum(1)
+            assert weight_factor.shape == (B, n_groups)
+            assert group_scores.shape == (B, n_groups)
 
+            # (**) Product with (Sum_{dead at t} w[i]): ----------------------------------
+            lse = weight_factor * group_scores
+            assert lse.shape == (B, n_groups)
+
+            # (***) Sum over strata and the death time stop, -----------------------------
+            # in parallel for bootstraps and batches:
+            lse = group_reduce(
+                values=lse,
+                groups=dataset.unique_groups[0],  # "batch" value for each unique (batch, strata, stop) triplet
+                reduction="sum",
+                output_size=dataset.n_batches,
+                backend="pyg", #backend=backend,
+            )
+
+            assert lse.shape == (B, dataset.n_batches)
+
+        # TODO: Update Efron too!
         elif ties == "efron":
             # groups_scores is (B,T*2)
             group_scores = group_logsumexp(
