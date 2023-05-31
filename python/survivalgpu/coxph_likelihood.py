@@ -259,16 +259,19 @@ def coxph_objective_unit_intervals(
         # Note that the strata does not matter here, because we sum all contributions
         # identically:
         # Sum_{strata s} Sum_{all samples in strata s} ... = Sum_{all samples} ...
-        lin = bootstrap.interval_weights.view(B, I) * scores.view(B, I) * dataset.event.view(1, I)
+        lin = (
+            bootstrap.interval_weights.view(B, I)
+            * scores.view(B, I)
+            * dataset.event.view(1, I)
+        )
         lin = group_reduce(
             values=lin,
             groups=dataset.batch,  # we should define groups instead to support all backends...
             reduction="sum",
             output_size=dataset.n_batches,
-            backend="pyg", #backend=backend,
+            backend="pyg",  # backend=backend,
         )
         assert lin.shape == (B, dataset.n_batches)
-
 
         # The log-sum-exp term in the CoxPH log-likelihood - (n_bootstrap, n_batches) ====
 
@@ -285,7 +288,7 @@ def coxph_objective_unit_intervals(
             #       *
             #       log( Sum_{observed at t} r[i] )             (*)
             # ))
-            # 
+            #
             #
             # that we compute in parallel over:
             # - all n_bootstrap values of the scores,
@@ -296,7 +299,10 @@ def coxph_objective_unit_intervals(
             # group corresponds to the values of (batch, strata, stop).
             # groups_scores is (n_bootstraps,n_death_times)
             group_scores = group_logsumexp(
-                values=weighted_scores, groups=group, output_size=n_groups, backend=backend,
+                values=weighted_scores,
+                groups=group,
+                output_size=n_groups,
+                backend=backend,
             )
             assert weight_factor.shape == (B, n_groups)
             assert group_scores.shape == (B, n_groups)
@@ -309,10 +315,12 @@ def coxph_objective_unit_intervals(
             # in parallel for bootstraps and batches:
             lse = group_reduce(
                 values=lse,
-                groups=dataset.unique_groups[0],  # "batch" value for each unique (batch, strata, stop) triplet
+                groups=dataset.unique_groups[
+                    0
+                ],  # "batch" value for each unique (batch, strata, stop) triplet
                 reduction="sum",
                 output_size=dataset.n_batches,
-                backend="pyg", #backend=backend,
+                backend="pyg",  # backend=backend,
             )
 
             assert lse.shape == (B, dataset.n_batches)
