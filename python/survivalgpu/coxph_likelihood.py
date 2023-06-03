@@ -101,7 +101,7 @@ def coxph_objective_unit_intervals(
     ties: Literal["efron", "breslow"],
     backend: Literal["torch", "pyg", "coo", "csr"],
     bootstrap: Resampling,
-) -> Callable[[Float32Tensor["batch_size covariates"]], Float32Tensor["batch_size"]]:
+) -> Callable[[Float32Tensor["bootstraps intervals"]], Float32Tensor["batch_size"]]:
     """Implements the CoxPH objective in the case where `stop == start + 1`.
 
     Since we follow the survival convention and assume that all intervals are of
@@ -112,17 +112,13 @@ def coxph_objective_unit_intervals(
     This simplifies some computations, compared with the general implementation of
     coxph_objective_any_intervals().
 
-    This function evaluates `batch_size` instances of the CoxPH objective in parallel:
-    we return one scalar value per row of the `coef` Tensor.
-    We assume that `batch_size == len(bootstrap) * dataset.n_batch`:
-
-    - If `batch_size == dataset.n_batch`, the vector of coefficients `coef[i]` will be
-      associated to the subset of patients such that `dataset.batch == i`.
-    - If `batch_size == len(bootstrap) * dataset.n_batch`, the vector of coefficients
-      `coef[i]` will be associated to the subset of patients such that
-      `dataset.batch == i % dataset.n_batch`.
-      In other words, the `(batch_size, covariates)` Tensor of coefficients `coef`
-      is interpreted as a `(n_bootstraps, dataset.n_batch, covariates)` Tensor.
+    The objective function evaluates `batch_size` instances of the CoxPH
+    neg-log-likelihood in parallel.
+    It takes as input a collection of scores (presumably computed via a dot
+    product between a vector of parameters and a vector of covariates)
+    and returns of length `batch_size == len(bootstrap) * dataset.n_batch`
+    which is identified with len(bootstrap) vectors of length data.n_batch,
+    concatenated with each other.
     """
 
     # Pre-processing ---------------------------------------------------------------------
@@ -246,7 +242,7 @@ def coxph_objective_unit_intervals(
 
         B, I = len(bootstrap), dataset.n_intervals
 
-        # The linear term in the CoxPH objective - (n_bootstraps,n_batches) ==============
+        # The linear term in the CoxPH objective - (n_bootstraps,n_batch) ==============
         # This is the term:
         #
         #   Sum_{all dead samples} w[i] * dot(x[i], b)
@@ -254,7 +250,7 @@ def coxph_objective_unit_intervals(
         #
         # that we compute in parallel over:
         # - all n_bootstrap values of the scores,
-        # - all n_batches values of the parameter vector.
+        # - all n_batch values of the parameter vector.
         #
         # Note that the strata does not matter here, because we sum all contributions
         # identically:
@@ -268,12 +264,12 @@ def coxph_objective_unit_intervals(
             values=lin,
             groups=dataset.batch,  # we should define groups instead to support all backends...
             reduction="sum",
-            output_size=dataset.n_batches,
+            output_size=dataset.n_batch,
             backend="pyg",  # backend=backend,
         )
-        assert lin.shape == (B, dataset.n_batches)
+        assert lin.shape == (B, dataset.n_batch)
 
-        # The log-sum-exp term in the CoxPH log-likelihood - (n_bootstrap, n_batches) ====
+        # The log-sum-exp term in the CoxPH log-likelihood - (n_bootstrap, n_batch) ====
 
         # We add the logarithms of the weights to the scores, so that
         # exp(weighted_scores[i,j]) = w[i,j] * exp(beta[i] . x[j]) = r[i,j]:
@@ -292,7 +288,7 @@ def coxph_objective_unit_intervals(
             #
             # that we compute in parallel over:
             # - all n_bootstrap values of the scores,
-            # - all n_batches values of the parameter vector.
+            # - all n_batch values of the parameter vector.
 
             # (*) Log-Sum-Exp over the death times,  -------------------------------------
             # in parallel for bootstraps, batches, strata and stop:
@@ -319,11 +315,11 @@ def coxph_objective_unit_intervals(
                     0
                 ],  # "batch" value for each unique (batch, strata, stop) triplet
                 reduction="sum",
-                output_size=dataset.n_batches,
+                output_size=dataset.n_batch,
                 backend="pyg",  # backend=backend,
             )
 
-            assert lse.shape == (B, dataset.n_batches)
+            assert lse.shape == (B, dataset.n_batch)
 
         # TODO: Update Efron too!
         elif ties == "efron":
@@ -399,8 +395,9 @@ def coxph_objective_unit_intervals(
             # The log-sum-exp term in the CoxPH log-likelihood - (B,):
             lse = time_scores.view(B, T).sum(1)
 
-        # lin and lse are (B,)
-        ret_value = lse - lin  # (B,) values, computed in parallel
+        # lin and lse are (n_bootstrap, n_batch)
+        ret_value = lse - lin  # (n_bootstrap, n_batch) values, computed in parallel
+        ret_value = ret_value.view(B * dataset.n_batch)
         return ret_value
 
     return negloglikelihood

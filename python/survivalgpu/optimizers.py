@@ -11,16 +11,37 @@ from .autodiff import derivatives_012
 
 from .utils import numpy, int64
 
-"""
-# N.B.: using cholesky_inverse guarantees the symmetry of the result:
-if False:
-    self.imat_ = torch.cholesky_inverse(torch.linalg.cholesky(self.hessian_))
-else:
-    self.imat_ = torch.inverse(self.hessian_)
-    self.imat_ = (self.imat_ + self.imat_.transpose(-1, -2)) / 2
+from .typecheck import typecheck, Optional, Literal
+from .typecheck import Float32Tensor
 
-self.std_ = self.imat_.diagonal(dim1=-2, dim2=-1).sqrt()
-"""
+
+class NewtonResult:
+    @typecheck
+    def __init__(
+        self,
+        *,
+        fun: Float32Tensor["batch"],
+        fun_init: Float32Tensor["batch"],
+        x: Float32Tensor["batch dim"],
+        jac: Float32Tensor["batch dim"],
+        hess: Float32Tensor["batch dim dim"],
+        score_test_init: Float32Tensor["batch"],
+    ):
+        self.fun = fun
+        self.fun_init = fun_init
+        self.x = x
+        self.jac = jac
+        self.hess = hess
+        self.score_test_init = score_test_init
+
+        if False:
+            # N.B.: using cholesky_inverse guarantees the symmetry of the result:
+            self.imat = torch.cholesky_inverse(torch.linalg.cholesky(self.hessian))
+        else:
+            self.imat = torch.inverse(self.hess)
+            self.imat = (self.imat + self.imat.transpose(-1, -2)) / 2
+
+        self.std = self.imat.diagonal(dim1=-2, dim2=-1).sqrt()
 
 
 def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):
@@ -134,10 +155,11 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):
     # N.B.: detach() removes the autograd history of the variables.
     # It is critical to prevent memory leaks, and allow us to scale up
     # to large datasets and bootstrap copies.
-    return {
-        "fun": values.detach(),
-        "x": best_params.detach(),
-        "grad": grads.detach(),
-        "hessian": hessians.detach(),
-        "score test init": score_test.detach(),
-    }
+    return NewtonResult(
+        fun=values.detach(),
+        fun_init = loss(start).detach(),
+        x=best_params.detach(),
+        jac=grads.detach(),
+        hess=hessians.detach(),
+        score_test_init=score_test.detach(),
+    )

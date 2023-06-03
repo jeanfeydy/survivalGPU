@@ -45,10 +45,10 @@ from .utils import numpy
 from .utils import use_cuda, float32, int32, int64
 from .utils import device as default_device
 
-from .typecheck import typecheck, Optional, Callable, Union
+from .typecheck import typecheck, Optional, Literal
 from .typecheck import Int, Real, Bool
 from .typecheck import Int64Array, Float64Array
-from .typecheck import Int64Tensor, Float32Tensor
+from .typecheck import Float32Tensor
 from .typecheck import TorchDevice
 
 from .datasets import SurvivalDataset
@@ -76,8 +76,8 @@ class CoxPHSurvivalAnalysis:
     def __init__(
         self,
         alpha: Real = 0.0,
-        ties: str = "efron",
-        backend: str = "csr",
+        ties: Literal["efron", "breslow"] = "efron",
+        backend: Literal["torch", "pyg", "coo", "csr"] = "csr",
         maxiter: Int = 20,
         eps: Real = 1e-5,
         doscale: Bool = False,
@@ -270,17 +270,28 @@ class CoxPHSurvivalAnalysis:
 
     @typecheck
     def _linear_risk_scores(
+        self,
         *,
         coef: Float32Tensor["batches covariates"],
         dataset: TorchSurvivalDataset,
         bootstrap: Resampling,
     ) -> Float32Tensor["bootstraps intervals"]:
-        """Standard function to compute risks in the CoxPH model: dot(beta, x[i])."""
+        """Standard function to compute risks in the CoxPH model: dot(beta, x[i]).
 
-        assert coef.shape[0] == len(bootstrap) * dataset.n_batches
+        TODO: clean docstring below
+        - If `batch_size == dataset.n_batch`, the vector of coefficients `coef[i]` will be
+        associated to the subset of patients such that `dataset.batch == i`.
+        - If `batch_size == len(bootstrap) * dataset.n_batch`, the vector of coefficients
+        `coef[i]` will be associated to the subset of patients such that
+        `dataset.batch == i % dataset.n_batch`.
+        In other words, the `(batch_size, covariates)` Tensor of coefficients `coef`
+        is interpreted as a `(n_bootstraps, dataset.n_batch, covariates)` Tensor.
+        """
 
-        # coef is (n_bootstraps, n_batches, covariates):
-        coef = coef.view(len(bootstrap), dataset.n_batches, -1)
+        assert coef.shape[0] == len(bootstrap) * dataset.n_batch
+
+        # coef is (n_bootstraps, n_batch, covariates):
+        coef = coef.view(len(bootstrap), dataset.n_batch, -1)
 
         # scattered_coef is (n_bootstraps, n_intervals, covariates):
         scattered_coef = coef[:, dataset.batch, :]  # (B, I, D)
@@ -293,7 +304,42 @@ class CoxPHSurvivalAnalysis:
         X = dataset.covariates  # (I, D)
         # (B, I, D) * (1, I, D) -> (B, I, D)
         scores = scattered_coef * X.view(1, dataset.n_intervals, dataset.n_covariates)
-        return scores.sum(-1)  # (B, I, D) -> (B, I)
+        scores = scores.sum(-1)  # (B, I, D) -> (B, I)
+        assert scores.shape == (len(bootstrap), dataset.n_intervals)
+        return scores
+    
+    
+    @typecheck
+    def _rescale(scales: Optional[Float32Tensor["covariates"]]):
+
+        # If the covariates have been normalized for the sake of stability,
+        # we shouldn't forget to "de-normalize" the results:
+
+        if scales is not None:
+            scales = scales.view(D) if single_C else scales.view(C, D)
+
+            # (B,D) *= (D,) or (B,C,D) *= (C,D):
+            res["coef"] = res["coef"] * scales
+            # (B,D) /= (D,) or (B,C,D) /= (C,D):
+            res["u"] = res["u"] / scales
+
+            if single_C:  # (B,D,D) *= (D,D)
+                res["imat"] = res["imat"] * (scales.view(1, D) * scales.view(D, 1))
+                res["hessian"] = res["hessian"] / (
+                    scales.view(1, D) * scales.view(D, 1)
+                )
+            else:  # (B,C,D,D) *= (C,D,D)
+                res["imat"] = res["imat"] * (
+                    scales.view(C, 1, D) * scales.view(C, D, 1)
+                )
+                res["hessian"] = res["hessian"] / (
+                    scales.view(C, 1, D) * scales.view(C, D, 1)
+                )
+
+        # We also return the means of our covariates:
+        res["means"] = means.view(D) if single_C else means.view(C, D)
+
+        results.append(res)
 
 
 # The code below should be obsolete soon: ================================================

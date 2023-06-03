@@ -595,6 +595,44 @@ def load_drugs(
     )
 
 
+@typecheck
+def test_dataset(
+    *,
+    n_covariates: int = 0,
+    n_patients: int = 1,
+    n_batch: int = 1,
+    n_strata: int = 1,
+    max_duration: int = 1,
+    ensure_one_life: bool = False,
+    ensure_one_death: bool = False,
+):
+    # N.B.: For the sake of simplicity, we assume one interval per patient:
+    n_intervals = n_patients
+
+    # Create a minimal random dataset:
+    rng = np.random.default_rng()
+    stop = rng.integers(low=1, high=1 + max_duration, size=(n_intervals,))
+    event = rng.integers(low=0, high=2, size=(n_intervals,))
+    batch = rng.integers(low=0, high=n_batch, size=(n_patients,))
+    strata = rng.integers(low=0, high=n_strata, size=(n_patients,))
+    covariates = rng.normal(loc=0, scale=1, size=(n_intervals, n_covariates))
+
+    if ensure_one_life:
+        event[0] = 0
+
+    if ensure_one_death:
+        event[-1] = 1
+
+    dataset = SurvivalDataset(
+        stop=stop,
+        event=event,
+        batch=batch,
+        strata=strata,
+        covariates=covariates,
+    )
+    return dataset
+
+
 if __name__ == "__main__":
     import time
     import imageio

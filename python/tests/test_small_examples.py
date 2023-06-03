@@ -29,22 +29,23 @@ data = {
     "covar2": data_csv[:, 3],
 }
 
-for ties in ["efron", "breslow"]:
-    for doscale in [True, False]:
-        print(f"\nties = {ties}, doscale = {doscale} ========")
-        res = coxph_R(
-            data,
-            "stop",
-            "death",
-            ["covar1", "covar2"],
-            bootstrap=1,
-            ties=ties,
-            doscale=doscale,
-            profile=None,
-        )
-        for key, item in res.items():
-            print(f"{key}:")
-            print(item)
+if False:
+    for ties in ["efron", "breslow"]:
+        for doscale in [True, False]:
+            print(f"\nties = {ties}, doscale = {doscale} ========")
+            res = coxph_R(
+                data,
+                "stop",
+                "death",
+                ["covar1", "covar2"],
+                bootstrap=1,
+                ties=ties,
+                doscale=doscale,
+                profile=None,
+            )
+            for key, item in res.items():
+                print(f"{key}:")
+                print(item)
 
 
 def test_newton_convex():
@@ -64,10 +65,10 @@ def test_newton_convex():
         verbosity=0,
     )
 
-    assert_allclose(numpy(res["x"][0]), np.array([0.31492, 3.1005, -0.35173]), 1e-2)
+    assert_allclose(numpy(res.x[0]), np.array([0.31492, 3.1005, -0.35173]), 1e-2)
 
     print(f"Three simple problems:")
-    print(f"Newton solutions: {numpy(res['x'][0])}")
+    print(f"Newton solutions: {numpy(res.x[0])}")
     print(f"Should be equal to 0.31492  3.1005  -0.35173")
     print("")
 
@@ -85,12 +86,12 @@ def test_newton_coxph():
         verbosity=0,
     )
 
-    assert numpy(res["x"][0]) == pytest.approx(-0.275057, 1e-2)
-    assert numpy(res["fun"]) == pytest.approx(0.97509, 1e-2)
+    assert numpy(res.x[0]) == pytest.approx(-0.275057, 1e-2)
+    assert numpy(res.fun) == pytest.approx(0.97509, 1e-2)
 
     print(f"Mini-CoxPH problem:")
-    print(f"Newton solution: {numpy(res['x'][0])}")
-    print(f"Value: {numpy(res['fun'])}")
+    print(f"Newton solution: {numpy(res.x[0])}")
+    print(f"Value: {numpy(res.fun)}")
     print(f"Should be equal to -0.275057 and 0.97509")
     print("")
 
