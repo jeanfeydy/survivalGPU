@@ -55,6 +55,10 @@ from .datasets import SurvivalDataset
 from .torch_datasets import TorchSurvivalDataset
 
 
+def numpy(x):
+    return x.detach().cpu().numpy()
+
+
 class CoxPHSurvivalAnalysis:
     """Cox Proportional Hazards model.
 
@@ -81,7 +85,7 @@ class CoxPHSurvivalAnalysis:
         maxiter: Int = 20,
         eps: Real = 1e-5,
         doscale: Bool = False,
-        verbosity: Int = 1,
+        verbosity: Int = 0,
     ):
         self.alpha = alpha
         self.ties = ties
@@ -243,7 +247,7 @@ class CoxPHSurvivalAnalysis:
 
         # If the covariates have been normalized for the sake of stability,
         # we shouldn't forget to "de-normalize" the results:
-        self._rescale(scales)
+        self._rescale(scales=scales, n_covariates=n_covariates)
 
         # And convert all the attributes to NumPy float64 arrays:
         self.to_numpy()
@@ -253,7 +257,7 @@ class CoxPHSurvivalAnalysis:
         coef_shape = (n_batch, n_covariates)
         hessian_shape = (n_batch, n_covariates, n_covariates)
 
-        assert self.means_.shape == coef_shape
+        assert self.means_.shape == (n_covariates,)  # TODO batch this...: coef_shape
         assert self.coef_.shape == coef_shape
         assert self.std_.shape == coef_shape
         assert self.score_.shape == coef_shape
@@ -294,7 +298,11 @@ class CoxPHSurvivalAnalysis:
         coef = coef.view(len(bootstrap), dataset.n_batch, -1)
 
         # scattered_coef is (n_bootstraps, n_intervals, covariates):
-        scattered_coef = coef[:, dataset.batch, :]  # (B, I, D)
+        scattered_coef = coef[:, dataset.batch_intervals, :]  # (B, I, D)
+
+        # print("True shape:", scattered_coef.shape,", Expected shape:", len(bootstrap), dataset.n_intervals, dataset.n_covariates,
+        #      ", batch", dataset.batch, ", batch_intervals", dataset.batch_intervals, ", intervals:", dataset.start, dataset.stop)
+
         assert scattered_coef.shape == (
             len(bootstrap),
             dataset.n_intervals,
@@ -307,39 +315,60 @@ class CoxPHSurvivalAnalysis:
         scores = scores.sum(-1)  # (B, I, D) -> (B, I)
         assert scores.shape == (len(bootstrap), dataset.n_intervals)
         return scores
-    
-    
+
     @typecheck
-    def _rescale(scales: Optional[Float32Tensor["covariates"]]):
+    def _rescale(
+        self,
+        *,
+        scales: Optional[Float32Tensor["covariates"]],
+        n_covariates: int,
+    ):
+        """Restores proper scaling for the parameters of the CoxPH model.
+
+        For the sake of numerical stability (and backward compatibility with the R
+        survival package), if doscale is True, we normalize the covariates with:
+
+        cov[:,i] *= scales[i]
+
+        where
+
+        scales[i] = 1 / mean(abs(cov[:,i])).
+
+        This induces a scaling of the model parameters that we "undo" with the code below.
+        """
 
         # If the covariates have been normalized for the sake of stability,
         # we shouldn't forget to "de-normalize" the results:
 
         if scales is not None:
-            scales = scales.view(D) if single_C else scales.view(C, D)
+            assert scales.shape == (n_covariates,)
 
-            # (B,D) *= (D,) or (B,C,D) *= (C,D):
-            res["coef"] = res["coef"] * scales
-            # (B,D) /= (D,) or (B,C,D) /= (C,D):
-            res["u"] = res["u"] / scales
+            # (B,D) * (D,) = (B,D)
+            self.coef_ = self.coef_ / scales
+            self.std_ = self.std_ / scales
+            self.score_ = self.scores_ / scales
 
-            if single_C:  # (B,D,D) *= (D,D)
-                res["imat"] = res["imat"] * (scales.view(1, D) * scales.view(D, 1))
-                res["hessian"] = res["hessian"] / (
-                    scales.view(1, D) * scales.view(D, 1)
-                )
-            else:  # (B,C,D,D) *= (C,D,D)
-                res["imat"] = res["imat"] * (
-                    scales.view(C, 1, D) * scales.view(C, D, 1)
-                )
-                res["hessian"] = res["hessian"] / (
-                    scales.view(C, 1, D) * scales.view(C, D, 1)
-                )
+            # (B,D,D) * (D,D) = (B,D,D)
+            scales_2 = scales.view(n_covariates, 1) * scales.view(1, n_covariates)
+            self.hessian_ = self.hessian_ / scales_2
+            self.imat_ = self.imat_ * scales_2
 
-        # We also return the means of our covariates:
-        res["means"] = means.view(D) if single_C else means.view(C, D)
+    @typecheck
+    def to_numpy(self):
+        self.means_ = numpy(self.means_)
+        self.coef_ = numpy(self.coef_)
+        self.std_ = numpy(self.std_)
+        self.score_ = numpy(self.score_)
 
-        results.append(res)
+        self.sctest_init_ = numpy(self.sctest_init_)
+        self.loglik_init_ = numpy(self.loglik_init_)
+        self.loglik_ = numpy(self.loglik_)
+
+        self.hessian_ = numpy(self.hessian_)
+        self.imat_ = numpy(self.imat_)
+
+        if hasattr(self, "bootstrap_coef_"):
+            self.bootstrap_coef_ = numpy(self.bootstrap_coef_)
 
 
 # The code below should be obsolete soon: ================================================

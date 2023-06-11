@@ -596,7 +596,7 @@ def load_drugs(
 
 
 @typecheck
-def test_dataset(
+def simple_dataset(
     *,
     n_covariates: int = 0,
     n_patients: int = 1,
@@ -605,6 +605,7 @@ def test_dataset(
     max_duration: int = 1,
     ensure_one_life: bool = False,
     ensure_one_death: bool = False,
+    unit_length_intervals: bool = False,
 ):
     # N.B.: For the sake of simplicity, we assume one interval per patient:
     n_intervals = n_patients
@@ -623,7 +624,13 @@ def test_dataset(
     if ensure_one_death:
         event[-1] = 1
 
+    if unit_length_intervals:
+        start = stop - 1
+    else:
+        start = None
+
     dataset = SurvivalDataset(
+        start=start,
         stop=stop,
         event=event,
         batch=batch,

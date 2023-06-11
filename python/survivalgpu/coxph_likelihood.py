@@ -262,7 +262,7 @@ def coxph_objective_unit_intervals(
         )
         lin = group_reduce(
             values=lin,
-            groups=dataset.batch,  # we should define groups instead to support all backends...
+            groups=dataset.batch_intervals,  # we should define groups instead to support all backends...
             reduction="sum",
             output_size=dataset.n_batch,
             backend="pyg",  # backend=backend,

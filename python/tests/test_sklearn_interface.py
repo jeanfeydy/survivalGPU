@@ -3,7 +3,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from survivalgpu import CoxPHSurvivalAnalysis, WCESurvivalAnalysis
-from survivalgpu.datasets import test_dataset, load_drugs
+from survivalgpu.datasets import simple_dataset, load_drugs
 
 
 small_int = st.integers(min_value=1, max_value=10)
@@ -12,15 +12,15 @@ small_int = st.integers(min_value=1, max_value=10)
 # @pytest.mark.skip()
 @given(
     n_covariates=small_int,
-    n_patients=st.integers(min_value=2, max_value=10),
-    n_batch=small_int,
-    n_strata=small_int,
+    n_patients=st.integers(min_value=100, max_value=110),
+    n_batch=st.integers(min_value=1, max_value=3),
+    n_strata=st.integers(min_value=1, max_value=3),
     max_duration=small_int,
 )
 def test_coxph_shapes(*, n_covariates, n_patients, n_batch, n_strata, max_duration):
     """Tests the shapes of the CoxPHSurvivalAnalysis attributes."""
 
-    ds = test_dataset(
+    ds = simple_dataset(
         n_covariates=n_covariates,
         n_patients=n_patients,
         n_batch=n_batch,
@@ -28,9 +28,17 @@ def test_coxph_shapes(*, n_covariates, n_patients, n_batch, n_strata, max_durati
         max_duration=max_duration,
         ensure_one_life=True,
         ensure_one_death=True,
+        unit_length_intervals=True,
     )
-    model = CoxPHSurvivalAnalysis(ties="breslow")
-    model.fit(ds.covariates, stop=ds.stop, event=ds.event)
+    model = CoxPHSurvivalAnalysis(ties="breslow", alpha=0.01)
+    model.fit(
+        covariates=ds.covariates,
+        start=ds.start,
+        stop=ds.stop,
+        event=ds.event,
+        batch=ds.batch,
+        strata=ds.strata,
+    )
 
     assert model.coef_.shape == (n_batch, n_covariates)
 

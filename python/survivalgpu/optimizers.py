@@ -157,7 +157,7 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):
     # to large datasets and bootstrap copies.
     return NewtonResult(
         fun=values.detach(),
-        fun_init = loss(start).detach(),
+        fun_init=loss(start).detach(),
         x=best_params.detach(),
         jac=grads.detach(),
         hess=hessians.detach(),
