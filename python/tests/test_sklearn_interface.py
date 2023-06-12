@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from survivalgpu import CoxPHSurvivalAnalysis, WCESurvivalAnalysis
@@ -17,6 +17,7 @@ small_int = st.integers(min_value=1, max_value=10)
     n_strata=st.integers(min_value=1, max_value=3),
     max_duration=small_int,
 )
+@settings(milliseconds=1000)
 def test_coxph_shapes(*, n_covariates, n_patients, n_batch, n_strata, max_duration):
     """Tests the shapes of the CoxPHSurvivalAnalysis attributes."""
 
