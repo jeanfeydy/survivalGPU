@@ -311,9 +311,8 @@ def coxph_objective_unit_intervals(
             # in parallel for bootstraps and batches:
             lse = group_reduce(
                 values=lse,
-                groups=dataset.unique_groups[
-                    0
-                ],  # "batch" value for each unique (batch, strata, stop) triplet
+                # "batch" value for each unique (batch, strata, stop) triplet
+                groups=dataset.unique_groups[0],
                 reduction="sum",
                 output_size=dataset.n_batch,
                 backend="pyg",  # backend=backend,

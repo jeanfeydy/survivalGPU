@@ -344,9 +344,9 @@ class CoxPHSurvivalAnalysis:
             assert scales.shape == (n_covariates,)
 
             # (B,D) * (D,) = (B,D)
-            self.coef_ = self.coef_ / scales
-            self.std_ = self.std_ / scales
-            self.score_ = self.scores_ / scales
+            self.coef_ = self.coef_ * scales
+            self.std_ = self.std_ * scales
+            self.score_ = self.score_ / scales
 
             # (B,D,D) * (D,D) = (B,D,D)
             scales_2 = scales.view(n_covariates, 1) * scales.view(1, n_covariates)

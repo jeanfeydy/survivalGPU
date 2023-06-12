@@ -30,7 +30,9 @@ def test_coxph_shapes(*, n_covariates, n_patients, n_batch, n_strata, max_durati
         ensure_one_death=True,
         unit_length_intervals=True,
     )
+
     model = CoxPHSurvivalAnalysis(ties="breslow", alpha=0.01)
+
     model.fit(
         covariates=ds.covariates,
         start=ds.start,
