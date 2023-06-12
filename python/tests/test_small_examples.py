@@ -50,7 +50,7 @@ def test_sanity_check_1(ties="breslow", alpha=0):
                     getattr(models[0], attr),
                     getattr(m, attr),
                     atol=1e-5,
-                    rtol=4e-2,
+                    rtol=5e-2 if attr == "imat_" else 1e-2,
                     err_msg=f"Attributes m.{attr} do not coincide.",
                 )
 

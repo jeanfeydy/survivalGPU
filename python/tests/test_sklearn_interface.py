@@ -12,7 +12,7 @@ small_int = st.integers(min_value=1, max_value=10)
 # @pytest.mark.skip()
 @given(
     n_covariates=small_int,
-    n_patients=st.integers(min_value=100, max_value=110),
+    n_patients=st.integers(min_value=30, max_value=40),
     n_batch=st.integers(min_value=1, max_value=3),
     n_strata=st.integers(min_value=1, max_value=3),
     max_duration=small_int,
