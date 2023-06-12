@@ -47,10 +47,11 @@ def test_sanity_check_1(ties="breslow", alpha=0):
             for m in models[1:]:
                 print(attr)
                 assert_allclose(
-                    getattr(models[0], attr), getattr(m, attr),
+                    getattr(models[0], attr),
+                    getattr(m, attr),
                     atol=1e-5,
                     rtol=2e-2,
-                    err_msg=f"Attributes m.{attr} do not coincide."
+                    err_msg=f"Attributes m.{attr} do not coincide.",
                 )
 
     if False:
