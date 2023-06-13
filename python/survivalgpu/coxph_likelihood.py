@@ -381,7 +381,7 @@ def coxph_objective(
                 #    This is to avoid indexing on empty tensors, but won't be used.
                 offsets_per_batch_strata = torch.cat(
                     (offsets_per_batch_strata,
-                     torch.zeros_like(group_scores[:1])),
+                     torch.zeros_like(group_scores[:, :1])),  # (B, 1)
                      dim=1
                 )
                 assert offsets_per_batch_strata.shape == (B, batch_strata_group[-1] + 1)
@@ -391,8 +391,7 @@ def coxph_objective(
                 #   [(d+e+f)+..., idem, idem, (g+h+i)+..., ..., m, m, 0]
                 offsets_per_group = offsets_per_batch_strata[:, batch_strata_group]
                 assert offsets_per_group.shape == (B, n_groups)
-                assert torch.all(cumsums > offsets_per_group)
-
+                
                 # 5) We now want to subtract the offsets from the cumsums.
                 #    This is not trivial, because we are dealing with logsumexps
                 #    instead of sums. We use the following identity:
@@ -423,6 +422,9 @@ def coxph_objective(
                 # For the last group (the right-most one), there is no offset:
                 last_batch_strata = (batch_strata_group == batch_strata_group[-1])
                 last_batch_strata = last_batch_strata.view(1, n_groups)
+
+                assert torch.all(cumsums[~last_batch_strata] > offsets_per_group[~last_batch_strata])
+
                 group_scores = torch.where(
                     last_batch_strata,
                     cumsums,

@@ -74,6 +74,9 @@ class CoxPHSurvivalAnalysis:
         eps (float): Convergence tolerance.
         doscale (bool): Whether to scale the covariates for stability.
         verbosity (int): Verbosity level.
+        mode (str or None): One of "unit length", "start zero", "any".
+            Assumptions made on the (start, stop] intervals.
+            Defaults to None, which selects automatically the fastest backend.
     """
 
     @typecheck
@@ -86,6 +89,7 @@ class CoxPHSurvivalAnalysis:
         eps: Real = 1e-5,
         doscale: Bool = False,
         verbosity: Int = 0,
+        mode: Optional[Literal["unit length", "start zero", "any"]] = None,
     ):
         self.alpha = alpha
         self.ties = ties
@@ -94,6 +98,7 @@ class CoxPHSurvivalAnalysis:
         self.eps = eps
         self.doscale = doscale
         self.verbosity = verbosity
+        self.mode = mode
 
     @typecheck
     def fit(
@@ -151,21 +156,25 @@ class CoxPHSurvivalAnalysis:
         # Choose the fastest implementation of the CoxPH objective, ----------------------
         # i.e. the partial neg-log-likelihood of the CoxPH model.
 
-        # Case 1: all the intervals are )t-1, t] (i.e. no-interval mode),
-        # we can group times using equality conditions on the stop times.
-        # This is typically the case when using time-dependent covariates as in the WCE model.
-        if torch.all(dataset.stop == dataset.start + 1):
-            mode = "unit length"
+        if self.mode is None:
+            # Case 1: all the intervals are )t-1, t] (i.e. no-interval mode),
+            # we can group times using equality conditions on the stop times.
+            # This is typically the case when using time-dependent covariates as in the WCE model.
+            if torch.all(dataset.stop == dataset.start + 1):
+                mode = "unit length"
 
-        # Case 2: all the intervals are )0, t]:
-        # this opens the door to a more efficient implementation using a cumulative hazard.
-        elif torch.all(dataset.start == 0):
-            mode = "start zero"
+            # Case 2: all the intervals are )0, t]:
+            # this opens the door to a more efficient implementation using a cumulative hazard.
+            elif torch.all(dataset.start == 0):
+                mode = "start zero"
 
-        # Case 3: general case )start, stop], we use two cumulative hazards:
+            # Case 3: general case )start, stop], we use two cumulative hazards:
+            else:
+                raise NotImplementedError("Currently, general intervals are not supported.")
+                mode = "any"
+
         else:
-            raise NotImplementedError("Currently, general intervals are not supported.")
-            mode = "any"
+            mode = self.mode
 
         objective = functools.partial(
             coxph_objective,
