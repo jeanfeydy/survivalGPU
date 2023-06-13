@@ -24,7 +24,7 @@ from .group_reduction import group_reduce
 # The convex CoxPH objective:
 from .coxph_likelihood import coxph_objective_torch
 from .coxph_likelihood_keops import coxph_objective_keops
-from .coxph_likelihood import coxph_objective_unit_intervals
+from .coxph_likelihood import coxph_objective
 from .bootstrap import Resampling
 
 
@@ -155,25 +155,25 @@ class CoxPHSurvivalAnalysis:
         # we can group times using equality conditions on the stop times.
         # This is typically the case when using time-dependent covariates as in the WCE model.
         if torch.all(dataset.stop == dataset.start + 1):
-            objective = functools.partial(
-                coxph_objective_unit_intervals,
-                dataset=dataset,
-                ties=self.ties,
-                backend=self.backend,
-            )
+            mode = "unit length"
 
         # Case 2: all the intervals are )0, t]:
         # this opens the door to a more efficient implementation using a cumulative hazard.
         elif torch.all(dataset.start == 0):
-            raise NotImplementedError(
-                "Currently, we only support 'no-interval mode' where all intervals are of length 1."
-            )
+            mode = "start zero"
 
         # Case 3: general case )start, stop], we use two cumulative hazards:
         else:
-            raise NotImplementedError(
-                "Currently, we only support 'no-interval mode' where all intervals are of length 1."
-            )
+            raise NotImplementedError("Currently, general intervals are not supported.")
+            mode = "any"
+
+        objective = functools.partial(
+            coxph_objective,
+            dataset=dataset,
+            ties=self.ties,
+            backend=self.backend,
+            mode=mode,
+        )
 
         # Define the loss function:
         def loss(*, bootstrap):

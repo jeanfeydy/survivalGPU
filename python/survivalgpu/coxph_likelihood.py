@@ -95,28 +95,38 @@ from .bootstrap import Resampling
 
 
 @typecheck
-def coxph_objective_unit_intervals(
+def coxph_objective(
     *,
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
     backend: Literal["torch", "pyg", "coo", "csr"],
     bootstrap: Resampling,
+    mode: Literal["unit length", "start zero", "any"],
 ) -> Callable[[Float32Tensor["bootstraps intervals"]], Float32Tensor["batch_size"]]:
-    """Implements the CoxPH objective in the case where `stop == start + 1`.
+    """Implements the CoxPH objective.
 
-    Since we follow the survival convention and assume that all intervals are of
-    the form `(start, stop]` with integer time values for `start` and `stop`,
-    the condition above ensures that the intervals used to describe our dataset
-    overlap if and only if they share the same 'stop' time.
+    Depending on the value of "mode", we use different optimizations:
 
-    This simplifies some computations, compared with the general implementation of
-    coxph_objective_any_intervals().
+      - mode == "unit length" corresponds to the case where `stop == start + 1`.
+
+        Since we follow the survival convention and assume that all intervals are of
+        the form `(start, stop]` with integer time values for `start` and `stop`,
+        the condition above ensures that the intervals used to describe our dataset
+        overlap if and only if they share the same 'stop' time.
+
+      - mode == "start zero" corresponds to the case where `start == 0`.
+
+        This implies that all risk sets correspond to successive subsets of the dataset,
+        with computations that can be handled by a cumsum.
+
+      - mode == "any" corresponds to the general case, where we have no assumption
+        on the values of `start` and `stop`.
 
     The objective function evaluates `batch_size` instances of the CoxPH
     neg-log-likelihood in parallel.
     It takes as input a collection of scores (presumably computed via a dot
     product between a vector of parameters and a vector of covariates)
-    and returns of length `batch_size == len(bootstrap) * dataset.n_batch`
+    and returns a vector of length `batch_size == len(bootstrap) * dataset.n_batch`
     which is identified with len(bootstrap) vectors of length data.n_batch,
     concatenated with each other.
     """
@@ -302,6 +312,123 @@ def coxph_objective_unit_intervals(
             )
             assert weight_factor.shape == (B, n_groups)
             assert group_scores.shape == (B, n_groups)
+
+            if mode == "start zero":
+                # At this point, suppose e.g. that data.unique_groups
+                # i.e. the values for (batch, strata, stop) is equal to:
+                # [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+                #  [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 2],
+                #  [3, 4, 5, 2, 4, 5, 1, 2, 3, 3, 4, 2]]
+                #   a  b  c| d  e  f| g  h  i| k  l| m
+                # -> 5 unique values of (batch, strata)
+                #
+                # TODO: make sure that groups with no deaths induce no bug,
+                #       or prune them intelligently!!!
+                #
+                # Since the "start" of all intervals is equal to 0, the risk sets
+                # within each "independent group" are 
+                #
+                # - Group 1: a+b+c, b+c, c
+                # - Group 2: d+e+f, e+f, f
+                # - Group 3: g+h+i, h+i, i
+                # - Group 4: k+l, l
+                # - Group 5: m
+                #
+                # We implement this using a cumulative logsumexp.
+                
+                # 1) Compute the (log)cumsum(exp) 
+                # [a+b+c+d+..., b+c+d+..., ..., k+l+m, l+m, m]
+                # Since cumsum starts from the first index and we are interested
+                # in "backward" sums, we must flip the tensors along the "n_group" dim:
+                cumsums = group_scores.flip(dims=(1,)).logcumsumexp(dim=1).flip(dims=(1,))
+                assert cumsums.shape == (B, n_groups)
+
+                # 2) Compute the offsets that correspond to the different 
+                #    "sums over independent groups":
+                #    [(d+e+f) + (g+...), (g+h+i) + ..., (k+l) + m, m]
+                #   These are the values of cumsum that correspond to the 
+                #   "first" (reading from left to right) indices of a new group.
+                #   We do not care about the very first value, (a+b+c)+...
+
+                # Make sure that (batch > strata > stop > event) is lexicographically sorted:
+                assert dataset.is_sorted, "The dataset must be sorted before computing a log-likelihood."
+                assert dataset.unique_groups.shape == (3, n_groups)
+
+                # batch_strata_group looks like:
+                # [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4]
+                _, batch_strata_group = torch.unique_consecutive(
+                    dataset.unique_groups[0:2],  # (batch, strata)
+                    return_inverse=True,
+                    dim=-1,
+                )
+                assert batch_strata_group.shape == (n_groups,)
+
+                # Identify the indices of the first (batch, strata, stop) group 
+                # for each value of (batch, strata):
+                # ., [F, F, T, F, F, T, F, F, T, F, T]
+                first_in_batch_strata_group = batch_strata_group[1:] != batch_strata_group[:-1]
+
+                # Fetch the values of the cumsum at this stage:
+                offsets_per_batch_strata = cumsums[:, 1:][:, first_in_batch_strata_group]
+
+                # At this stage, on every row, offsets_per_group is:
+                # [(d+e+f) + (g+...), (g+h+i) + ..., (k+l) + m, m]
+                # N.B.: Since we have discarded the cumsum over the full array,
+                #       if there is only one value for (batch, strata),
+                #       offsets_per_group = tensor([]) !
+
+                # 3) Add an arbitrary "offset" value for the last group.
+                #    This is to avoid indexing on empty tensors, but won't be used.
+                offsets_per_batch_strata = torch.cat(
+                    (offsets_per_batch_strata,
+                     torch.zeros_like(group_scores[:1])),
+                     dim=1
+                )
+                assert offsets_per_batch_strata.shape == (B, batch_strata_group[-1] + 1)
+
+                # 4) Unwrap this offset into a tensor of shape (batch, n_groups).
+                #    On every row:
+                #   [(d+e+f)+..., idem, idem, (g+h+i)+..., ..., m, m, 0]
+                offsets_per_group = offsets_per_batch_strata[:, batch_strata_group]
+                assert offsets_per_group.shape == (B, n_groups)
+                assert torch.all(cumsums > offsets_per_group)
+
+                # 5) We now want to subtract the offsets from the cumsums.
+                #    This is not trivial, because we are dealing with logsumexps
+                #    instead of sums. We use the following identity:
+                #    if a > b,
+                #    log(e^a - e^b) = log( e^a  * (1 - e^(b-a)))
+                #                   = a + log(1 - e^(b-a))
+                def log1mexp(x):
+                    """Numerically accurate evaluation of log(1 - exp(x)) for x < 0.
+
+                    See https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf for details.
+
+                    We rely on numerically stable implementations of
+                    [x -> log(1+x)] and [x -> exp(x)-1] for x close to 0.
+
+                    If -log(2) < x < 0, we use the following identity:
+                    log(1 - exp(x)) = log(-(exp(x) - 1))
+
+                    If x <= -log(2), we use the following identity:
+                    log(1 - exp(x)) = log1p(-exp(x))
+                    """
+                    mask = -np.log(2) < x  # x < 0
+                    return torch.where(
+                        mask,
+                        (-x.expm1()).log(),
+                        (-x.exp()).log1p(),
+                    )
+
+                # For the last group (the right-most one), there is no offset:
+                last_batch_strata = (batch_strata_group == batch_strata_group[-1])
+                last_batch_strata = last_batch_strata.view(1, n_groups)
+                group_scores = torch.where(
+                    last_batch_strata,
+                    cumsums,
+                    cumsums + log1mexp(offsets_per_group - cumsums),
+                )
+                assert group_scores.shape == (B, n_groups)
 
             # (**) Product with (Sum_{dead at t} w[i]): ----------------------------------
             lse = weight_factor * group_scores
