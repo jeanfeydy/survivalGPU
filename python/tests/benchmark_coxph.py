@@ -3,6 +3,7 @@ import time
 from survivalgpu import CoxPHSurvivalAnalysis
 from survivalgpu.datasets import simple_dataset
 
+torch.use_deterministic_algorithms(False)
 
 def benchmark_coxph_simple(
     *, n_covariates, n_patients, n_batch=1, n_strata=1, max_duration=None, backend="csr", maxiter=20,

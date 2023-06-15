@@ -5,6 +5,15 @@ import torch
 # from the PyTorch Geometric project for fast heterogeneous summations:
 import torch_scatter
 
+# TODO: on GPU, there is a huge bottleneck in the backward pass
+# because of the use of a deterministic algorithm in
+# the indexing_backward_kernel
+# https://github.com/pytorch/pytorch/issues/41162
+# https://github.com/dmlc/dgl/issues/3729
+#
+# Instead of indexing, we should use the (much faster) operation
+# index_select.
+
 
 class SlicedSummation(torch.autograd.Function):
     """Adds a list of vectors as "suffixes".
