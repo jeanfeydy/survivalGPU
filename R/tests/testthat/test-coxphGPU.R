@@ -89,6 +89,21 @@ test_that("Coxph Coefs - Breslow", {
 })
 
 
+coxphGPU_no_iter <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+                             drugdata,
+                             ties = "efron",
+                             bootstrap = 1,
+                             iter.max = 1
+)
+
+test_that("No Newton iterations - Null Coefs", {
+  expect_equal(
+    as.vector(coxphGPU_no_iter$coefficients),
+    c(0,0)
+  )
+})
+
+
 # # Right Surv on coxph with drugdata
 # drugdata2 <- drugdata %>%
 #   dplyr::arrange(Stop %>% dplyr::desc()) %>%

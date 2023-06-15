@@ -36,6 +36,7 @@ def coxph_torch(
     ties="efron",
     backend="csr",
     maxiter=20,
+    init=None,
     eps=1e-9,
     alpha=0,
     verbosity=0,
@@ -157,6 +158,14 @@ def coxph_torch(
 
     B = batchsize  # Number of bootstraps that we handle at a time
     results = []  # We store one output per batch
+    
+    # Vector of inital values of the Newton iteration. Zero for all
+    # variables by default.
+    if init is None:
+        init = torch.zeros(B * C, D, dtype=float32, device=device)
+    else:
+        init_tensor = torch.tensor(init, dtype=float32, device=device)
+        init = init_tensor.repeat(B * C, 1)
 
     for batch_it in range(bootstrap // batchsize):
         # We simulate bootstrapping using an integer array
@@ -290,8 +299,7 @@ def coxph_torch(
         # Step 3: Newton iterations ================================================
         # We estimate the optimal vector of parameters "beta"
         # by minimizing a convex objective function.
-
-        init = torch.zeros(B * C, D, dtype=float32, device=device)
+        
         res = newton(
             loss=loss,
             start=init,
@@ -402,6 +410,8 @@ def coxph_R(
     bootstrap=1,
     batchsize=0,
     ties="efron",
+    maxiter=20,
+    init=None,
     doscale=False,
     profile=None,
 ):
@@ -429,7 +439,8 @@ def coxph_R(
             backend="csr",
             bootstrap=int(bootstrap),
             batchsize=int(batchsize),
-            maxiter=20 if profile is None else 1,
+            maxiter=int(maxiter) if profile is None else 1,
+            init=init,
             verbosity=0,
             alpha=0.0,
             doscale=doscale,

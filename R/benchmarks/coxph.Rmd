@@ -149,6 +149,11 @@ benchmark_coxph_df <- do.call(rbind, benchmark_coxph) %>%
 ```
 
 
+```{r}
+benchmark_coxph_df
+```
+
+
 ```{r, warning=FALSE}
 benchmark_coxph_df %>%
   gather("Method", "Time in secs", -`N bootstrap`) %>%
