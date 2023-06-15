@@ -613,10 +613,16 @@ def simple_dataset(
     # Create a minimal random dataset:
     rng = np.random.default_rng()
     stop = rng.integers(low=1, high=1 + max_duration, size=(n_intervals,))
-    event = rng.integers(low=0, high=2, size=(n_intervals,))
     batch = rng.integers(low=0, high=n_batch, size=(n_patients,))
     strata = rng.integers(low=0, high=n_strata, size=(n_patients,))
     covariates = rng.normal(loc=0, scale=1, size=(n_intervals, n_covariates))
+
+    if False:
+        event = rng.integers(low=0, high=2, size=(n_intervals,))
+    else:
+        poison = rng.normal(loc=0, scale=1, size=(n_intervals,))
+        event = (poison > 0).astype(np.int64)
+        covariates[:,0] += poison
 
     if ensure_one_life:
         event[0] = 0

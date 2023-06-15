@@ -96,8 +96,14 @@ def group_reduce(*, values, groups, reduction, output_size, backend):
         # Compatibility switch for PyTorch.scatter_reduce:
         if reduction == "max":
             reduction = "amax"
-        return torch.scatter_reduce(
-            values, 1, groups, reduction, output_size=output_size
+        # return torch.scatter_reduce(
+        #    values, 1, groups, reduction, output_size=output_size
+        # )
+        assert len(values.shape) == 2
+        return torch.zeros(
+            values.shape[0], output_size, dtype=values.dtype, device=values.device
+        ).scatter_reduce_(
+            dim=1, index=groups, src=values, reduce=reduction, include_self=False
         )
     elif backend == "pyg":
         return torch_scatter.scatter(

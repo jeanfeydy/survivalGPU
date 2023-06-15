@@ -1,0 +1,75 @@
+---
+title: "Coxph benchmark"
+author: "Jean Feydy"
+output:
+  rmdformats::readthedown
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, warning=FALSE}
+library(survival)
+library(WCE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+# library(parallel)
+# library(survivalGPU)
+```
+
+
+Bootstrap with :  
+- survival::coxph  
+- survival.GPU.R::coxphGPU
+
+
+# Functions
+
+```{r coxph}
+time_cox <- function(dataset, n_bootstrap) {
+    start_time <- Sys.time()
+    res <- coxph(Surv(Stop, Event) ~ cov1 + cov2 + cov3 + cov4 + cov5,
+      data = dataset,
+      id = Id,
+      ties="breslow",
+    )
+    print(difftime(Sys.time(), start_time, units = "secs"))
+    return(res)
+}
+
+
+# Create a dataframe with columns :
+# - Id : the id of the individual
+# - Stop : the time of the event
+# - Event : the event
+# - cov1 : a covariate
+
+n_patients <- 10000000
+
+poison <- rnorm(n_patients, 0, 1)
+
+mydataset <- data.frame(
+  Id = 1:n_patients,
+  Stop = sample(1:n_patients, n_patients, replace = TRUE),
+  Event = (poison > 0) * 1,
+  cov1 = rnorm(n_patients, 0, 1) + poison,
+  cov2 = rnorm(n_patients, 0, 1),
+  cov3 = rnorm(n_patients, 0, 1),
+  cov4 = rnorm(n_patients, 0, 1),
+  cov5 = rnorm(n_patients, 0, 1)
+)
+
+res <- time_cox(mydataset)
+
+print(res$iter)
+summary(res)
+```
+
+```{r profvis}
+library(profvis)
+profvis({
+  res <- time_cox(mydataset)
+})
+```

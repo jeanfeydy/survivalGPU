@@ -5,8 +5,11 @@ from survivalgpu.datasets import simple_dataset
 
 
 def benchmark_coxph_simple(
-    *, n_covariates, n_patients, n_batch=1, n_strata=1, max_duration=10
+    *, n_covariates, n_patients, n_batch=1, n_strata=1, max_duration=None, backend="csr", maxiter=20,
 ):
+    if max_duration is None:
+        max_duration = n_patients
+
     ds = simple_dataset(
         n_covariates=n_covariates,
         n_patients=n_patients,
@@ -18,7 +21,7 @@ def benchmark_coxph_simple(
         unit_length_intervals=True,
     )
 
-    model = CoxPHSurvivalAnalysis(ties="breslow", alpha=0.01)
+    model = CoxPHSurvivalAnalysis(ties="breslow", alpha=0.01, backend=backend, maxiter=maxiter)
 
     time_start = time.time()
     model.fit(
@@ -33,10 +36,38 @@ def benchmark_coxph_simple(
     print(
         f"{n_covariates} covariates, {n_patients:8,} patients -- time = {time_end - time_start:.2e}s"
     )
+    print(model.coef_)
 
 
-for n_patients in [1000, 10000, 100000]:
-    benchmark_coxph_simple(
-        n_covariates=5,
-        n_patients=n_patients,
-    )
+for backend in ["torch"]: #["torch", "pyg", "coo", "csr"]:
+    print("backend:", backend)
+    for n_patients in [1000000]: #[1000, 10000, 100000]:
+        benchmark_coxph_simple(
+            n_covariates=5,
+            n_patients=n_patients,
+            backend=backend,
+            maxiter=3,
+        )
+
+    if True:
+        from torch.profiler import profile, record_function, ProfilerActivity
+
+        with profile(
+            activities=[
+                ProfilerActivity.CPU,
+                ProfilerActivity.CUDA,
+            ],
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True,
+        ) as prof:
+            N, D = 1000000, 5
+            benchmark_coxph_simple(
+                n_covariates=D,
+                n_patients=N,
+                backend=backend,
+                maxiter=3,
+            )
+
+        # Export to chrome://tracing
+        prof.export_chrome_trace(f"trace_{backend}_{N}_{D}.json")

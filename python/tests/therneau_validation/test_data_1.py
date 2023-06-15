@@ -124,6 +124,7 @@ if __name__ == "__main__":
     # and the backward pass.
     import torch
     from torch.profiler import profile, record_function, ProfilerActivity
+
     with profile(
         activities=[
             ProfilerActivity.CPU,
@@ -134,6 +135,6 @@ if __name__ == "__main__":
         with_stack=True,
     ) as prof:
         test_final_value(ties="breslow", doscale=False)
-    
+
     # Export to chrome://tracing
     prof.export_chrome_trace("profile.json")
