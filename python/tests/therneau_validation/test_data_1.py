@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from survivalgpu import coxph_R, CoxPHSurvivalAnalysis
@@ -48,6 +48,7 @@ final_values = {
     ties=st.sampled_from(SUPPORTED_TIES),
     doscale=st.booleans(),
 )
+@settings(deadline=1000)
 def test_final_value(*, ties, doscale):
     model = CoxPHSurvivalAnalysis(ties=ties, doscale=doscale)
     model.fit(
@@ -103,6 +104,7 @@ iter_values = {
 @given(
     ties=st.sampled_from(SUPPORTED_TIES),
 )
+@settings(deadline=1000)
 def test_iterations(*, ties):
     for maxiter in range(len(iter_values[ties]["coef_"])):
         model = CoxPHSurvivalAnalysis(ties=ties, maxiter=maxiter)
@@ -115,3 +117,23 @@ def test_iterations(*, ties):
             assert np.allclose(
                 getattr(model, key), values[maxiter], rtol=1e-3, atol=1e-3
             ), f"maxiter={maxiter}, key={key}"
+
+
+if __name__ == "__main__":
+    # Use the PyTorch profiler to get a trace of the forward pass
+    # and the backward pass.
+    import torch
+    from torch.profiler import profile, record_function, ProfilerActivity
+    with profile(
+        activities=[
+            ProfilerActivity.CPU,
+            ProfilerActivity.CUDA,
+        ],
+        record_shapes=True,
+        profile_memory=True,
+        with_stack=True,
+    ) as prof:
+        test_final_value(ties="breslow", doscale=False)
+    
+    # Export to chrome://tracing
+    prof.export_chrome_trace("profile.json")

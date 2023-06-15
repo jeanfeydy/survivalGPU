@@ -105,7 +105,7 @@ def test_torch_lexsort(*, n_values: int, n_keys: int, n_vectors: int, use_cuda: 
         a = a.cuda()
 
     ind = torch_lexsort(a)
-    ind_np = torch.from_numpy(np.lexsort(a.numpy()))
+    ind_np = torch.from_numpy(np.lexsort(a.cpu().numpy()))
 
     if use_cuda and torch.cuda.is_available():
         ind_np = ind_np.cuda()
@@ -187,13 +187,13 @@ def test_scale(n_intervals: int, n_covariates: int, rescale: bool, device: str):
     means, scales = dataset.scale(rescale=rescale)
 
     assert means.shape == (n_covariates,)
-    assert np.allclose(means, np.mean(covariates, axis=0), atol=1e-3)
+    assert np.allclose(means.cpu(), np.mean(covariates, axis=0), atol=1e-3)
 
     if rescale:
         # Check that the data has been centered:
         assert torch.allclose(
             dataset.covariates.mean(dim=0),
-            torch.zeros(n_covariates, dtype=torch.float32),
+            torch.zeros(n_covariates, dtype=torch.float32, device=device),
             atol=1e-3,
         )
 
@@ -204,12 +204,12 @@ def test_scale(n_intervals: int, n_covariates: int, rescale: bool, device: str):
         if n_intervals > 1:
             assert torch.allclose(
                 dataset.covariates.abs().sum(dim=0),
-                torch.ones(n_covariates, dtype=torch.float32),
+                torch.ones(n_covariates, dtype=torch.float32, device=device),
             )
         else:
             assert torch.allclose(
                 dataset.covariates.abs().sum(dim=0),
-                torch.zeros(n_covariates, dtype=torch.float32),
+                torch.zeros(n_covariates, dtype=torch.float32, device=device),
                 atol=1e-3,
             )
     else:

@@ -38,7 +38,7 @@ class NewtonResult:
             # N.B.: using cholesky_inverse guarantees the symmetry of the result:
             self.imat = torch.cholesky_inverse(torch.linalg.cholesky(self.hessian))
         else:
-            self.imat = torch.inverse(self.hess)
+            self.imat = torch.inverse(self.hess.cpu()).to(self.hess.device)
             self.imat = (self.imat + self.imat.transpose(-1, -2)) / 2
 
         self.std = self.imat.diagonal(dim1=-2, dim2=-1).sqrt()
