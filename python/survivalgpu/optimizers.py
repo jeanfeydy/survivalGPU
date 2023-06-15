@@ -83,12 +83,12 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):
     # Are we running into infinite or NaN values?
     notfinites = torch.zeros(B, dtype=int64, device=candidates.device)
 
-    if maxiter < 1:
+    if maxiter < 0:
         raise ValueError(
-            f"The Newton solver expects at least 1 iteration but received {maxiter}."
+            f"The Newton solver expects at least 0 iteration but received {maxiter}."
         )
 
-    for it in range(maxiter):
+    for it in range(maxiter + 1):
         # Compute the value of the convex objective, its gradient and its Hessian:
         # (We perform this step in parallel over the B bootstrap samples.)
         values, grads, hessians = loss_grad_hessian(candidates)
@@ -101,13 +101,17 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):
         # Newton step = (H \ grad). (B,D,D) @ (B,D) = (B,D)
         # N.B.: Currently, we encounter a strange CUDA bug with linsolve.
         #       A simple workaround is to come back to the CPU, just for this operation.
-        # TODO: remove this "duct tape" fix as soon as possible.
+        # TODO: remove this "duct tape" fix.
         steps = torch.linalg.solve(hessians.cpu(), grads.cpu()).to(grads.device)
 
         # The R survival package returns the score test statistic at iteration 0,
         # so we do the same:
         if it == 0:
             score_test = (steps * grads).sum(-1)  # (B,), should be >= 0
+
+        if maxiter == 0:
+            # We only want to compute the score test statistic at iteration 0:
+            break
 
         # Did the values of the loss function decrease?
         accept = values < best_values  # (B,) boolean vector
@@ -150,7 +154,8 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):
         candidates.data[~accept] = closer_steps[~accept]
 
     # Recompute the local descriptors at the optimum:
-    values, grads, hessians = loss_grad_hessian(best_params)
+    if maxiter > 0:
+        values, grads, hessians = loss_grad_hessian(best_params)
 
     # N.B.: detach() removes the autograd history of the variables.
     # It is critical to prevent memory leaks, and allow us to scale up

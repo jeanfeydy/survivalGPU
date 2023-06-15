@@ -13,7 +13,16 @@ We provide a TorchSurvivalDataset object with methods that implement:
 import torch
 import numpy as np
 from matplotlib import pyplot as plt
-from .typecheck import typecheck, Optional, Callable, Union, List, Tuple, TorchDevice
+from .typecheck import (
+    typecheck,
+    Optional,
+    Callable,
+    Union,
+    List,
+    Tuple,
+    TorchDevice,
+    Literal,
+)
 from .typecheck import Int, Real
 from .typecheck import Int64Tensor, Float32Tensor
 from .bootstrap import Resampling
@@ -195,7 +204,10 @@ class TorchSurvivalDataset:
         # if self.event == [0, 0, 0, 1, 1, 0, 1, 0, 0, 1].
         return self
 
-    def prune(self):
+    @typecheck
+    def prune(
+        self, *, mode: Optional[Literal["unit length", "start zero", "any"]] = None
+    ):
         """Filters out the intervals that have no impact on the CoxPH likelihood.
 
         This may be a common occurence in some datasets where the raw
@@ -214,29 +226,89 @@ class TorchSurvivalDataset:
             self, "tied_deaths"
         ), "Please apply `.count_deaths()` before pruning."
 
-        # We only implement some pruning if the start-stop times are consecutive:
-        if torch.any(self.stop != self.start + 1):
-            return self
-        # From now on, we assume that the intervals are (stop-1, stop]
+        if mode is None:
+            # Case 1: the intervals are (stop-1, stop].
+            #         -> we remove all the times where no one dies.
+            if torch.all(self.stop == self.start + 1):
+                mode = "unit length"
+            # Case 2: the intervals are (0, stop].
+            #         -> we remove all the intervals that get censored before the first death.
+            #         -> the intervals that get censored right after the n-th death
+            #            get their time values updated to the time of the n-th death.
+            elif torch.all(self.start == 0):
+                mode = "start zero"
+            else:
+                mode = "any"
 
-        # Filter out the groups that have no deaths:
-        mask = self.tied_deaths[self.group] > 0
-        assert mask.shape == self.stop.shape
+        if mode in ["unit length", "start zero"]:
+            if mode == "unit length":
+                # Filter out the groups that have no deaths:
+                mask = self.tied_deaths[self.group] > 0
 
-        # Just keep the lines that correspond to times where someone dies:
-        self.stop = self.stop[mask]
-        self.start = self.start[mask]
-        self.event = self.event[mask]
-        self.patient = self.patient[mask]
-        self.covariates = self.covariates[mask, :]
-        self.batch_intervals = self.batch_intervals[mask]
-        self.strata_intervals = self.strata_intervals[mask]
+            elif mode == "start zero":
+                if False:
+                    # Get an id per independent group:
+                    _, batch_strata_group = torch.unique_consecutive(
+                        self.unique_groups[0:2],
+                        return_inverse=True,
+                        dim=-1,
+                    )
 
-        # Don't forget to re-count the deaths:
-        self.count_deaths()
-        # This updates self.group, self.unique_groups, self.n_groups and self.tied_deaths
-        # We can now check that the filtering worked as expected:
-        assert (self.tied_deaths > 0).all()
+                # Build a "new_stop" vector that contains the time of the most recent
+                # death at any given time for a given (batch, strata, stop),
+                # within a given (batch, strata) group:
+                assert self.tied_deaths.shape == (self.unique_groups.shape[1],)
+
+                current_stop = 0
+                current_batch_strata = self.unique_groups[0:2, 0]
+                new_stop = torch.zeros_like(self.unique_groups[2])
+
+                # We loop over the unique values of (batch, strata, stop)
+                # and the associated numbers of deaths:
+                for i, (b_s_s, deaths) in enumerate(
+                    zip(self.unique_groups.T, self.tied_deaths)
+                ):
+                    # Reset the counter if we are in a new (batch, strata):
+                    if not torch.equal(current_batch_strata, b_s_s[0:2]):
+                        current_stop = 0
+                        current_batch_strata = b_s_s[0:2]
+                    # Update the counter if we meet a new "death time":
+                    if deaths > 0:
+                        current_stop = b_s_s[2]
+                    new_stop[i] = current_stop
+
+                if False:
+                    print("Pruning!")
+                    print("batch: ", self.batch_intervals)
+                    print("strata:", self.strata_intervals)
+                    print("stop:  ", self.stop)
+                    print("death: ", self.event)
+                    print("n stop:", new_stop[self.group])
+
+                # Update the stop times to these new values:
+                self.stop = new_stop[self.group]
+
+                # If new_stop==0, this means that the interval has been censored
+                # before the first death in the current (batch, strata)
+                # -> we can prune it safely.
+                mask = self.stop > 0
+
+            # Prune out useless lines:
+            assert mask.shape == self.stop.shape
+            assert mask.shape == self.start.shape
+            self.stop = self.stop[mask]
+            self.start = self.start[mask]
+            self.event = self.event[mask]
+            self.patient = self.patient[mask]
+            self.covariates = self.covariates[mask, :]
+            self.batch_intervals = self.batch_intervals[mask]
+            self.strata_intervals = self.strata_intervals[mask]
+
+            # Don't forget to re-count the deaths:
+            self.count_deaths()
+            # This updates self.group, self.unique_groups, self.n_groups and self.tied_deaths
+            # We can now check that the filtering worked as expected:
+            assert (self.tied_deaths > 0).all()
 
         return self
 

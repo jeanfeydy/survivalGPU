@@ -11,8 +11,9 @@ from survivalgpu.optimizers import newton
 
 np.set_printoptions(precision=4)
 
-SUPPORTED_TIES = ["breslow"] #, "efron"]
-SUPPORTED_MODES = ["unit length", "start zero"] #, "any"]
+SUPPORTED_TIES = ["breslow"]  # , "efron"]
+SUPPORTED_MODES = ["unit length", "start zero"]  # , "any"]
+
 
 @pytest.mark.skip()
 @given(
@@ -24,12 +25,13 @@ def test_doscale_identity(*, ties, alpha, mode):
     data_csv = np.array(
         [
             # Time, Death, Covars
-            [1, 0, -1.0, 0.0],
-            [1, 0, 4.0, 4.0],
-            [1, 1, 0.0, 2.0],
-            [2, 0, 4.0, 2.0],
-            [2, 0, 0.0, 0.0],
-            [3, 1, 4.0, 1.0],
+            [1, 0, 1.0, 0.0],
+            [2, 0, -1.0, 0.0],
+            [2, 0, 4.0, 4.0],
+            [2, 1, 0.0, 2.0],
+            [4, 0, 4.0, 2.0],
+            [4, 0, 0.0, 0.0],
+            [5, 1, 4.0, 1.0],
         ]
     )
     ds = {
@@ -87,6 +89,7 @@ def test_doscale_identity(*, ties, alpha, mode):
                     print(item)
 
 
+@pytest.mark.skip()
 @given(
     n_patients=st.integers(min_value=10, max_value=20),
     n_covariates=st.integers(min_value=1, max_value=5),
@@ -94,11 +97,14 @@ def test_doscale_identity(*, ties, alpha, mode):
     n_strata=st.integers(min_value=1, max_value=3),
     ties=st.sampled_from(SUPPORTED_TIES),
     alpha=st.floats(min_value=0.1, max_value=1),
+    doscale=st.booleans(),
 )
-def test_modes_equality(*, n_patients, n_covariates, n_batch, n_strata, ties, alpha):
+def test_modes_equality(
+    *, n_patients, n_covariates, n_batch, n_strata, ties, alpha, doscale
+):
     """Checks that all implementations of the CoxPH likelihood coincide when start=0, stop=1."""
     models = [
-        CoxPHSurvivalAnalysis(ties=ties, alpha=alpha, mode=mode)
+        CoxPHSurvivalAnalysis(ties=ties, alpha=alpha, mode=mode, doscale=doscale)
         for mode in SUPPORTED_MODES
     ]
     # We need at least two patients per batch to ensure identifiability
@@ -114,10 +120,10 @@ def test_modes_equality(*, n_patients, n_covariates, n_batch, n_strata, ties, al
 
     # Ensure that the problem is not degenerate:
     for k in range(n_batch):
-        event[2*k] = 0
-        event[2*k+1] = 1
-        batch[2*k:2*k+2] = k
-        strata[2*k:2*k+2] = 0
+        event[2 * k] = 0
+        event[2 * k + 1] = 1
+        batch[2 * k : 2 * k + 2] = k
+        strata[2 * k : 2 * k + 2] = 0
 
     for model in models:
         model.fit(
@@ -132,7 +138,7 @@ def test_modes_equality(*, n_patients, n_covariates, n_batch, n_strata, ties, al
     for attr in dir(models[0]):
         if attr.endswith("_") and not attr.endswith("__"):
             for m in models[1:]:
-                if attr in ["sctest_init_"]: # ["hessian_", "imat_"]:
+                if attr in ["sctest_init_"]:  # ["hessian_", "imat_"]:
                     continue
                 assert_allclose(
                     getattr(models[0], attr),

@@ -286,6 +286,9 @@ def coxph_objective(
         weighted_scores = scores + bootstrap.interval_log_weights  # (B,I)
         assert weighted_scores.shape == (B, I)
 
+        # print("scores          :", scores.detach().cpu().numpy())
+        # print("weighted_scores :", weighted_scores.detach().cpu().numpy())
+
         if ties == "breslow":
             # This is the term:
             #
@@ -322,11 +325,9 @@ def coxph_objective(
                 #   a  b  c| d  e  f| g  h  i| k  l| m
                 # -> 5 unique values of (batch, strata)
                 #
-                # TODO: make sure that groups with no deaths induce no bug,
-                #       or prune them intelligently!!!
                 #
                 # Since the "start" of all intervals is equal to 0, the risk sets
-                # within each "independent group" are 
+                # within each "independent group" are
                 #
                 # - Group 1: a+b+c, b+c, c
                 # - Group 2: d+e+f, e+f, f
@@ -335,23 +336,29 @@ def coxph_objective(
                 # - Group 5: m
                 #
                 # We implement this using a cumulative logsumexp.
-                
-                # 1) Compute the (log)cumsum(exp) 
+
+                # 1) Compute the (log)cumsum(exp)
                 # [a+b+c+d+..., b+c+d+..., ..., k+l+m, l+m, m]
                 # Since cumsum starts from the first index and we are interested
                 # in "backward" sums, we must flip the tensors along the "n_group" dim:
-                cumsums = group_scores.flip(dims=(1,)).logcumsumexp(dim=1).flip(dims=(1,))
+                cumsums = (
+                    group_scores.flip(dims=(1,)).logcumsumexp(dim=1).flip(dims=(1,))
+                )
                 assert cumsums.shape == (B, n_groups)
+                # print("group_scores:", group_scores.detach().cpu().numpy())
+                # print("cumsums:     ", cumsums.detach().cpu().numpy())
 
-                # 2) Compute the offsets that correspond to the different 
+                # 2) Compute the offsets that correspond to the different
                 #    "sums over independent groups":
                 #    [(d+e+f) + (g+...), (g+h+i) + ..., (k+l) + m, m]
-                #   These are the values of cumsum that correspond to the 
+                #   These are the values of cumsum that correspond to the
                 #   "first" (reading from left to right) indices of a new group.
                 #   We do not care about the very first value, (a+b+c)+...
 
                 # Make sure that (batch > strata > stop > event) is lexicographically sorted:
-                assert dataset.is_sorted, "The dataset must be sorted before computing a log-likelihood."
+                assert (
+                    dataset.is_sorted
+                ), "The dataset must be sorted before computing a log-likelihood."
                 assert dataset.unique_groups.shape == (3, n_groups)
 
                 # batch_strata_group looks like:
@@ -363,13 +370,17 @@ def coxph_objective(
                 )
                 assert batch_strata_group.shape == (n_groups,)
 
-                # Identify the indices of the first (batch, strata, stop) group 
+                # Identify the indices of the first (batch, strata, stop) group
                 # for each value of (batch, strata):
                 # ., [F, F, T, F, F, T, F, F, T, F, T]
-                first_in_batch_strata_group = batch_strata_group[1:] != batch_strata_group[:-1]
+                first_in_batch_strata_group = (
+                    batch_strata_group[1:] != batch_strata_group[:-1]
+                )
 
                 # Fetch the values of the cumsum at this stage:
-                offsets_per_batch_strata = cumsums[:, 1:][:, first_in_batch_strata_group]
+                offsets_per_batch_strata = cumsums[:, 1:][
+                    :, first_in_batch_strata_group
+                ]
 
                 # At this stage, on every row, offsets_per_group is:
                 # [(d+e+f) + (g+...), (g+h+i) + ..., (k+l) + m, m]
@@ -380,18 +391,22 @@ def coxph_objective(
                 # 3) Add an arbitrary "offset" value for the last group.
                 #    This is to avoid indexing on empty tensors, but won't be used.
                 offsets_per_batch_strata = torch.cat(
-                    (offsets_per_batch_strata,
-                     torch.zeros_like(group_scores[:, :1])),  # (B, 1)
-                     dim=1
+                    (
+                        offsets_per_batch_strata,
+                        torch.zeros_like(group_scores[:, :1]),
+                    ),  # (B, 1)
+                    dim=1,
                 )
                 assert offsets_per_batch_strata.shape == (B, batch_strata_group[-1] + 1)
+                # print("offsets/bs  :", offsets_per_batch_strata.detach().cpu().numpy())
 
                 # 4) Unwrap this offset into a tensor of shape (batch, n_groups).
                 #    On every row:
                 #   [(d+e+f)+..., idem, idem, (g+h+i)+..., ..., m, m, 0]
                 offsets_per_group = offsets_per_batch_strata[:, batch_strata_group]
                 assert offsets_per_group.shape == (B, n_groups)
-                
+                # print("offsets/bss :", offsets_per_batch_strata.detach().cpu().numpy())
+
                 # 5) We now want to subtract the offsets from the cumsums.
                 #    This is not trivial, because we are dealing with logsumexps
                 #    instead of sums. We use the following identity:
@@ -420,10 +435,12 @@ def coxph_objective(
                     )
 
                 # For the last group (the right-most one), there is no offset:
-                last_batch_strata = (batch_strata_group == batch_strata_group[-1])
+                last_batch_strata = batch_strata_group == batch_strata_group[-1]
                 last_batch_strata = last_batch_strata.view(1, n_groups)
 
-                assert torch.all(cumsums[~last_batch_strata] > offsets_per_group[~last_batch_strata])
+                assert torch.all(
+                    cumsums[~last_batch_strata] > offsets_per_group[~last_batch_strata]
+                )
 
                 group_scores = torch.where(
                     last_batch_strata,

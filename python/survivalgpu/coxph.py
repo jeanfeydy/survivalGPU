@@ -148,8 +148,9 @@ class CoxPHSurvivalAnalysis:
         # Count the number of death times:
         dataset.count_deaths()
 
-        # Filter out the times where no one dies:
-        dataset.prune()
+        # Filter out the times that have no impact on the CoxPH model
+        # (e.g. censoring that occurs before the first death):
+        dataset.prune(mode=self.mode)
 
         n_batch, n_covariates = dataset.n_batch, dataset.n_covariates
 
@@ -170,7 +171,9 @@ class CoxPHSurvivalAnalysis:
 
             # Case 3: general case )start, stop], we use two cumulative hazards:
             else:
-                raise NotImplementedError("Currently, general intervals are not supported.")
+                raise NotImplementedError(
+                    "Currently, general intervals are not supported."
+                )
                 mode = "any"
 
         else:
