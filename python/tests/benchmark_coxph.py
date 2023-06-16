@@ -42,7 +42,7 @@ def benchmark_coxph_simple(
 
 for backend in ["torch"]: #["torch", "pyg", "coo", "csr"]:
     print("backend:", backend)
-    for n_patients in [1000000]: #[1000, 10000, 100000]:
+    for n_patients in [100000]: #[1000, 10000, 100000]:
         benchmark_coxph_simple(
             n_covariates=5,
             n_patients=n_patients,
@@ -52,17 +52,17 @@ for backend in ["torch"]: #["torch", "pyg", "coo", "csr"]:
 
     if True:
         from torch.profiler import profile, record_function, ProfilerActivity
+        activities = [ProfilerActivity.CPU]
+        if torch.cuda.is_available():
+            activities.append(ProfilerActivity.CUDA)
 
         with profile(
-            activities=[
-                ProfilerActivity.CPU,
-                ProfilerActivity.CUDA,
-            ],
+            activities=activities,
             record_shapes=True,
             profile_memory=True,
             with_stack=True,
         ) as prof:
-            N, D = 1000000, 5
+            N, D = 100000, 5
             benchmark_coxph_simple(
                 n_covariates=D,
                 n_patients=N,
