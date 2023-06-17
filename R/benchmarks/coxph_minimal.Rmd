@@ -46,7 +46,8 @@ time_cox <- function(dataset, n_bootstrap) {
 # - Event : the event
 # - cov1 : a covariate
 
-n_patients <- 10000000
+#n_patients <- 10000000
+n_patients <- 1000000
 
 poison <- rnorm(n_patients, 0, 1)
 

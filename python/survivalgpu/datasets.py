@@ -622,7 +622,7 @@ def simple_dataset(
     else:
         poison = rng.normal(loc=0, scale=1, size=(n_intervals,))
         event = (poison > 0).astype(np.int64)
-        covariates[:,0] += poison
+        covariates[:, 0] += poison
 
     if ensure_one_life:
         event[0] = 0

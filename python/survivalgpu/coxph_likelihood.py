@@ -145,20 +145,34 @@ def coxph_objective(
     # [[1, 1, 1, 1],
     #  [2, 0, 1, 1]]
 
-    # Recall that dataset.group is a (n_intervals,) Tensor of int64 that records
-    # the T unique values of (batch, strata, stop):
-    dead_cluster_indices = dataset.group[dataset.event == 1].repeat(len(bootstrap), 1)
-    # dead_cluster_indices is (n_bootstraps, n_death_intervals), e.g.
-    # [[0, 0, 1, 2],
-    #  [0, 0, 1, 2]]
+    if True:  # backend == "torch":
+        dead_cluster_indices = dataset.group[dataset.event == 1].long()
 
-    tied_dead_weights = group_reduce(
-        values=dead_weights,
-        groups=dead_cluster_indices.long(),
-        reduction="sum",
-        output_size=dataset.n_groups,
-        backend="pyg",
-    )
+        tied_dead_weights = group_reduce(
+            values=dead_weights,
+            groups=dead_cluster_indices,
+            reduction="sum",
+            output_size=dataset.n_groups,
+            backend="torch" if backend == "torch" else "pyg",
+        )
+
+    else:
+        # Recall that dataset.group is a (n_intervals,) Tensor of int64 that records
+        # the T unique values of (batch, strata, stop):
+        dead_cluster_indices = dataset.group[dataset.event == 1].repeat(
+            len(bootstrap), 1
+        )
+        # dead_cluster_indices is (n_bootstraps, n_death_intervals), e.g.
+        # [[0, 0, 1, 2],
+        #  [0, 0, 1, 2]]
+
+        tied_dead_weights = group_reduce(
+            values=dead_weights,
+            groups=dead_cluster_indices.long(),
+            reduction="sum",
+            output_size=dataset.n_groups,
+            backend="pyg",
+        )
     # Equivalent to:
     # tied_dead_weights = torch.bincount(cluster_indices[deaths == 1],
     #                     weights=weights.view(-1)[deaths == 1],
@@ -202,6 +216,9 @@ def coxph_objective(
 
     # Format the "group" vector as required by our backend for group-wise summations:
     if backend in ["torch", "pyg", "coo"]:
+        assert group.shape == (dataset.n_intervals,)
+
+    elif False:  # backend in ["pyg", "coo"]:
         group = group.repeat(len(bootstrap), 1)
         # group is (n_bootstrap,n_intervals),
         # and indicates the summation group that is associated to each interval e.g.
@@ -275,7 +292,7 @@ def coxph_objective(
             groups=dataset.batch_intervals,  # we should define groups instead to support all backends...
             reduction="sum",
             output_size=dataset.n_batch,
-            backend="pyg",  # backend=backend,
+            backend="torch",  # "pyg",  # backend=backend,
         )
         assert lin.shape == (B, dataset.n_batch)
 
@@ -461,7 +478,7 @@ def coxph_objective(
                 groups=dataset.unique_groups[0],
                 reduction="sum",
                 output_size=dataset.n_batch,
-                backend="pyg",  # backend=backend,
+                backend="torch",  # "pyg",  # backend=backend,
             )
 
             assert lse.shape == (B, dataset.n_batch)
