@@ -4,7 +4,7 @@ from survivalgpu import CoxPHSurvivalAnalysis
 from survivalgpu.datasets import simple_dataset
 import functools
 
-torch.use_deterministic_algorithms(False)
+# torch.use_deterministic_algorithms(False)
 
 import numpy as np
 
@@ -58,6 +58,8 @@ def benchmark_coxph_simple(
         ties="breslow", alpha=0.01, backend=backend, maxiter=maxiter
     )
 
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
     time_start = time.time()
     model.fit(
         covariates=ds.covariates,
@@ -67,6 +69,8 @@ def benchmark_coxph_simple(
         batch=ds.batch,
         strata=ds.strata,
     )
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
     time_end = time.time()
     print(
         f"{n_covariates} covariates, {n_patients:8,} patients -- time = {time_end - time_start:3.3f}s"
@@ -74,18 +78,20 @@ def benchmark_coxph_simple(
     print(model.coef_)
 
 
+n_covar = 2
+
 for backend in ["torch", "pyg", "coo", "csr"]:
     print("backend:", backend)
-    for n_patients in [10000]:  # [1000, 10000, 100000]:
+    for n_patients in [int(10**k) for k in range(3, 8)]:  # [1000, 10000, 100000]:
         benchmark_coxph_simple(
-            n_covariates=5,
+            n_covariates=n_covar,
             n_patients=n_patients,
             backend=backend,
             maxiter=3,
         )
 
     if False:
-        from torch.profiler import profile, record_function, ProfilerActivity
+        from torch.profiler import profile, ProfilerActivity
 
         activities = [ProfilerActivity.CPU]
         if torch.cuda.is_available():
@@ -100,10 +106,9 @@ for backend in ["torch", "pyg", "coo", "csr"]:
         )
 
         with myprof as prof:
-            N, D = n_patients, 5
             benchmark_coxph_simple(
-                n_covariates=D,
-                n_patients=N,
+                n_covariates=n_covar,
+                n_patients=n_patients,
                 backend=backend,
                 maxiter=3,
             )
@@ -115,7 +120,8 @@ for backend in ["torch", "pyg", "coo", "csr"]:
             os.makedirs("output")
 
         # Export to chrome://tracing
-        prof.export_chrome_trace(f"output/trace_{backend}_{N}_{D}.json")
+        prof.export_chrome_trace(f"output/trace_{backend}_{n_patients}_{n_covar}.json")
         prof.export_stacks(
-            f"output/stacks_{backend}_{N}_{D}.txt", "self_cuda_time_total"
+            f"output/stacks_{backend}_{n_patients}_{n_covar}.txt",
+            "self_cuda_time_total",
         )

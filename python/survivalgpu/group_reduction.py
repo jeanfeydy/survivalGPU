@@ -6,6 +6,15 @@ import torch
 import torch_scatter
 
 
+def make_2d(g):
+    if len(g.shape) == 1:
+        return g.view(1, -1)
+    elif len(g.shape) == 2:
+        return g
+    else:
+        raise ValueError("Invalid shape for groups")
+
+
 class SlicedSummation(torch.autograd.Function):
     """Adds a list of vectors as "suffixes".
 
@@ -55,7 +64,7 @@ class SumTorch(torch.autograd.Function):
         z = torch.zeros(
             values.shape[0], dim_size, dtype=values.dtype, device=values.device
         )
-        i = groups.view(1, -1)
+        i = make_2d(groups)
         return z.scatter_reduce_(
             dim=1,
             index=i,
@@ -69,7 +78,6 @@ class SumTorch(torch.autograd.Function):
         (groups,) = ctx.saved_tensors
         # TODO: what about dim_size?
         return torch.index_select(grad_output, 1, groups), None, None
-        return GatherCOO.apply(grad_output, groups, ctx.dim_size), None, None
 
 
 """
@@ -140,23 +148,12 @@ class GatherCOO(torch.autograd.Function):
         return SumCOO.apply(grad_output, groups, ctx.dim_size), None, None
 
 
-def make_2d(g):
-    if len(g.shape) == 1:
-        return g.view(1, -1)
-    elif len(g.shape) == 2:
-        return g
-    else:
-        raise ValueError("Invalid shape for groups")
-
-
 def group_reduce(*, values, groups, reduction, output_size, backend):
     if backend == "torch":
         # Compatibility switch for PyTorch.scatter_reduce:
         if reduction == "max":
             reduction = "amax"
-        # return torch.scatter_reduce(
-        #    values, 1, groups, reduction, output_size=output_size
-        # )
+
         assert len(values.shape) == 2
         if reduction == "sum":
             return SumTorch.apply(values, groups, output_size)
@@ -175,21 +172,14 @@ def group_reduce(*, values, groups, reduction, output_size, backend):
             values, make_2d(groups), dim=1, dim_size=output_size, reduce=reduction
         )
 
-    elif False:  # backend == "coo":
-        return torch_scatter.segment_coo(
-            values, groups, dim_size=output_size, reduce=reduction
-        )
-    elif backend == "coo":  # backend == "my_coo":
+    elif backend == "coo":
         if reduction == "sum":
             return SumCOO.apply(values, make_2d(groups), output_size)
         else:
             return torch_scatter.segment_coo(
                 values, make_2d(groups), dim_size=output_size, reduce=reduction
             )
-
-    elif False:  # backend == "csr":
-        return torch_scatter.segment_csr(values, groups, reduce=reduction)
-    elif backend == "csr":  # backend == "my_csr":
+    elif backend == "csr":
         if reduction == "sum":
             return SumCSR.apply(values, groups)
         else:

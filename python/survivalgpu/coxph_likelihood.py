@@ -130,6 +130,7 @@ def coxph_objective(
     which is identified with len(bootstrap) vectors of length data.n_batch,
     concatenated with each other.
     """
+    coo_backend = "torch" if backend == "torch" else "pyg"
 
     # Pre-processing ---------------------------------------------------------------------
     # For each bootstrap and value of (batch, strata), aggregate the
@@ -145,34 +146,19 @@ def coxph_objective(
     # [[1, 1, 1, 1],
     #  [2, 0, 1, 1]]
 
-    if True:  # backend == "torch":
-        dead_cluster_indices = dataset.group[dataset.event == 1].long()
+    # Recall that dataset.group is a (n_intervals,) Tensor of int64 that records
+    # the T unique values of (batch, strata, stop):
+    dead_cluster_indices = dataset.group[dataset.event == 1].long()
+    # dead_cluster_indices is (n_death_intervals,), e.g.
+    # [0, 0, 1, 2]
 
-        tied_dead_weights = group_reduce(
-            values=dead_weights,
-            groups=dead_cluster_indices,
-            reduction="sum",
-            output_size=dataset.n_groups,
-            backend="torch" if backend == "torch" else "pyg",
-        )
-
-    else:
-        # Recall that dataset.group is a (n_intervals,) Tensor of int64 that records
-        # the T unique values of (batch, strata, stop):
-        dead_cluster_indices = dataset.group[dataset.event == 1].repeat(
-            len(bootstrap), 1
-        )
-        # dead_cluster_indices is (n_bootstraps, n_death_intervals), e.g.
-        # [[0, 0, 1, 2],
-        #  [0, 0, 1, 2]]
-
-        tied_dead_weights = group_reduce(
-            values=dead_weights,
-            groups=dead_cluster_indices.long(),
-            reduction="sum",
-            output_size=dataset.n_groups,
-            backend="pyg",
-        )
+    tied_dead_weights = group_reduce(
+        values=dead_weights,
+        groups=dead_cluster_indices,
+        reduction="sum",
+        output_size=dataset.n_groups,
+        backend=coo_backend,
+    )
     # Equivalent to:
     # tied_dead_weights = torch.bincount(cluster_indices[deaths == 1],
     #                     weights=weights.view(-1)[deaths == 1],
@@ -217,13 +203,9 @@ def coxph_objective(
     # Format the "group" vector as required by our backend for group-wise summations:
     if backend in ["torch", "pyg", "coo"]:
         assert group.shape == (dataset.n_intervals,)
-
-    elif False:  # backend in ["pyg", "coo"]:
-        group = group.repeat(len(bootstrap), 1)
-        # group is (n_bootstrap,n_intervals),
+        # group is (n_intervals,),
         # and indicates the summation group that is associated to each interval e.g.
-        # [[0, 0, 0, 0, 0, 1, 1, 1, 2, 2],
-        #  [0, 0, 0, 0, 0, 1, 1, 1, 2, 2]]
+        # [0, 0, 0, 0, 0, 1, 1, 1, 2, 2]
 
     elif backend == "csr":
         # We assume that group looks like:
@@ -289,10 +271,10 @@ def coxph_objective(
         )
         lin = group_reduce(
             values=lin,
-            groups=dataset.batch_intervals,  # we should define groups instead to support all backends...
+            groups=dataset.batch_intervals,
             reduction="sum",
             output_size=dataset.n_batch,
-            backend="torch",  # "pyg",  # backend=backend,
+            backend=coo_backend,
         )
         assert lin.shape == (B, dataset.n_batch)
 
@@ -302,9 +284,6 @@ def coxph_objective(
         # exp(weighted_scores[i,j]) = w[i,j] * exp(beta[i] . x[j]) = r[i,j]:
         weighted_scores = scores + bootstrap.interval_log_weights  # (B,I)
         assert weighted_scores.shape == (B, I)
-
-        # print("scores          :", scores.detach().cpu().numpy())
-        # print("weighted_scores :", weighted_scores.detach().cpu().numpy())
 
         if ties == "breslow":
             # This is the term:
@@ -362,8 +341,6 @@ def coxph_objective(
                     group_scores.flip(dims=(1,)).logcumsumexp(dim=1).flip(dims=(1,))
                 )
                 assert cumsums.shape == (B, n_groups)
-                # print("group_scores:", group_scores.detach().cpu().numpy())
-                # print("cumsums:     ", cumsums.detach().cpu().numpy())
 
                 # 2) Compute the offsets that correspond to the different
                 #    "sums over independent groups":
@@ -415,14 +392,12 @@ def coxph_objective(
                     dim=1,
                 )
                 assert offsets_per_batch_strata.shape == (B, batch_strata_group[-1] + 1)
-                # print("offsets/bs  :", offsets_per_batch_strata.detach().cpu().numpy())
 
                 # 4) Unwrap this offset into a tensor of shape (batch, n_groups).
                 #    On every row:
                 #   [(d+e+f)+..., idem, idem, (g+h+i)+..., ..., m, m, 0]
                 offsets_per_group = offsets_per_batch_strata[:, batch_strata_group]
                 assert offsets_per_group.shape == (B, n_groups)
-                # print("offsets/bss :", offsets_per_batch_strata.detach().cpu().numpy())
 
                 # 5) We now want to subtract the offsets from the cumsums.
                 #    This is not trivial, because we are dealing with logsumexps
@@ -478,7 +453,7 @@ def coxph_objective(
                 groups=dataset.unique_groups[0],
                 reduction="sum",
                 output_size=dataset.n_batch,
-                backend="torch",  # "pyg",  # backend=backend,
+                backend=coo_backend,
             )
 
             assert lse.shape == (B, dataset.n_batch)
