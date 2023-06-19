@@ -78,11 +78,11 @@ def benchmark_coxph_simple(
     print(model.coef_)
 
 
-n_covar = 2
+n_covar = 5
 
 for backend in ["torch", "pyg", "coo", "csr"]:
     print("backend:", backend)
-    for n_patients in [int(10**k) for k in range(3, 8)]:  # [1000, 10000, 100000]:
+    for n_patients in [int(10**k) for k in range(7, 8)]:
         benchmark_coxph_simple(
             n_covariates=n_covar,
             n_patients=n_patients,
@@ -90,7 +90,7 @@ for backend in ["torch", "pyg", "coo", "csr"]:
             maxiter=3,
         )
 
-    if False:
+    if True:
         from torch.profiler import profile, ProfilerActivity
 
         activities = [ProfilerActivity.CPU]
@@ -125,3 +125,5 @@ for backend in ["torch", "pyg", "coo", "csr"]:
             f"output/stacks_{backend}_{n_patients}_{n_covar}.txt",
             "self_cuda_time_total",
         )
+
+    print("")

@@ -311,22 +311,31 @@ class CoxPHSurvivalAnalysis:
 
         # scattered_coef is (n_bootstraps, n_intervals, covariates):
 
-        # N.B.: Naive implementation with an indexing operation as in
-        #
-        # scattered_coef = coef[:, dataset.batch_intervals, :]  # (B, I, D)
-        #
-        # is MASSIVELY inefficient in the backward pass, as discussed in
-        # https://github.com/pytorch/pytorch/issues/41162
-        # https://github.com/dmlc/dgl/issues/3729
-        #
-        # Instead, we prefer the following line, with a non-deterministic backward pass:
-        scattered_coef = torch.index_select(coef, 1, dataset.batch_intervals)
+        if True and dataset.n_batch == 1:
+            # Simple case with no batch - don't waste time with indexing operations:
+            scattered_coef = coef.view(len(bootstrap), 1, -1)
 
-        assert scattered_coef.shape == (
-            len(bootstrap),
-            dataset.n_intervals,
-            dataset.n_covariates,
-        )
+        else:
+
+            # N.B.: Naive implementation with an indexing operation as in
+            #
+            if False:
+                scattered_coef = coef[:, dataset.batch_intervals, :]  # (B, I, D)
+            #
+            # is MASSIVELY inefficient in the backward pass, as discussed in
+            # https://github.com/pytorch/pytorch/issues/41162
+            # https://github.com/dmlc/dgl/issues/3729
+            #
+            # Instead, we prefer the following line, with a non-deterministic backward pass:
+            else:
+                scattered_coef = torch.index_select(coef, 1, dataset.batch_intervals)
+
+            assert scattered_coef.shape == (
+                len(bootstrap),
+                dataset.n_intervals,
+                dataset.n_covariates,
+            )
+        
 
         X = dataset.covariates  # (I, D)
         # (B, I, D) * (1, I, D) -> (B, I, D)
