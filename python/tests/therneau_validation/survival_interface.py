@@ -54,8 +54,6 @@ def survival_fit(*, dataset, ties, ridge) -> dict:
     if np.any(dataset.batch != 0):
         raise NotImplementedError("We should loop over batch values!")
 
-    print(formula)
-
     with (ro.default_converter + numpy2ri.converter).context():
         # Thanks rpy2!
         data_R = DataFrame(df)

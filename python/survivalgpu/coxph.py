@@ -196,7 +196,12 @@ class CoxPHSurvivalAnalysis:
                 scores = self._linear_risk_scores(
                     coef=coef, dataset=dataset, bootstrap=bootstrap
                 )
-                reg = self.alpha * (coef**2).sum(dim=1)
+                if scales is None:
+                    scaled_coef = coef
+                else:
+                    assert scales.shape == (coef.shape[-1],)
+                    scaled_coef = coef * scales
+                reg = self.alpha * (scaled_coef**2).sum(dim=1)
                 return obj(scores) + reg
 
             return aux
