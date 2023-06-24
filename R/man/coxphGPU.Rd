@@ -5,21 +5,9 @@
 \alias{summary.coxphGPU}
 \title{Fast Cox Proportional Hazards Regression Model}
 \usage{
-coxphGPU(
-  formula,
-  data,
-  ties = c("efron", "breslow"),
-  bootstrap = 1,
-  batchsize = 0,
-  all.results = FALSE,
-  na.action,
-  control,
-  singular.ok = TRUE,
-  model = FALSE,
-  x = FALSE,
-  y = TRUE,
-  ...
-)
+coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
+         batchsize = 0, init, all.results = FALSE, control,
+         singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
 
 \method{summary}{coxphGPU}(object, ..., conf.int = 0.95, scale = 1)
 }
@@ -47,16 +35,15 @@ computationally.}
 Defaults to 0, which means that we handle all copies at once. If you run
 into out of memory errors, please consider using batchsize=100, 10 or 1.}
 
+\item{init}{Vector of initial values of the iteration. Default initial value
+is zero for all variables.}
+
 \item{all.results}{Post-processing calculations. If TRUE, coxphGPU returns
 linears.predictors, wald.test, concordance for all bootstraps. Default to
 FALSE if bootstrap.}
 
-\item{na.action}{a missing-data filter function. This is applied to the
-model.frame after any subset argument has been used. Default is
-options()\$na.action.}
-
-\item{control}{Object of class coxph.control specifying iteration limit and
-other control options. Default is coxph.control(...).}
+\item{control}{Object of class coxph.control specifying iteration limit
+(iter.max argument) and other control options. Default is coxph.control(...).}
 
 \item{singular.ok}{logical value indicating how to handle collinearity in the
 model matrix. If TRUE, the program will automatically skip over columns of
@@ -124,15 +111,19 @@ coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
 
 ## Cox Proportional Hazards with bootstrap
 
- if(use_cuda()){
-     n_bootstrap <- 1000; batchsize <- 200
- }else{
-     n_bootstrap <- 50  ; batchsize <- 10}
+if (use_cuda()) {
+  n_bootstrap <- 1000
+  batchsize <- 200
+} else {
+  n_bootstrap <- 50
+  batchsize <- 10
+}
 
 coxph_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
                             data = drugdata,
                             bootstrap = n_bootstrap,
                             batchsize = batchsize)
+
 summary(coxph_bootstrap)
 }
 }

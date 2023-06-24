@@ -5,6 +5,12 @@
 #'   work with large datasets.
 #'
 #'   Use `summary()` and `plot()` methods to see results and risk function.
+#'
+#' @usage
+#' wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
+#'        event, start, stop, expos, covariates = NULL, nbootstraps = 1,
+#'        batchsize = 0, confint = 0.95, controls = NULL, ...)
+#'
 #' @param data A data frame in an interval (long) format, in which each line
 #'   corresponds to one and only one time unit for a given individual.
 #' @param nknots Corresponds to the number(s) of interior knots for the cubic
@@ -70,12 +76,11 @@
 #' drugdata <- WCE::drugdata
 #'
 #' # WCE model
-#' wce_gpu <- wceGPU(
-#'   data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-#'   event = "Event", start = "Start", stop = "Stop", expos = "dose",
-#'   covariates = c("age", "sex"), constrained = FALSE, aic = FALSE,
-#'   confint = 0.95, nbootstraps = 1, batchsize = 0
-#' )
+#' wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+#'                   event = "Event", start = "Start", stop = "Stop",
+#'                   expos = "dose", covariates = c("age", "sex"),
+#'                   constrained = FALSE, aic = FALSE, confint = 0.95,
+#'                   nbootstraps = 1, batchsize = 0)
 #'
 #' # Results
 #' wce_gpu
@@ -84,19 +89,26 @@
 #' # See estimated weight function
 #' plot(wce_gpu)
 #'
-#' # WCE model with bootstrap (example with 20 bootstraps)
-#' wce_gpu_bootstrap <- wceGPU(
-#'   data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-#'   event = "Event", start = "Start", stop = "Stop", expos = "dose",
-#'   covariates = c("age", "sex"), constrained = FALSE, aic = FALSE,
-#'   confint = 0.95, nbootstraps = 20, batchsize = 0
-#' )
+#' # WCE model with bootstrap (example with 20 bootstraps, but normally
+#' # nbootstraps > 500)
+#' wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = 90,
+#'                             id = "Id", event = "Event", start = "Start",
+#'                             stop = "Stop", expos = "dose",
+#'                             covariates = c("age", "sex"),
+#'                             constrained = FALSE, aic = FALSE, confint = 0.95,
+#'                             nbootstraps = 20, batchsize = 0)
 #'
 #' # See confidence bands for the estimated weight function due to bootstrap
 #' plot(wce_gpu_bootstrap)
 #'
 #' # All estimated coefficients in bootstrap
 #' coef(wce_gpu_bootstrap)
+#'
+#' # Estimate a HR (Exposed at a dose vs. unexposed)
+#' exposed   <- rep(1, 90)
+#' unexposed <- rep(0, 90)
+#'
+#' HR(wce_gpu_bootstrap, exposed, unexposed)
 #' }
 wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
                    event, start, stop, expos, covariates = NULL,
@@ -178,8 +190,8 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   nevents <- length(data$Event[data$Event == 1])
 
   BIC <- sapply(wce$loglik, BIC_for_wce,
-    n.events = nevents, n.knots = nknots,
-    cons = constrained, aic = aic, covariates = covariates
+                n.events = nevents, n.knots = nknots,
+                cons = constrained, aic = aic, covariates = covariates
   )
 
   # List to return
@@ -287,12 +299,12 @@ print.wceGPU <- function(x, ...) {
 
   cat("\n")
   cat(paste("Number of events :", object$nevents[1]),
-    paste("Partial log-Likelihoods :", signif(object$loglik[1])),
-    paste(
-      ifelse(object$aic == TRUE, "AIC :", "BIC :"),
-      signif(object$info.criterion[1])
-    ),
-    sep = "\n"
+      paste("Partial log-Likelihoods :", signif(object$loglik[1])),
+      paste(
+        ifelse(object$aic == TRUE, "AIC :", "BIC :"),
+        signif(object$info.criterion[1])
+      ),
+      sep = "\n"
   )
 
   if (!is.null(object$covariates)) {
@@ -361,18 +373,18 @@ summary.wceGPU <- function(object, ...) {
 
   cat("Estimated coefficients for the covariates :", sep = "\n")
   stats::printCoefmat(coef_mat,
-    digits = 2,
-    P.values = TRUE,
-    has.Pvalue = TRUE
+                      digits = 2,
+                      P.values = TRUE,
+                      has.Pvalue = TRUE
   )
   cat("\n")
   cat(paste("Number of events :", object$nevents[1]),
-    paste("Partial log-Likelihoods :", signif(object$loglik[1])),
-    paste(
-      ifelse(object$aic == TRUE, "AIC :", "BIC :"),
-      signif(object$info.criterion[1])
-    ),
-    sep = "\n"
+      paste("Partial log-Likelihoods :", signif(object$loglik[1])),
+      paste(
+        ifelse(object$aic == TRUE, "AIC :", "BIC :"),
+        signif(object$info.criterion[1])
+      ),
+      sep = "\n"
   )
   if (object$nbootstraps > 1) {
     cat("\n ---------------- \n")
@@ -446,8 +458,8 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
     bic_legend <- paste(info, "=", round(object$info.criterion, 2))
 
     graphics::matplot(t(object$WCEmat),
-      lty = 1, type = "l", ylab = "weights",
-      xlab = "Time elapsed"
+                      lty = 1, type = "l", ylab = "weights",
+                      xlab = "Time elapsed"
     )
     graphics::title(paste("Estimated weight functions\n", bic_legend))
     graphics::matplot(t(object$WCEmat), pch = 1, add = TRUE)
@@ -456,20 +468,20 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
     if (isTRUE(hist.covariates) & !is.null(object$covariates)) {
       for (i in object$covariates) {
         graphics::hist(object$coef[, i],
-          main = paste0(
-            "Histogram of ", i, " coefficient with ",
-            object$nbootstraps,
-            " bootstraps\n (without bootstraps coef = ",
-            round(object$coef[1, i], 2), ")"
-          ),
-          xlab = "Coefficient"
+                       main = paste0(
+                         "Histogram of ", i, " coefficient with ",
+                         object$nbootstraps,
+                         " bootstraps\n (without bootstraps coef = ",
+                         round(object$coef[1, i], 2), ")"
+                       ),
+                       xlab = "Coefficient"
         )
       }
     }
 
     graphics::matplot((object$WCEmat[1, ]),
-      lty = 1, type = "l", ylab = "weights",
-      xlab = "Time elapsed"
+                      lty = 1, type = "l", ylab = "weights",
+                      xlab = "Time elapsed"
     )
     graphics::title(paste0(
       "Estimated weight functions\n with confidence interval (",
@@ -477,12 +489,12 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
     ))
     graphics::matplot((object$WCEmat[1, ]), pch = 1, add = TRUE)
     graphics::matplot((object$WCEmat_CI[1, ]),
-      type = c("l"), lty = 2, col = "red",
-      add = TRUE
+                      type = c("l"), lty = 2, col = "red",
+                      add = TRUE
     )
     graphics::matplot((object$WCEmat_CI[2, ]),
-      type = c("l"), lty = 2, col = "red",
-      add = TRUE
+                      type = c("l"), lty = 2, col = "red",
+                      add = TRUE
     )
   }
 }
@@ -515,4 +527,67 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
   ses <- sqrt(diag(object$vcovmat[[1]]))[parm]
   ci[] <- cf[parm] + ses %o% fac
   ci
+}
+
+
+#' Hazard Ratio for WCE model
+#'
+#' Calcul the hazard ratio from a wceGPU object to compare two scenarios of
+#' time-dependant exposures.
+#'
+#' @param object wceGPU object.
+#' @param vecnum 	A vector of time-dependent exposures corresponding to a
+#'   scenario of interest (numerator of the HR).
+#' @param vecdenom A vector of time-dependent exposures corresponding to a
+#'   scenario for the reference category (denominator of the HR).
+#' @param level the confidence level required for HR if bootstrap. Default to
+#'   0.95.
+#'
+#' @export
+#' @return Returns a HR according to the scenarios. If bootstrap is present in
+#'   wceGPU object, this function returns confidence interval for the HR.
+#' @examples
+#' \dontrun{
+#' # Dataset
+#' drugdata <- WCE::drugdata
+#'
+#' # WCE model with bootstrap (example with 20 bootstraps)
+#' cutoff <- 90
+#' wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff,
+#'                             id = "Id", event = "Event", start = "Start",
+#'                             stop = "Stop", expos = "dose",
+#'                             covariates = c("age", "sex"),
+#'                             constrained = FALSE, aic = FALSE, confint = 0.95,
+#'                             nbootstraps = 20, batchsize = 0)
+#'
+#' # Exposed at a dose vs. unexposed
+#' exposed   <- rep(1, cutoff)
+#' unexposed <- rep(0, cutoff)
+#'
+#' HR(wce_gpu_bootstrap, exposed, unexposed)
+#' }
+HR <- function(object, vecnum, vecdenom, level = 0.95) {
+  if (!inherits(object, "wceGPU")) stop("It's not a wceGPU object.")
+  cutoff <- ncol(object$WCEmat)
+  if (length(vecnum) != cutoff | length(vecdenom) != cutoff) stop("At least one of the vector provided as the numerator or denominator is not of proper length.")
+
+  hr <- apply(object$WCEmat, 1, function(x) exp(x %*% vecnum) / exp(x %*% vecdenom), simplify = TRUE)
+
+  if (object$nbootstraps > 1) {
+    a <- (1 - level) / 2
+    a <- c(a, 1 - a)
+    ci <- quantile(hr, p = a)
+    pct <- paste0(format(100 * a, trim = TRUE, scientific = FALSE), "%")
+
+    results <- matrix(c(hr[1], ci), nrow = 1L)
+    colnames(results) <- c(
+      "HR",
+      paste("CI", pct[1]),
+      paste("CI", pct[2])
+    )
+  } else {
+    results <- matrix(hr, nrow = 1L)
+    colnames(results) <- "HR"
+  }
+  return(results)
 }

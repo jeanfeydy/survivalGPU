@@ -7,24 +7,9 @@
 \alias{confint.wceGPU}
 \title{Fast WCE}
 \usage{
-wceGPU(
-  data,
-  nknots,
-  cutoff,
-  constrained = FALSE,
-  aic = FALSE,
-  id,
-  event,
-  start,
-  stop,
-  expos,
-  covariates = NULL,
-  nbootstraps = 1,
-  batchsize = 0,
-  confint = 0.95,
-  controls = NULL,
-  ...
-)
+wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
+       event, start, stop, expos, covariates = NULL, nbootstraps = 1,
+       batchsize = 0, confint = 0.95, controls = NULL, ...)
 
 \method{summary}{wceGPU}(object, ...)
 
@@ -133,9 +118,10 @@ drugdata <- WCE::drugdata
 
 # WCE model
 wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-             event = "Event", start = "Start", stop = "Stop", expos = "dose",
-             covariates = c("age","sex"), constrained = FALSE, aic = FALSE,
-             confint = 0.95, nbootstraps = 1, batchsize = 0)
+                  event = "Event", start = "Start", stop = "Stop",
+                  expos = "dose", covariates = c("age", "sex"),
+                  constrained = FALSE, aic = FALSE, confint = 0.95,
+                  nbootstraps = 1, batchsize = 0)
 
 # Results
 wce_gpu
@@ -144,17 +130,26 @@ summary(wce_gpu)
 # See estimated weight function
 plot(wce_gpu)
 
-# WCE model with bootstrap (example with 20 bootstraps)
-wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1,cutoff = 90, id="Id",
-             event = "Event", start = "Start", stop = "Stop", expos = "dose",
-             covariates = c("age","sex"), constrained = FALSE, aic = FALSE,
-             confint = 0.95, nbootstraps = 20, batchsize = 0)
+# WCE model with bootstrap (example with 20 bootstraps, but normally
+# nbootstraps > 500)
+wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = 90,
+                            id = "Id", event = "Event", start = "Start",
+                            stop = "Stop", expos = "dose",
+                            covariates = c("age", "sex"),
+                            constrained = FALSE, aic = FALSE, confint = 0.95,
+                            nbootstraps = 20, batchsize = 0)
 
 # See confidence bands for the estimated weight function due to bootstrap
 plot(wce_gpu_bootstrap)
 
 # All estimated coefficients in bootstrap
 coef(wce_gpu_bootstrap)
+
+# Estimate a HR (Exposed at a dose vs. unexposed)
+exposed   <- rep(1, 90)
+unexposed <- rep(0, 90)
+
+HR(wce_gpu_bootstrap, exposed, unexposed)
 }
 }
 \references{

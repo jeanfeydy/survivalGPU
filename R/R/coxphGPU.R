@@ -4,6 +4,11 @@
 #'   to use (or not) your GPU to speed up calculations, in particular for
 #'   bootstrap.
 #'
+#' @usage
+#' coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
+#'          batchsize = 0, init, all.results = FALSE, control,
+#'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
+#'
 #' @param formula a formula object, with the response on the left of a ~
 #'   operator, and the terms on the right. The response must be a survival
 #'   object as returned by the `survival::Surv` function. For the moment,
@@ -22,14 +27,13 @@
 #' @param batchsize Number of bootstrap copies that should be handled at a time.
 #'   Defaults to 0, which means that we handle all copies at once. If you run
 #'   into out of memory errors, please consider using batchsize=100, 10 or 1.
+#' @param init Vector of initial values of the iteration. Default initial value
+#' is zero for all variables.
 #' @param all.results Post-processing calculations. If TRUE, coxphGPU returns
 #'   linears.predictors, wald.test, concordance for all bootstraps. Default to
 #'   FALSE if bootstrap.
-#' @param na.action a missing-data filter function. This is applied to the
-#'   model.frame after any subset argument has been used. Default is
-#'   options()\$na.action.
-#' @param control Object of class coxph.control specifying iteration limit and
-#'   other control options. Default is coxph.control(...).
+#' @param control Object of class coxph.control specifying iteration limit
+#' (iter.max argument) and other control options. Default is coxph.control(...).
 #' @param singular.ok logical value indicating how to handle collinearity in the
 #'   model matrix. If TRUE, the program will automatically skip over columns of
 #'   the X matrix that are linear combinations of earlier columns. In this case
@@ -65,9 +69,8 @@
 #'
 #' ## Cox Proportional Hazards without bootstrap
 #' coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-#'   data = drugdata,
-#'   bootstrap = 1
-#' )
+#'          data = drugdata,
+#'          bootstrap = 1)
 #'
 #' ## Cox Proportional Hazards with bootstrap
 #'
@@ -80,14 +83,14 @@
 #' }
 #'
 #' coxph_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-#'   data = drugdata,
-#'   bootstrap = n_bootstrap,
-#'   batchsize = batchsize
-#' )
+#'                             data = drugdata,
+#'                             bootstrap = n_bootstrap,
+#'                             batchsize = batchsize)
+#'
 #' summary(coxph_bootstrap)
 #' }
 coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
-                     batchsize = 0, all.results = FALSE, na.action, control,
+                     batchsize = 0, init, all.results = FALSE, control,
                      singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
                      ...) {
   UseMethod("coxphGPU")
@@ -98,13 +101,14 @@ coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
 #' @method coxphGPU default
 #' @exportS3Method coxphGPU default
 coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
-                             bootstrap = 1, batchsize = 0, all.results = FALSE,
-                             na.action, control, singular.ok = TRUE,
+                             bootstrap = 1, batchsize = 0, init,
+                             all.results = FALSE, control, singular.ok = TRUE,
                              model = FALSE, x = FALSE, y = TRUE, ..., weights,
-                             subset, init, robust, tt, method = ties, id,
-                             cluster, istate, statedata, nocenter = c(-1, 0, 1)) {
+                             subset, na.action, robust, tt, method = ties, id,
+                             cluster, istate, statedata,
+                             nocenter = c(-1, 0, 1)) {
+
   if (!missing(weights)) stop("weights are not yet implemented in coxphGPU")
-  if (!missing(init)) stop("init is not yet implemented in coxphGPU")
   if (!missing(tt)) stop("tt process is not yet implemented in coxphGPU")
 
   ##############################################################################
@@ -212,7 +216,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   tform <- Call[c(1, indx)]
   tform[[1L]] <- quote(stats::model.frame)
 
-
   # if the formula is a list, do the first level of processing on it.
 
   # If formula is a list
@@ -315,8 +318,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     multi <- TRUE
   } else if (type != "right" && type != "counting") {
     stop(paste("Cox model doesn't support \"", type,
-      "\" survival data",
-      sep = ""
+               "\" survival data",
+               sep = ""
     ))
   }
   data.n <- nrow(Y) # remember this before any time transforms
@@ -513,7 +516,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   if (missing(robust) || is.null(robust)) {
     if (has.cluster || has.rwt ||
-      (has.id && (multi || anyDuplicated(id[Y[, ncol(Y)] == 1])))) {
+        (has.id && (multi || anyDuplicated(id[Y[, ncol(Y)] == 1])))) {
       robust <- TRUE
     } else {
       robust <- FALSE
@@ -588,13 +591,13 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     #  build tmap, which has one row per term, one column per transition
     if (missing(statedata)) {
       covlist2 <- parsecovar2(covlist, NULL,
-        dformula = dformula,
-        Terms, transitions, states
+                              dformula = dformula,
+                              Terms, transitions, states
       )
     } else {
       covlist2 <- parsecovar2(covlist, statedata,
-        dformula = dformula,
-        Terms, transitions, states
+                              dformula = dformula,
+                              Terms, transitions, states
       )
     }
     tmap <- covlist2$tmap
@@ -623,9 +626,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
         for (jcol in j) {
           k <- which(trow & tmap[, jcol] > 0) # the terms involved in that
           bad.tran[rindex] <- (bad.tran[rindex] |
-            apply(termiss[rindex, k, drop = FALSE], 1, any))
+                                 apply(termiss[rindex, k, drop = FALSE], 1, any))
           good.tran[rindex] <- (good.tran[rindex] |
-            apply(!termiss[rindex, k, drop = FALSE], 1, all))
+                                  apply(!termiss[rindex, k, drop = FALSE], 1, all))
         }
       }
       n.partially.used <- sum(good.tran & bad.tran & !is.na(Y))
@@ -747,8 +750,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     }
     cmap <- parsecovar3(tmap, colnames(X), attr(X, "assign"), covlist2$phbaseline)
     xstack <- stacker(cmap, stratum_map, as.integer(istate), X, Y,
-      strata = istrat,
-      states = states
+                      strata = istrat,
+                      states = states
     )
 
     rkeep <- unique(xstack$rindex)
@@ -769,7 +772,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     tab <- table(r2)
     count <- tab[r2]
     names(a2) <- ifelse(count == 1, row.names(t2)[r2],
-      paste(row.names(t2)[r2], colnames(cmap)[c2], sep = "_")
+                        paste(row.names(t2)[r2], colnames(cmap)[c2], sep = "_")
     )
     assign <- a2
   }
@@ -802,7 +805,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   rname <- row.names(mf)
 
   if (type == "right") stop("right Surv not yet implemented in coxphGPU.
-                           Please use `Surv(time1,time2,event)` in formaula")
+                           Please use `Surv(time1,time2,event)` in formula")
 
   # from agreg.fit.R (survival) / for counting type Surv object
   nvar <- ncol(X)
@@ -868,8 +871,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     nullmodel <- FALSE
     maxiter <- control$iter.max
 
-    if (is.null(init)) init <- rep(0., nvar)
-    if (length(init) != nvar) stop("Wrong length for inital values")
+    # In commentary below because Null value for coxph_R
+    #if (is.null(init)) init <- rep(0., nvar)
+    #if (length(init) != nvar) stop("Wrong length for inital values")
   }
 
   # 2021 change: pass in per covariate centering.  This gives
@@ -929,16 +933,25 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   # Covariables
   covar <- assign
 
+  # remove NA for coxph_R
+  keep_col <- c(stop, event, colnames(X))
+  data <- as.data.frame(data)[,keep_col]
+
+  # data <- quote(options()$na.action)
+  data <- na.omit(data)
+
   # Python coxph
   survivalgpu <- use_survivalGPU()
   coxph_R <- survivalgpu$coxph_R
   coxfit <- coxph_R(data,
-    stop,
-    event,
-    covar,
-    ties = ties,
-    bootstrap = bootstrap,
-    batchsize = batchsize
+                    stop,
+                    event,
+                    covar,
+                    ties = ties,
+                    bootstrap = bootstrap,
+                    batchsize = batchsize,
+                    maxiter = maxiter,
+                    init = init
   )
   # maxiter = maxiter (add maxiter argument in coxph_R)
   # doscale
@@ -962,7 +975,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   coef <- coxfit$coef
   colnames(coef) <- dimnames(X)[[2]]
-  var <- lapply(c(1:bootstrap), function(x) coxfit$imat[x, , ])
+  var <- lapply(c(1:bootstrap), function(x) matrix(coxfit$imat[x, , ],
+                                                   ncol = ncol(coef)))
 
   # fit, object to return
   if (bootstrap > 1 & !isTRUE(all.results)) {
@@ -1051,8 +1065,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
       if (length(istrat)) fit2$strata <- istrat
       if (length(cluster)) {
         temp <- residuals(fit2,
-          type = "dfbeta", collapse = cluster,
-          weighted = TRUE
+                          type = "dfbeta", collapse = cluster,
+                          weighted = TRUE
         )
         # get score for null model
         if (is.null(init)) {
@@ -1061,8 +1075,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
           fit2$linear.predictors <- c(X %*% init)
         }
         temp0 <- residuals(fit2,
-          type = "score", collapse = cluster,
-          weighted = TRUE
+                           type = "score", collapse = cluster,
+                           weighted = TRUE
         )
       } else {
         temp <- residuals(fit2, type = "dfbeta", weighted = TRUE)
@@ -1083,7 +1097,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
         temp <- fit$coefficients[nabeta]
       } else {
         temp <- (fit$coefficients -
-          init[1:ncol(fit$coefficients)])[nabeta]
+                   init[1:ncol(fit$coefficients)])[nabeta]
       }
 
       n_wald.test <- nrow(fit$coefficients)
@@ -1104,15 +1118,15 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     #  is all we need, but more for backward compatability with survConcordance.fit
     if (length(cluster)) {
       temp <- apply(fit$linear.predictors, 2, concordancefit,
-        y = Y,
-        strata = istrat, weights = weights, cluster = cluster,
-        reverse = TRUE, timefix = FALSE
+                    y = Y,
+                    strata = istrat, weights = weights, cluster = cluster,
+                    reverse = TRUE, timefix = FALSE
       )
     } else {
       temp <- apply(fit$linear.predictors, 2, concordancefit,
-        y = Y,
-        strata = istrat, weights = weights,
-        reverse = TRUE, timefix = FALSE
+                    y = Y,
+                    strata = istrat, weights = weights,
+                    reverse = TRUE, timefix = FALSE
       )
     }
 
@@ -1266,16 +1280,16 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
         # restore character row names
         rownames(tmp2) <- rownames(cmap)[cmap[, i] > 0]
         printCoefmat(tmp2,
-          digits = digits, P.values = TRUE,
-          has.Pvalue = TRUE,
-          signif.stars = signif.stars, ...
+                     digits = digits, P.values = TRUE,
+                     has.Pvalue = TRUE,
+                     signif.stars = signif.stars, ...
         )
         cat("\n")
       }
     }
 
     cat(" States: ", paste(paste(seq(along.with = x$states), x$states, sep = "= "),
-      collapse = ", "
+                           collapse = ", "
     ), "\n")
     # cat(" States: ", paste(x$states, collapse=", "), '\n')
     if (FALSE) { # alternate forms, still deciding which I like
@@ -1285,8 +1299,8 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
     }
   } else {
     printCoefmat(tmp,
-      digits = digits, P.values = TRUE, has.Pvalue = TRUE,
-      signif.stars = signif.stars, ...
+                 digits = digits, P.values = TRUE, has.Pvalue = TRUE,
+                 signif.stars = signif.stars, ...
     )
   }
 
@@ -1298,10 +1312,10 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
   }
   cat("\n")
   cat("Likelihood ratio test=", format(round(logtest, 2)), "  on ",
-    df, " df,", " p=",
-    format.pval(pchisq(logtest, df, lower.tail = FALSE), digits = digits),
-    "\n",
-    sep = ""
+      df, " df,", " p=",
+      format.pval(pchisq(logtest, df, lower.tail = FALSE), digits = digits),
+      "\n",
+      sep = ""
   )
   omit <- x$na.action
   cat("n=", x$n)
@@ -1449,7 +1463,7 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
     test = as.vector(round(cox$wald.test[1], 2)),
     df = df,
     pvalue = pchisq(as.vector(cox$wald.test[1]), df,
-      lower.tail = FALSE
+                    lower.tail = FALSE
     )
   )
 
@@ -1526,8 +1540,8 @@ print.summary.coxphGPU <- function(x, ...,
   if (!is.null(x$coefficients)) {
     cat("\n")
     printCoefmat(x$coefficients,
-      digits = digits,
-      signif.stars = signif.stars, ...
+                 digits = digits,
+                 signif.stars = signif.stars, ...
     )
   }
   if (!is.null(x$conf.int)) {
@@ -1551,30 +1565,30 @@ print.summary.coxphGPU <- function(x, ...,
 
   pdig <- max(1, getOption("digits") - 4) # default it too high IMO
   cat("Likelihood ratio test= ", format(round(x$logtest["test"], 2)), "  on ",
-    x$logtest["df"], " df,", "   p=",
-    format.pval(x$logtest["pvalue"], digits = pdig),
-    "\n",
-    sep = ""
+      x$logtest["df"], " df,", "   p=",
+      format.pval(x$logtest["pvalue"], digits = pdig),
+      "\n",
+      sep = ""
   )
 
   cat("Wald test            = ", format(round(x$waldtest["test"], 2)), "  on ",
-    x$waldtest["df"], " df,", "   p=",
-    format.pval(x$waldtest["pvalue"], digits = pdig),
-    "\n",
-    sep = ""
+      x$waldtest["df"], " df,", "   p=",
+      format.pval(x$waldtest["pvalue"], digits = pdig),
+      "\n",
+      sep = ""
   )
   cat("Score (logrank) test = ", format(round(x$sctest["test"], 2)), "  on ",
-    x$sctest["df"], " df,", "   p=",
-    format.pval(x$sctest["pvalue"], digits = pdig),
-    sep = ""
+      x$sctest["df"], " df,", "   p=",
+      format.pval(x$sctest["pvalue"], digits = pdig),
+      sep = ""
   )
   if (is.null(x$robscore)) {
     cat("\n\n")
   } else {
     cat(",   Robust = ", format(round(x$robscore["test"], 2)),
-      "  p=",
-      format.pval(x$robscore["pvalue"], digits = pdig), "\n\n",
-      sep = ""
+        "  p=",
+        format.pval(x$robscore["pvalue"], digits = pdig), "\n\n",
+        sep = ""
     )
   }
 

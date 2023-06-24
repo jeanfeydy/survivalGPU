@@ -11,20 +11,19 @@ Description: Allows to perform survivals analysis on GPU with coxph and WCE mode
 License: LGPL (>= 2.1)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.1
+RoxygenNote: 7.2.3
 Imports: 
     reticulate,
     stats,
     survival,
-    tinytest,
-    utils,
-    WCE
+    utils
 Suggests: 
     knitr,
     rmarkdown,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    WCE
 Config/testthat/edition: 3
 VignetteBuilder: knitr
-SystemRequirements: python, TensorFlow, pytorch, pytorch-scatter, pykeops
+SystemRequirements: python, pytorch, pytorch-scatter, pykeops
 URL: https://github.com/jeanfeydy/survivalGPU
 BugReports: https://github.com/jeanfeydy/survivalGPU/issues

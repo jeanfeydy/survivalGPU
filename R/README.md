@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# survivalGPU
+# survivalGPU <img src="man/figures/logo.png" align="right" height="139" />
 
 <!-- badges: start -->
 <!-- badges: end -->
@@ -10,8 +10,8 @@ The survivalGPU library allows you to perform survival analyzes using
 the resources of Graphic Processing Units (GPU) in order to accelerate
 the speed of calculations. Currently, two models have been implemented :
 
-- Cox[^1] [^2]  
-- WCE[^3] (Weighted Cumulative Exposure)
+- `coxphGPU()` for Cox[^1] [^2] model  
+- `wceGPU()` for Weighted Cumulative Exposure[^3] model
 
 It’s also possible to use the library without having Graphics Processing
 Units (with CPU).
@@ -20,21 +20,41 @@ Units (with CPU).
 
 ### Requirements
 
+Python packages :
+
 - pytorch
 - pytorch-scatter
 - pykeops (for WCE model)
 
-You can install the development version of survivalGPU from
-[GitHub](https://github.com/) with:
+Actually, survivalGPU is not available for Windows.
+
+survivalGPU require submodules : you can install the development version
+of survivalGPU from [GitHub](https://github.com/) with
+`install_git_with_submodule()`:
 
 ``` r
 # install.packages("devtools")
-devtools::install_github("jeanfeydy/survivalGPU",
-                         subdir = "R")
+
+install_git_with_submodule <- function(x, subdir) {
+  install_dir <- tempfile()
+  system(paste("git clone --recursive", shQuote(x), shQuote(install_dir)))
+  
+  # change name for windows install
+  file.rename(file.path(install_dir,"R/inst/python/survivalgpu"),
+              file.path(install_dir,"R/inst/python/survivalgpu_submodule"))
+  file.copy(file.path(install_dir,"python/survivalgpu"),
+            file.path(install_dir,"R/inst/python"), recursive=TRUE)
+  
+  devtools::install(file.path(file.path(install_dir,subdir)))
+}
+
+install_git_with_submodule("https://github.com/jeanfeydy/survivalGPU",
+                           subdir="R")
 ```
 
-You can build the package on tar.gz file with `devtools::build()` after
-git clone this repository.
+> **Warning**: survivalGPU is a package dependant of python, and it’s
+> necessary to have installed the `reticulate` R package. To manage your
+> python or miniconda configuration, check vignette(“python_connect”).
 
 ## Examples
 
@@ -53,10 +73,13 @@ number of bootstrap, and consequently the batchsize argument, according
 to CUDA drivers detection.
 
 ``` r
-if(use_cuda()){
-  n_bootstrap <- 1000; batchsize <- 200
-}else{
-  n_bootstrap <- 50  ; batchsize <- 10}
+if (use_cuda()) {
+  n_bootstrap <- 1000
+  batchsize <- 200
+} else {
+  n_bootstrap <- 50
+  batchsize <- 10
+}
 ```
 
 ### Cox
@@ -67,10 +90,11 @@ package, with a Surv object in the formula, containing Start, Stop and
 Event variables.
 
 ``` r
-coxphGPU_bootstrap<-coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-                             data = drugdata,
-                             bootstrap = n_bootstrap,
-                             batchsize = batchsize)
+coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+  data = drugdata,
+  bootstrap = n_bootstrap,
+  batchsize = batchsize
+)
 ```
 
 You obtain with `summary` all results for initial model, and a
@@ -105,8 +129,8 @@ summary(coxphGPU_bootstrap)
 #>  ---------------- 
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>      2.5% 97.5%
-#> sex 1.487 2.447
-#> age 1.002 1.018
+#> sex 1.506 2.269
+#> age 1.004 1.020
 ```
 
 ### WCE
@@ -119,11 +143,13 @@ can use the `wceGPU` function in the same way as the `WCE::WCE` function
 from WCE package.
 
 ``` r
-wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots =  1, cutoff =  90, id="Id",
-                            event = "Event", start = "Start", stop = "Stop",
-                            expos = "dose", covariates = c("age","sex"),
-                            constrained = FALSE, aic = FALSE, confint = 0.95,
-                            nbootstraps = n_bootstrap, batchsize = batchsize)
+wce_gpu_bootstrap <- wceGPU(
+  data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+  event = "Event", start = "Start", stop = "Stop",
+  expos = "dose", covariates = c("age", "sex"),
+  constrained = FALSE, aic = FALSE, confint = 0.95,
+  nbootstraps = n_bootstrap, batchsize = batchsize
+)
 ```
 
 In the summary, there are estimated coefficients for the covariates with
@@ -148,9 +174,9 @@ summary(wce_gpu_bootstrap)
 #> With bootstrap (50 bootstraps), conf.level = 0.95 :
 #> 
 #> CI of estimates :
-#>          2.5%     97.5%
-#> age 0.0012846 0.0176067
-#> sex 0.4742390 0.8820490
+#>           2.5%     97.5%
+#> age 0.00340716 0.0193621
+#> sex 0.44109100 0.9042010
 ```
 
 The risk function can be plot, and if you added bootstrap, confidence
