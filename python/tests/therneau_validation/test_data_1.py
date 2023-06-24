@@ -1,17 +1,12 @@
-import pytest
 import numpy as np
-from numpy.testing import assert_allclose
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from survivalgpu import coxph_R, CoxPHSurvivalAnalysis
-from survivalgpu.utils import numpy
-from survivalgpu.optimizers import newton
+from survivalgpu import SUPPORTED_TIES, CoxPHSurvivalAnalysis
 
 np.set_printoptions(precision=4)
 
-SUPPORTED_TIES = ["breslow"]  # , "efron"]
 
 data_csv = np.array(
     [

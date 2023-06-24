@@ -24,6 +24,10 @@ __all__ = sorted(
     ]
 )
 
+# Ties in the CoxPH model:
+SUPPORTED_TIES = ["breslow"]  # , "efron"]
+# Backends for the CoxPH likelihood:
+SUPPORTED_BACKENDS = ["torch", "pyg", "coo", "csr"]
 
 # Warm up the GPU:
 if use_cuda:

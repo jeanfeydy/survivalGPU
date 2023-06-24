@@ -29,7 +29,7 @@ def my_dataset(
         max_duration=max_duration,
         ensure_one_life=True,
         ensure_one_death=True,
-        unit_length_intervals=True,
+        unit_length_intervals=False,
     )
 
 
@@ -78,11 +78,12 @@ def benchmark_coxph_simple(
     print(model.coef_)
 
 
-n_covar = 2
+n_covar = 5
+max_power = 7 if torch.cuda.is_available() else 5
 
 for backend in ["torch", "pyg", "coo", "csr"]:
     print("backend:", backend)
-    for n_patients in [int(10**k) for k in range(3, 8)]:  # [1000, 10000, 100000]:
+    for n_patients in [int(10**k) for k in range(3, max_power + 1)]:
         benchmark_coxph_simple(
             n_covariates=n_covar,
             n_patients=n_patients,
