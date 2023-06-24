@@ -91,7 +91,7 @@ for backend in ["torch", "pyg", "coo", "csr"]:
             maxiter=3,
         )
 
-    if False:
+    if True:
         from torch.profiler import profile, ProfilerActivity
 
         activities = [ProfilerActivity.CPU]
@@ -126,3 +126,5 @@ for backend in ["torch", "pyg", "coo", "csr"]:
             f"output/stacks_{backend}_{n_patients}_{n_covar}.txt",
             "self_cuda_time_total",
         )
+
+    print("")
