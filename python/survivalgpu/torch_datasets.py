@@ -331,7 +331,7 @@ class TorchSurvivalDataset:
         self,
         *,
         n_bootstraps: int,
-        batch_size: int,
+        batch_size: Optional[int],
         stratify: bool = True,
     ) -> List[Resampling]:
         """Returns a list of Resampling objects that correspond to bootstrap samples.
@@ -453,6 +453,8 @@ class TorchSurvivalDataset:
         # ids that belong to the strata.
 
         bootstrap_list = []
+        if batch_size is None:
+            batch_size = n_bootstraps
         for s in range(0, n_bootstraps, batch_size):
             B = min(batch_size, n_bootstraps - s)
             rnd = torch.rand(

@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
-from .coxph import coxph_torch, CoxPHSurvivalAnalysis
+from .coxph import CoxPHSurvivalAnalysis
 
 from .utils import numpy, timer
 from .utils import use_cuda, device, float32, int32, int64

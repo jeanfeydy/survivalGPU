@@ -3,6 +3,12 @@ options(na.action=na.exclude) # preserve missings
 options(contrasts=c('contr.treatment', 'contr.poly')) #ensure constrast type
 library(survival)
 
+
+# TODO: remove this when the re-implementation of coxph is over
+# We currently do not support Efron ties, only Breslow
+ties <- "breslow"  # "efron"
+
+
 # Create a "counting process" version of the simplest test data set
 #
 test1 <- data.frame(time=  c(9, 3,1,1,6,6,8),
@@ -21,18 +27,18 @@ aeq <- function(x,y) all.equal(as.vector(x), as.vector(y))
 #
 
 # Right process
-fit0 <- coxph(Surv(time, status)~ x, test1, iter=0)
-fit  <- coxph(Surv(time, status) ~x, test1)
+fit0 <- coxph(Surv(time, status)~ x, test1, iter=0, ties=ties)
+fit  <- coxph(Surv(time, status) ~x, test1, ties=ties)
 
 # Counting process
-fit0b <- coxph(Surv(start, stop, status) ~ x, test1b, iter=0)
-fitb  <- coxph(Surv(start, stop, status) ~x, test1b)
-fit0b_gpu <- coxphGPU(Surv(start, stop, status) ~ x, test1b, iter.max=1)
-fitb_gpu <- coxphGPU(Surv(start, stop, status) ~ x, test1b)
+fit0b <- coxph(Surv(start, stop, status) ~ x, test1b, iter=0, ties=ties)
+fitb  <- coxph(Surv(start, stop, status) ~x, test1b, ties=ties)
+fit0b_gpu <- coxphGPU(Surv(start, stop, status) ~ x, test1b, iter.max=0, ties=ties)
+fitb_gpu <- coxphGPU(Surv(start, stop, status) ~ x, test1b, ties=ties)
 
 # offset feature
-fitc  <- coxph(Surv(time, status) ~ offset(fit$coef*x), test1)
-fitd  <- coxph(Surv(start, stop, status) ~ offset(fit$coef*x), test1b)
+fitc  <- coxph(Surv(time, status) ~ offset(fit$coef*x), test1, ties=ties)
+fitd  <- coxph(Surv(start, stop, status) ~ offset(fit$coef*x), test1b, ties=ties)
 #fitd_gpu  <- coxphGPU(Surv(start, stop, status) ~ offset(fit$coef*x), test1b) # offset feature not yet implemented in coxphGPU
 
 test_that("Check coefs between counting process - No iter", {

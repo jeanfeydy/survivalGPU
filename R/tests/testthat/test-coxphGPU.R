@@ -2,29 +2,33 @@
 drugdata <- WCE::drugdata
 # library(survival)
 
+# TODO: remove this when the re-implementation of coxph is over
+# We currently do not support Efron ties, only Breslow
+efron <- "breslow"  # "efron"
+
 # Original Coxph model
 coxph <- coxph(
   Surv(Start, Stop, Event) ~ sex + age,
   drugdata,
-  ties = "efron"
+  ties = efron
 )
 
 # CoxphGPU
 coxphGPU <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   drugdata,
-  ties = "efron",
+  ties = efron,
   bootstrap = 1
 )
 
 coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   drugdata,
-  ties = "efron",
+  ties = efron,
   bootstrap = 15
 )
 
 coxphGPU_bootstrap_all_result <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   drugdata,
-  ties = "efron",
+  ties = efron,
   bootstrap = 15,
   all.results = TRUE
 )
@@ -91,7 +95,7 @@ test_that("Coxph Coefs - Breslow", {
 
 coxphGPU_no_iter <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
                              drugdata,
-                             ties = "efron",
+                             ties = efron,
                              bootstrap = 1,
                              iter.max = 1
 )
@@ -123,12 +127,12 @@ test_that("CoxPH counting", {
   expect_snapshot({
     coxphGPU(Surv(Start,Stop, Event) ~ sex + age,
              data = drugdata,
-             ties = "efron")
+             ties = efron)
   })
   expect_snapshot({
     coxphGPU(Surv(Start,Stop, Event) ~ sex,
              data = drugdata,
-             ties = "efron")
+             ties = efron)
   })
 })
 

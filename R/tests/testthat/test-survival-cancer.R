@@ -4,6 +4,12 @@ options(na.action=na.exclude) # preserve missings
 options(contrasts=c('contr.treatment', 'contr.poly')) #ensure constrast type
 aeq <- function(x, y, ...) all.equal(as.vector(x), as.vector(y), ...)
 
+
+# TODO: remove this when the re-implementation of coxph is over
+# We currently do not support Efron ties, only Breslow
+ties <- "breslow"  # "efron"
+
+
 #
 # Test out all of the routines on a more complex data set
 #
@@ -23,13 +29,13 @@ dtime <- lung$time[lung$status==2]
 lung2 <- survSplit(Surv(time, status) ~ ., lung, cut=dtime)
 
 cfit1 <-coxph(Surv(time, status) ~ ph.ecog + ph.karno + pat.karno + wt.loss,
-              lung)
+              lung, ties=ties)
 
 cfit2 <-coxph(Surv(tstart, time, status) ~ ph.ecog + ph.karno + pat.karno +
-                wt.loss, lung2)
+                wt.loss, lung2, ties=ties)
 
 cfit2_gpu <-coxphGPU(Surv(tstart, time, status) ~ ph.ecog + ph.karno +
-                       pat.karno + wt.loss, lung2)
+                       pat.karno + wt.loss, lung2, ties=ties)
 
 test_that("Loglik right - counting", {
   expect_equal(
