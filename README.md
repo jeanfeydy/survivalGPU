@@ -1,4 +1,9 @@
 # survivalGPU
+
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml)
+<!-- badges: end -->
+  
 Fast implementation of survival analysis models (CoxPH, WCE...) with GPU support, for R and Python.
 Please note that this package is still little more than a proof of concept: we are working to publish a first stable version by the summer of 2023. We have opened the code to get a first feed back from the community, but stress that our solver has not yet been tested thoroughly. The user interface of the Python and R packages are also likely to change over the next few months.
 
