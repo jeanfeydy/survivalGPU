@@ -46,12 +46,14 @@ jobs:
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
           
-      - name: Install dependencies
+      - name: Install R dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::rcmdcheck
           needs: check
           working-directory: "R/"
+          
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install ruff pytest pytest-cov hypothesis
