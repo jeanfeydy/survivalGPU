@@ -119,18 +119,20 @@ test_that("No Newton iterations - Null Coefs", {
 
 
 # snapshot
-test_that("CoxPH counting", {
-  expect_snapshot({
-    coxphGPU(Surv(Start,Stop, Event) ~ sex + age,
-             data = drugdata,
-             ties = "efron")
-  })
-  expect_snapshot({
-    coxphGPU(Surv(Start,Stop, Event) ~ sex,
-             data = drugdata,
-             ties = "efron")
-  })
-})
+
+# Actually, no Efron method
+# test_that("CoxPH counting - Efron", {
+#   expect_snapshot({
+#     coxphGPU(Surv(Start,Stop, Event) ~ sex + age,
+#              data = drugdata,
+#              ties = "efron")
+#   })
+#   expect_snapshot({
+#     coxphGPU(Surv(Start,Stop, Event) ~ sex,
+#              data = drugdata,
+#              ties = "efron")
+#   })
+# })
 
 test_that("CoxPH counting - Breslow", {
   expect_snapshot({
