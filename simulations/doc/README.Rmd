@@ -1,0 +1,15 @@
+---
+bibliography: references.bib
+csl: mycsl.csl
+output: md_document
+---
+
+# doc/
+
+> pdf files in local machine
+
+### Publications
+
+-   @sylvestre2008
+
+-   @sylvestre2009
