@@ -150,3 +150,5 @@ survivalGPU_*.tar.gz
 *output*.png
 *Rplots.pdf
 *anti_inflammatoires.R
+
+simulations/doc/*.pdf
