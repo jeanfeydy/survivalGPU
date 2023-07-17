@@ -540,12 +540,13 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #'   scenario of interest (numerator of the HR).
 #' @param vecdenom A vector of time-dependent exposures corresponding to a
 #'   scenario for the reference category (denominator of the HR).
-#' @param level the confidence level required for HR if bootstrap. Default to
-#'   0.95.
+#' @param level the confidence level required for HR CI. Default to 0.95.
+#' @param without_bootstrap Gaussian approximation for confidence interval.
 #'
 #' @export
-#' @return Returns a HR according to the scenarios. If bootstrap is present in
-#'   wceGPU object, this function returns confidence interval for the HR.
+#' @return Returns a HR according to the scenarios. If bootstrap is present
+#' (or without_bootstrap = TRUE) in wceGPU object, this function returns
+#' confidence interval for the HR.
 #' @examples
 #' \dontrun{
 #' # Dataset
@@ -565,29 +566,69 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #' unexposed <- rep(0, cutoff)
 #'
 #' HR(wce_gpu_bootstrap, exposed, unexposed)
+#'
+#' # Confidence interval with Gaussian approximation when no bootstrap
+#'  wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff, id = "Id",
+#'                    event = "Event", start = "Start", stop = "Stop",
+#'                    expos = "dose", covariates = c("age", "sex"),
+#'                    constrained = FALSE, aic = FALSE, confint = 0.95,
+#'                    batchsize = 0)
+#'
+#' HR(wce_gpu_bootstrap, exposed, unexposed, without_bootstrap = TRUE)
 #' }
-HR <- function(object, vecnum, vecdenom, level = 0.95) {
+HR <- function(object, vecnum, vecdenom, level = 0.95,
+               without_bootstrap = FALSE) {
   if (!inherits(object, "wceGPU")) stop("It's not a wceGPU object.")
   cutoff <- ncol(object$WCEmat)
   if (length(vecnum) != cutoff | length(vecdenom) != cutoff) stop("At least one of the vector provided as the numerator or denominator is not of proper length.")
 
   hr <- apply(object$WCEmat, 1, function(x) exp(x %*% vecnum) / exp(x %*% vecdenom), simplify = TRUE)
 
-  if (object$nbootstraps > 1) {
+  if(without_bootstrap == FALSE){
+
+    # CI with bootstrap
+    if (object$nbootstraps > 1) {
+      a <- (1 - level) / 2
+      a <- c(a, 1 - a)
+      ci <- quantile(hr, p = a)
+      pct <- paste0(format(100 * a, trim = TRUE, scientific = FALSE), "%")
+
+      results <- matrix(c(hr[1], ci), nrow = 1L)
+      colnames(results) <- c(
+        "HR",
+        paste("CI", pct[1]),
+        paste("CI", pct[2])
+      )
+    } else {
+      results <- matrix(hr, nrow = 1L)
+      colnames(results) <- "HR"
+    }
+  }else{
+
+    # CI without bootstrap
+    message("CI without bootstrap")
+
+    bbasis <- splines::splineDesign(knots = c(object$knotsmat), x = 1:cutoff, ord=4)
+
+    if(object$nbootstraps > 1){
+      D_names <- colnames(object$coef[, !colnames(object$coef) %in% object$covariates])
+    }else{
+      D_names <- names(object$coef[, !colnames(object$coef) %in% object$covariates])
+    }
+
+    std <- sqrt(apply(bbasis[, 1:(length(D_names))], 2, sum) %*% object$vcovmat$bootstrap1[D_names,D_names] %*% apply(bbasis[, 1:(length(D_names))], 2, sum))
+
     a <- (1 - level) / 2
     a <- c(a, 1 - a)
-    ci <- quantile(hr, p = a)
     pct <- paste0(format(100 * a, trim = TRUE, scientific = FALSE), "%")
+    ci <- c(hr[1]) + qnorm(a) * c(std)
 
     results <- matrix(c(hr[1], ci), nrow = 1L)
     colnames(results) <- c(
       "HR",
       paste("CI", pct[1]),
-      paste("CI", pct[2])
-    )
-  } else {
-    results <- matrix(hr, nrow = 1L)
-    colnames(results) <- "HR"
+      paste("CI", pct[2]))
+
   }
   return(results)
 }

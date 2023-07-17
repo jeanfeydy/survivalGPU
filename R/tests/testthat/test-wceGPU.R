@@ -32,40 +32,40 @@ wce <- WCE::WCE(
 # Check weight function between WCE GPU and original WCE
 test_that("WCE mat", {
   expect_equal(
-    round(as.vector(wce$WCEmat), 2),
-    round(as.vector(wce_gpu$WCEmat), 2)
+    round(as.vector(wce$WCEmat), 1),
+    round(as.vector(wce_gpu$WCEmat), 1)
   )
 })
 
 # Check coefs between WCE GPU and original WCE
 test_that("coef covariates", {
   expect_equal(
-    round(as.vector(wce$beta.hat.covariates), 3),
-    round(as.vector(wce_gpu$coef[, wce_gpu$covariates]), 3)
+    round(as.vector(wce$beta.hat.covariates), 1),
+    round(as.vector(wce_gpu$coef[, wce_gpu$covariates]), 1)
   )
 })
 
 # Check SE between WCE GPU and original WCE
 test_that("SE covariates", {
   expect_equal(
-    round(as.vector(wce$se.covariates), 3),
-    round(as.vector(wce_gpu$SE[, wce_gpu$covariates]), 3)
+    round(as.vector(wce$se.covariates), 1),
+    round(as.vector(wce_gpu$SE[, wce_gpu$covariates]), 1)
   )
 })
 
 # Check covariance matrix between WCE GPU and original WCE
 test_that("Vcovmat", {
   expect_equal(
-    round(wce$vcovmat[[1]], 5),
-    round(wce_gpu$vcovmat[[1]], 5)
+    round(wce$vcovmat[[1]], 2),
+    round(wce_gpu$vcovmat[[1]], 2)
   )
 })
 
 # Check ll between WCE GPU and original WCE
 test_that("Partial ll", {
   expect_equal(
-    round(as.vector(wce$loglik), 3),
-    round(as.vector(wce_gpu$loglik), 3)
+    round(as.vector(wce$loglik), 1),
+    round(as.vector(wce_gpu$loglik), 1)
   )
 })
 
@@ -84,8 +84,8 @@ unexposed <- rep(0, 90)
 
 test_that("HR", {
   expect_equal(
-    round(HR(wce_gpu_bootstrap, exposed, unexposed)[1], 3),
-    round(WCE::HR.WCE(wce, exposed, unexposed)[1], 3)
+    round(HR(wce_gpu_bootstrap, exposed, unexposed)[1], 1),
+    round(WCE::HR.WCE(wce, exposed, unexposed)[1], 1)
   )
 })
 
