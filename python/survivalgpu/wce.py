@@ -13,18 +13,25 @@ from .utils import numpy, timer
 from .utils import use_cuda, device, float32, int32, int64
 from .wce_features import wce_features_batch, bspline_atoms
 
+from .typecheck import typecheck, Optional, Literal
+from .typecheck import Int, Real, Bool
+from .typecheck import Int64Array, Float64Array
+from .typecheck import Float32Tensor
+from .typecheck import TorchDevice
+
 
 # Our main, object-oriented API ==========================================================
 
 
 class WCESurvivalAnalysis:
+    @typecheck
     def __init__(
         self,
         *,
-        cutoff,
-        n_knots=1,
-        order=3,
-        constrained="Right",
+        cutoff: Int,
+        n_knots: Int=1,
+        order: Int=3,
+        constrained: Optional[Literal["right", "left"]] = None,
         survival_model=CoxPHSurvivalAnalysis(),
     ):
         """Weighted Cumulative Exposure Model that combines B-spline time-varying features with a CoxPH analysis.
@@ -35,7 +42,7 @@ class WCESurvivalAnalysis:
         The total number of degrees of freedom for the risk function (i.e. WCE covariates)
         is equal to:
             n_knots + order + 1 if constrained is None,
-            n_knots + 2         if constrained is "Left" or "Right".
+            n_knots + 2         if constrained is "left" or "right".
 
         Args:
             cutoff (int): size of the time window for the risk function.
@@ -70,6 +77,16 @@ class WCESurvivalAnalysis:
         self.constrained = constrained
         self.survival_model = survival_model
 
+    def set_non_negative_int(self, value, name):
+        if int(value) != value:
+            raise TypeError(
+                f"{name} should be an integer. " f"Received {value} of type {type(value)}."
+            )
+        elif int(value) < 0:
+            raise ValueError(f"{name} should be >= 0. " f"Received {value}.")
+        else:
+            setattr(self, "_" + name, int(value))
+
     # The order should be an integer >= 0 --------------------------------
     @property
     def order(self):
@@ -77,17 +94,7 @@ class WCESurvivalAnalysis:
 
     @order.setter
     def order(self, new_o):
-        if int(new_o) != new_o:
-            raise TypeError(
-                "The order of the B-splines should be an integer. "
-                f"Received {new_o} of type {type(new_o)}."
-            )
-        elif int(new_o) < 0:
-            raise ValueError(
-                "The order of the B-splines should be >= 0. " f"Received {new_o}."
-            )
-        else:
-            self._order = int(new_o)
+        self.set_non_negative_int(new_o, "order")
 
     # The number of extra knots should be an integer >= 0 --------------------------------
     @property
@@ -96,17 +103,7 @@ class WCESurvivalAnalysis:
 
     @n_knots.setter
     def n_knots(self, new_n):
-        if int(new_n) != new_n:
-            raise TypeError(
-                "The number of knots should be an integer. "
-                f"Received {new_n} of type {type(new_n)}."
-            )
-        elif int(new_n) < 0:
-            raise ValueError(
-                "The number of knots should be >= 0. " f"Received {new_n}."
-            )
-        else:
-            self._n_knots = int(new_n)
+        self.set_non_negative_int(new_n, "n_knots")
 
     # The cutoff value should be an integer >= 0 -----------------------------------------
     @property
@@ -115,18 +112,7 @@ class WCESurvivalAnalysis:
 
     @cutoff.setter
     def cutoff(self, new_cutoff):
-        if int(new_cutoff) != new_cutoff:
-            raise TypeError(
-                "The cutoff (size of the time window) should be an integer. "
-                f"Received {new_cutoff} of type {type(new_cutoff)}."
-            )
-        elif int(new_cutoff) < 0:
-            raise ValueError(
-                "The cutoff (size of the time window) should be >= 0. "
-                f"Received {new_cutoff}."
-            )
-        else:
-            self._cutoff = int(new_cutoff)
+        self.set_non_negative_int(new_cutoff, "cutoff")
 
     # "Constrained" only accepts three values: None, "Left" and "Right" ------------------
     @property
@@ -135,7 +121,7 @@ class WCESurvivalAnalysis:
 
     @constrained.setter
     def constrained(self, new_c):
-        supported_values = [None, "L", "Left", "R", "Right"]
+        supported_values = [None, "left", "right"]
         if new_c not in supported_values:
             raise ValueError(
                 f"constrained should be one of {supported_values}. "
@@ -167,14 +153,17 @@ class WCESurvivalAnalysis:
         assert len(features.shape) == 2
         assert features.shape[1] == self.n_knots + self.order + 1
 
-        if self.constrained in ["R", "Right"]:
+        if self.constrained == "right":
             return features[:, : -(self.order - 1)]
 
-        elif self.constrained in ["L", "Left"]:
+        elif self.constrained == "left":
             return features[:, (self.order - 1) :]
 
-        else:
+        elif self.constrained is None:
             return features
+        else:
+            raise ValueError("constrained should be None, 'left' or 'right'. "
+                             f"Received {self.constrained}.")
 
     @property
     def atoms(self):

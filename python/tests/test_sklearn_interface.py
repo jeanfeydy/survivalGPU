@@ -9,7 +9,6 @@ from survivalgpu.datasets import simple_dataset, load_drugs
 small_int = st.integers(min_value=1, max_value=10)
 
 
-# @pytest.mark.skip()
 @given(
     n_covariates=small_int,
     n_patients=st.integers(min_value=30, max_value=40),
@@ -51,7 +50,7 @@ def test_wce_shapes():
     """Tests the shapes of the WCESurvivalAnalysis attributes."""
 
     ds = load_drugs(n_drugs=1, n_patients=1, n_times=1)
-    model = WCESurvivalAnalysis()
+    model = WCESurvivalAnalysis(cutoff=10, order=3, n_knots=1)
     model.fit(ds.covariates, ds.times, events=ds.events)
 
     assert model is not None
