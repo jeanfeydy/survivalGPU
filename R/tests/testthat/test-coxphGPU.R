@@ -148,3 +148,5 @@ test_that("CoxPH counting - Breslow", {
              ties = "breslow")
   })
 })
+
+# new branch on github ?
