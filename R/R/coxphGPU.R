@@ -804,8 +804,10 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   rname <- row.names(mf)
 
-  if (type == "right") stop("right Surv not yet implemented in coxphGPU.
-                           Please use `Surv(time1,time2,event)` in formula")
+  # if (type == "right") stop("right Surv not yet implemented in coxphGPU.
+  #                          Please use `Surv(time1,time2,event)` in formula")
+
+  if(type == "counting"){
 
   # from agreg.fit.R (survival) / for counting type Surv object
   nvar <- ncol(X)
@@ -904,6 +906,66 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   agmeans <- ifelse(zero.one, 0, colMeans(X))
 
+  }else if(type == "right"){
+
+    n <-  nrow(Y)
+    if (is.matrix(X)) nvar <- ncol(X)
+    else {
+      if (length(X)==0) nvar <-0
+      else nvar <-1
+    }
+    time <- Y[,1]
+    status <- Y[,2]
+
+    # Sort the data (or rather, get a list of sorted indices)
+    if (length(istrat)==0) {
+      sorted <- order(time)
+      strata <- NULL
+      newstrat <- as.integer(rep(0,n))
+    }
+    else {
+      sorted <- order(istrat, time)
+      strata <- istrat[sorted]
+      newstrat <- as.integer(c(1*(diff(as.numeric(strata))!=0), 1))
+    }
+    if (missing(offset) || is.null(offset)) offset <- rep(0,n)
+    if (missing(weights)|| is.null(weights))weights<- rep(1,n)
+    else {
+      if (any(weights<=0)) stop("Invalid weights, must be >0")
+      weights <- weights[sorted]
+    }
+    stime <- as.double(time[sorted])
+    sstat <- as.integer(status[sorted])
+
+    if (nvar==0) {
+      # A special case: Null model.
+      #  (This is why I need the rownames arg- can't use x' names)
+      # Set things up for 0 iterations on a dummy variable
+      x <- as.matrix(rep(1.0, n))
+      nullmodel <- TRUE
+      nvar <- 1
+      init <- 0
+      maxiter <- 0
+    }
+    else {
+      nullmodel <- FALSE
+      maxiter <- control$iter.max
+      if (!missing(init) && length(init)>0) {
+        if (length(init) != nvar) stop("Wrong length for inital values")
+      }
+      else init <- rep(0,nvar)
+    }
+
+    # 2012 change: individually choose which variable to rescale
+    # default: leave 0/1 variables alone
+    if (is.null(nocenter)) zero.one <- rep(FALSE, ncol(X))
+    else zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
+
+    storage.mode(weights) <- storage.mode(init) <- "double"
+
+  }
+
+
   ##############################################################################
   ##############################################################################
   #
@@ -914,9 +976,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   ##############################################################################
   ##############################################################################
 
-  if (!is.null(istrat)) {
-    stop("Stratification is not implemented yet in coxphGPU")
-  }
+  # if (!is.null(istrat)) {
+  #   stop("Stratification is not implemented yet in coxphGPU")
+  # }
 
   # if(robust == TRUE)
   #   stop("Robust variance is not implemented yet in coxphGPU")
@@ -948,10 +1010,12 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
                     event,
                     covar,
                     ties = ties,
+                    survtype = type,
+                    strata = strata,
                     bootstrap = bootstrap,
                     batchsize = batchsize,
-                    maxiter = maxiter,
-                    init = init
+                    maxiter = maxiter#,
+                    #init = init
   )
   # maxiter = maxiter (add maxiter argument in coxph_R)
   # doscale
@@ -973,39 +1037,66 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     }
   }
 
-  coef <- coxfit$coef
-  colnames(coef) <- dimnames(X)[[2]]
-  var <- lapply(c(1:bootstrap), function(x) matrix(coxfit$imat[x, , ],
-                                                   ncol = ncol(coef)))
+  coef <- c(coxfit$coef)
+  names(coef) <- dimnames(X)[[2]]
 
-  # fit, object to return
-  if (bootstrap > 1 & !isTRUE(all.results)) {
-    all.results <- FALSE
-    fit <- list(
-      coefficients = utils::head(coef, 1), # coef[1,],
-      var = utils::head(var, 1), # var[[1]],
-      loglik = coxfit$loglik[1],
-      loglik_init = coxfit$`loglik init`[1],
-      score = coxfit$`sctest init`[1],
-      means = coxfit$means
-    )
-  } else {
-    all.results <- TRUE
-    fit <- list(
-      coefficients = coef,
-      var = var,
-      loglik = coxfit$loglik,
-      loglik_init = coxfit$`loglik init`,
-      score = coxfit$`sctest init`,
-      means = coxfit$means
-    )
-  }
+  # now only one imat, hessian
+  # var <- lapply(c(1:bootstrap), function(x) matrix(coxfit$imat[x, , ],
+  #                                                  ncol = ncol(coef)))
+
+  # list ?
+  # var <- lapply(c(1:1), function(x) matrix(coxfit$imat[x, ,],
+  #                                                  ncol = ncol(coef)))
+
+  # matrix array format
+  var <- matrix(coxfit$imat,
+                ncol = length(coef))
+
+  # # fit, object to return
+  # if (bootstrap > 1 & !isTRUE(all.results)) {
+  #   all.results <- FALSE
+  #   fit <- list(
+  #     coefficients = utils::head(coef, 1), # coef[1,],
+  #     var = utils::head(var, 1), # var[[1]],
+  #     loglik = coxfit$loglik[1],
+  #     loglik_init = coxfit$`loglik init`[1],
+  #     score = coxfit$`sctest_init`[1],
+  #     means = coxfit$means
+  #   )
+  # } else {
+  #   all.results <- TRUE
+  #   fit <- list(
+  #     coefficients = coef,
+  #     var = var,
+  #     loglik = coxfit$loglik,
+  #     loglik_init = coxfit$`loglik init`,
+  #     score = coxfit$`sctest_init`,
+  #     means =coxfit$means
+  #   )
+  # }
+
+  fit <- list(
+    coefficients = coef,
+    var = var,
+    loglik = c(coxfit$loglik),
+    loglik_init = c(coxfit$`loglik init`),
+    score = c(coxfit$`sctest_init`),
+    means = c(coxfit$means),
+    iter = c(coxfit$iter)
+  )
 
   fit$method <- method
   fit$nbootstraps <- bootstrap
-  if (bootstrap > 1) fit$coef_bootstrap <- coef
+  if (bootstrap > 1){
+    coef_bootstrap <- matrix(coxfit$`bootstrap coef`,
+                             ncol = length(coef))
+    colnames(coef_bootstrap) <- dimnames(X)[[2]]
+    fit$coef_bootstrap <- coef_bootstrap
+  }
+
   fit$class <- "coxphGPU"
 
+  if(type == "counting"){
 
   # return to agreg.fit.R
   lp <- apply(matrix(fit$coefficients, ncol = length(covar)), 1, function(x) c(X %*% x) + offset - sum(x * agmeans))
@@ -1026,9 +1117,58 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     as.integer(method == "efron")
   )
 
+  }else if(type == "right"){
+
+    # coef <- coxfit$coef
+    lp <- apply(matrix(fit$coefficients, ncol = length(covar)), 1, function(x) c(X %*% x) + offset - sum(x * coxfit$means))
+  #  lp <- c(X %*% matrix(fit$coefficients, ncol = length(covar))) + offset - sum(coef * coxfit$means)
+   # var <- matrix(coxfit$imat, nvar, nvar)
+
+    # if (coxfit$flag < nvar) which.sing <- diag(var)==0
+    # else which.sing <- rep(FALSE,nvar)
+
+    infs <- abs(coxfit$u %*% var)
+    # if (maxiter >1) {
+    #   if (coxfit$flag == 1000) {
+    #     warning("Ran out of iterations and did not converge")
+    #     if (max(lp) > 500 || any(!is.finite(infs)))
+    #       warning("one or more coefficients may be infinite")
+    #   }
+    #   else {
+    #     infs <- (!is.finite(coxfit$u) |
+    #                ((infs > control$eps) &
+    #                   infs > control$toler.inf*abs(coef)))
+    #     if (any(infs))
+    #       warning(paste("Loglik converged before variable ",
+    #                     paste((1:nvar)[infs],collapse=","),
+    #                     "; coefficient may be infinite. "))
+    #   }
+    # }
+    # if (maxiter > 0) coef[which.sing] <- NA  #leave it be if iter=0 is set
+
+    temp <- lp[sorted]
+    if (any(temp > log(.Machine$double.xmax))) {
+      # prevent a failure message due to overflow
+      #  this occurs with near-infinite coefficients
+      temp <- temp + log(.Machine$double.xmax) - (1 + max(temp))
+    }
+    score <- exp(temp)
+    coxres <- .C("coxmart", as.integer(n),
+                 as.integer(method=='efron'),
+                 stime,
+                 sstat,
+                 newstrat,
+                 as.double(score),
+                 as.double(weights),
+                 resid=double(n))
+    residuals <- double(n)
+    residuals[sorted] <- coxres$resid
+
+  }
+
   names(residuals) <- rname
 
-  fit$linear.predictors <- lp
+  fit$linear.predictors <- c(lp)
   fit$residuals <- residuals
 
   if (is.character(fit)) {
@@ -1088,63 +1228,90 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
       fit$rscore <- coxph.wtest(t(temp0) %*% temp0, u, control$toler.chol)$test
     }
 
-    # Wald test
+    # plusieurs tests de Wald nécessaire ? il faut la matrice de variance covar pour tous les bootstraps
+
+    # # Wald test
+    # if (length(fit$coefficients) && is.null(fit$wald.test)) {
+    #   # not for intercept only models, or if test is already done
+    #   nabeta <- !is.na(fit$coefficients)
+    #   # The init vector might be longer than the betas, for a sparse term
+    #   if (is.null(init)) {
+    #     temp <- fit$coefficients[nabeta]
+    #   } else {
+    #     temp <- (fit$coefficients -
+    #                init[1:ncol(fit$coefficients)])[nabeta]
+    #   }
+    #
+    #   n_wald.test <- nrow(fit$coefficients)
+    #   temp <- matrix(temp, nrow = n_wald.test)
+    #
+    #   wald.test <- rep(NA, n_wald.test)
+    #   for (n_wt in 1:n_wald.test) {
+    #     wald.test[n_wt] <- coxph.wtest(
+    #       fit$var[[n_wt]][nabeta[n_wt, ], nabeta[n_wt, ]], temp[n_wt, ],
+    #       control$toler.chol
+    #     )$test
+    #   }
+    #   fit$wald.test <- wald.test
+    # }
+
+    #Wald test
     if (length(fit$coefficients) && is.null(fit$wald.test)) {
-      # not for intercept only models, or if test is already done
+      #not for intercept only models, or if test is already done
       nabeta <- !is.na(fit$coefficients)
       # The init vector might be longer than the betas, for a sparse term
-      if (is.null(init)) {
-        temp <- fit$coefficients[nabeta]
-      } else {
-        temp <- (fit$coefficients -
-                   init[1:ncol(fit$coefficients)])[nabeta]
-      }
-
-      n_wald.test <- nrow(fit$coefficients)
-      temp <- matrix(temp, nrow = n_wald.test)
-
-      wald.test <- rep(NA, n_wald.test)
-      for (n_wt in 1:n_wald.test) {
-        wald.test[n_wt] <- coxph.wtest(
-          fit$var[[n_wt]][nabeta[n_wt, ], nabeta[n_wt, ]], temp[n_wt, ],
-          control$toler.chol
-        )$test
-      }
-      fit$wald.test <- wald.test
+      if (is.null(init)) temp <- fit$coefficients[nabeta]
+      else temp <- (fit$coefficients -
+                      init[1:length(fit$coefficients)])[nabeta]
+      fit$wald.test <-  coxph.wtest(fit$var[nabeta,nabeta], temp,
+                                    control$toler.chol)$test
     }
 
     # Concordance.  Done here so that we can use cluster if it is present
     # The returned value is a subset of the full result, partly because it
     #  is all we need, but more for backward compatability with survConcordance.fit
-    if (length(cluster)) {
-      temp <- apply(fit$linear.predictors, 2, concordancefit,
-                    y = Y,
-                    strata = istrat, weights = weights, cluster = cluster,
-                    reverse = TRUE, timefix = FALSE
-      )
-    } else {
-      temp <- apply(fit$linear.predictors, 2, concordancefit,
-                    y = Y,
-                    strata = istrat, weights = weights,
-                    reverse = TRUE, timefix = FALSE
-      )
-    }
 
-    if (is.matrix(temp$count)) {
-      fit$concordance <- lapply(temp, function(x) {
-        c(colSums(x$count),
-          concordance = x$concordance,
-          std = sqrt(x$var)
-        )
-      })
-    } else {
-      fit$concordance <- lapply(temp, function(x) {
-        c(x$count,
-          concordance = x$concordance,
-          std = sqrt(x$var)
-        )
-      })
-    }
+    # if (length(cluster)) {
+    #   temp <- apply(fit$linear.predictors, 2, concordancefit,
+    #                 y = Y,
+    #                 strata = istrat, weights = weights, cluster = cluster,
+    #                 reverse = TRUE, timefix = FALSE
+    #   )
+    # } else {
+    #   temp <- apply(fit$linear.predictors, 2, concordancefit,
+    #                 y = Y,
+    #                 strata = istrat, weights = weights,
+    #                 reverse = TRUE, timefix = FALSE
+    #   )
+    # }
+    #
+    # if (is.matrix(temp$count)) {
+    #   fit$concordance <- lapply(temp, function(x) {
+    #     c(colSums(x$count),
+    #       concordance = x$concordance,
+    #       std = sqrt(x$var)
+    #     )
+    #   })
+    # } else {
+    #   fit$concordance <- lapply(temp, function(x) {
+    #     c(x$count,
+    #       concordance = x$concordance,
+    #       std = sqrt(x$var)
+    #     )
+    #   })
+    # }
+
+    if (length(cluster))
+      temp <- concordancefit(Y, fit$linear.predictors, istrat, weights,
+                             cluster=cluster, reverse=TRUE,
+                             timefix= FALSE)
+    else temp <- concordancefit(Y, fit$linear.predictors, istrat, weights,
+                                reverse=TRUE, timefix= FALSE)
+    if (is.matrix(temp$count))
+      fit$concordance <- c(colSums(temp$count), concordance=temp$concordance,
+                           std=sqrt(temp$var))
+    else fit$concordance <- c(temp$count, concordance=temp$concordance,
+                              std=sqrt(temp$var))
 
     na.action <- attr(mf, "na.action")
     if (length(na.action)) fit$na.action <- na.action
@@ -1230,12 +1397,14 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
   savedig <- options(digits = digits)
   on.exit(options(savedig))
 
-  coef <- matrix(x$coefficients[1, ])
-  if (length(x$var[[1]]) > 1) {
-    se <- matrix(sqrt(diag(x$var[[1]])))
-  } else {
-    se <- sqrt(x$var[[1]])
-  }
+  # coef <- matrix(x$coefficients[1, ])
+  coef <- x$coefficients
+  # if (length(x$var[[1]]) > 1) {
+  #   se <- matrix(sqrt(diag(x$var[[1]])))
+  # } else {
+  #   se <- sqrt(x$var[[1]])
+  # }
+  se <- sqrt(diag(x$var))
   if (is.null(coef) | is.null(se)) {
     stop("Input is not valid")
   }
@@ -1245,7 +1414,7 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
       coef, exp(coef), se, coef / se,
       pchisq((coef / se)^2, 1, lower.tail = FALSE)
     )
-    dimnames(tmp) <- list(colnames(x$coefficients), c(
+    dimnames(tmp) <- list(names(coef), c(
       "coef", "exp(coef)",
       "se(coef)", "z", "p"
     ))
@@ -1279,7 +1448,7 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
         names(dimnames(tmp2)) <- c(paste(cname[j], collapse = ", "), "")
         # restore character row names
         rownames(tmp2) <- rownames(cmap)[cmap[, i] > 0]
-        printCoefmat(tmp2,
+        stats::printCoefmat(tmp2,
                      digits = digits, P.values = TRUE,
                      has.Pvalue = TRUE,
                      signif.stars = signif.stars, ...
@@ -1298,7 +1467,7 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
       print(stemp, quote = FALSE)
     }
   } else {
-    printCoefmat(tmp,
+    stats::printCoefmat(tmp,
                  digits = digits, P.values = TRUE, has.Pvalue = TRUE,
                  signif.stars = signif.stars, ...
     )
@@ -1327,11 +1496,11 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
   if (length(omit)) {
     cat("\   (", naprint(omit), ")\n", sep = "")
   }
-  invisible(x)
-
   if (x$nbootstraps > 1) {
     cat("\n--- Other results with bootstrap with summary() ---")
   }
+  invisible(x)
+
 }
 
 
@@ -1362,8 +1531,9 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
 summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
   cox <- object
 
-  cov_names <- colnames(cox$coefficients)
-  beta <- matrix(cox$coefficients[1, ] * scale)
+  cov_names <- names(cox$coefficients)
+  # beta <- matrix(cox$coefficients[1, ] * scale)
+  beta <- cox$coefficients * scale
   if (is.null(cox$coefficients)) { # Null model
     return(object) # The summary method is the same as print in this case
   }
@@ -1372,7 +1542,8 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
   if (is.null(beta) | is.null(cox$var)) {
     stop("Input is not valid")
   }
-  se <- matrix(sqrt(diag(cox$var[[1]])) * scale)
+  # se <- matrix(sqrt(diag(cox$var[[1]])) * scale)
+  se <- sqrt(diag(cox$var)) * scale
   if (!is.null(cox$naive.var)) nse <- sqrt(diag(cox$naive.var))
 
   rval <- list(
@@ -1539,7 +1710,7 @@ print.summary.coxphGPU <- function(x, ...,
 
   if (!is.null(x$coefficients)) {
     cat("\n")
-    printCoefmat(x$coefficients,
+    stats::printCoefmat(x$coefficients,
                  digits = digits,
                  signif.stars = signif.stars, ...
     )

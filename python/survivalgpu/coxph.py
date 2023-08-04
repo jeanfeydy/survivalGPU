@@ -193,8 +193,8 @@ class CoxPHSurvivalAnalysis:
             return aux
 
         # Run the Newton optimizer: ------------------------------------------------------
-        
-        # Vector of inital values of the Newton iteration. 
+
+        # Vector of inital values of the Newton iteration.
         # Zero for all variables by default.
         if init is None:
             init_tensor = torch.zeros((n_batch, n_covariates), dtype=float32, device=device)
@@ -233,6 +233,8 @@ class CoxPHSurvivalAnalysis:
         self.imat_ = res.imat
         # Estimate for the standard errors of the coefficients:
         self.std_ = res.std
+        # Number of Newton iteration
+        self.iter_ = res.iterations
 
         # If required, compute a distribution of the coefficients using bootstrap: -------
         if n_bootstraps is not None:
@@ -240,7 +242,7 @@ class CoxPHSurvivalAnalysis:
             for bootstrap in dataset.bootstraps(
                 n_bootstraps=n_bootstraps, batch_size=batch_size
             ):
-                # Vector of inital values of the Newton iteration. 
+                # Vector of inital values of the Newton iteration.
                 # Zero for all variables by default.
                 if init is None:
                     init_tensor = torch.zeros(
@@ -345,7 +347,7 @@ class CoxPHSurvivalAnalysis:
                 dataset.n_intervals,
                 dataset.n_covariates,
             )
-        
+
 
         X = dataset.covariates  # (I, D)
         # (B, I, D) * (1, I, D) -> (B, I, D)
@@ -419,6 +421,8 @@ def coxph_numpy(
     bootstrap=1,
     batchsize=None,
     ties="efron",
+    survtype,
+    strata=None,
     backend="csr",
     maxiter=20,
     init=None,
@@ -468,12 +472,19 @@ def coxph_numpy(
         doscale=doscale,
         verbosity=verbosity,
     )
+    
+    # Configure 'start' according to survtype ('counting' or 'right')
+    if survtype == "counting":
+        start = times - 1
+    else:
+        start = None
 
     model.fit(
         covariates=x,
         stop=times,
-        start=times - 1,
+        start=start,
         event=deaths,
+        strata=strata,
         n_bootstraps=bootstrap,
         batch_size=batchsize,
         init=init,
@@ -486,9 +497,11 @@ def coxph_numpy(
         "std": model.std_,
         "loglik init": model.loglik_init_,
         "loglik": model.loglik_,
+        "sctest_init": model.sctest_init_,
         "u": model.score_,
         "imat": model.imat_,
         "hessian": model.hessian_,
+        "iter": model.iter_
     }
 
     if hasattr(model, "bootstrap_coef_"):
@@ -505,9 +518,11 @@ def coxph_R(
     stop,
     death,
     covars,
+    survtype,
     bootstrap=1,
     batchsize=0,
     ties="efron",
+    strata=None,
     maxiter=20,
     init=None,
     doscale=False,
@@ -531,6 +546,9 @@ def coxph_R(
     else:
         myprof = nullcontext()
 
+    if strata is not None:
+      strata = np.array(strata, dtype=np.int64)
+
     with myprof as prof:
         times = np.array(data[stop], dtype=np.int64)
         deaths = np.array(data[death], dtype=np.int64)
@@ -547,6 +565,8 @@ def coxph_R(
             times=times,
             deaths=deaths,
             ties=ties,
+            survtype=survtype,
+            strata=strata,
             backend="csr",
             bootstrap=int(bootstrap),
             batchsize=int(batchsize) if batchsize > 0 else None,
