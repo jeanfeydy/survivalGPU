@@ -12,7 +12,7 @@ terms.inner <- function(x) {
       terms.inner(x[[2]])
     }
   } else if (inherits(x, "call") &&
-    (x[[1]] != as.name("$") && x[[1]] != as.name("["))) {
+             (x[[1]] != as.name("$") && x[[1]] != as.name("["))) {
     if (x[[1]] == "+" || x[[1]] == "*" || x[[1]] == "-" || x[[1]] == ":") {
       # terms in a model equation, unary minus only has one argument
       if (length(x) == 3) {
@@ -61,15 +61,15 @@ drop.special <- function(termobj, i, addparen = FALSE) {
   #   It's a crude fix and causes the formula to look different
   if (addparen) {
     newformula <- reformulate(paste0("(", newterms, ")"),
-      response = rvar,
-      intercept = attr(termobj, "intercept"),
-      env = environment(termobj)
+                              response = rvar,
+                              intercept = attr(termobj, "intercept"),
+                              env = environment(termobj)
     )
   } else {
     newformula <- reformulate(newterms,
-      response = rvar,
-      intercept = attr(termobj, "intercept"),
-      env = environment(termobj)
+                              response = rvar,
+                              intercept = attr(termobj, "intercept"),
+                              env = environment(termobj)
     )
   }
   if (length(newformula) == 0L) newformula <- "1"
@@ -166,8 +166,8 @@ rightslash <- function(x) {
     if (x[[1]] == as.name("/")) {
       return(list(x[[2]], x[[3]]))
     } else if (x[[1]] == as.name("+") || (x[[1]] == as.name("-") && length(x) == 3) ||
-      x[[1]] == as.name("*") || x[[1]] == as.name(":") ||
-      x[[1]] == as.name("%in%")) {
+               x[[1]] == as.name("*") || x[[1]] == as.name(":") ||
+               x[[1]] == as.name("%in%")) {
       temp <- rightslash(x[[3]])
       if (is.list(temp)) {
         x[[3]] <- temp[[1]]
@@ -735,8 +735,8 @@ surv2data <- function(mf, check = FALSE) {
       temp <- survcheck(y3 ~ 1, id = id3, istate = itemp)
     } else {
       temp <- survcheck(y3 ~ 1,
-        id = id3,
-        istate = factor(itemp, 1:length(states), states)
+                        id = id3,
+                        istate = factor(itemp, 1:length(states), states)
       )
     }
   }
@@ -783,7 +783,7 @@ survcheck2 <- function(y, id, istate = NULL, istate0 = "(s0)") {
   # the next few line are a debug for my code; survcheck2 is not visible
   #  to users so only survival can call it directly
   if (!is.Surv(y) || is.null(attr(y, "states")) ||
-    any(y[, ncol(y)] > length(attr(y, "states")))) {
+      any(y[, ncol(y)] > length(attr(y, "states")))) {
     stop("survcheck2 called with an invalid y argument")
   }
   to.names <- c(attr(y, "states"), "(censored)")
@@ -923,4 +923,192 @@ survcheck2 <- function(y, id, istate = NULL, istate0 = "(s0)") {
   }
 
   rval
+}
+
+
+
+### For residuals
+
+coxph.getdata <- function(fit, y=TRUE, x=TRUE, stratax=TRUE,
+                          weights=TRUE, offset=FALSE, id=TRUE, cluster=TRUE) {
+  ty <- fit[['y']]  #avoid grabbing this by accident due to partial matching
+  tx <- fit[['x']]  #  for x, fit$x will get fit$xlevels --> not good
+  twt <- fit[["weights"]]
+  toff <- fit[["offset"]]
+  if (is.null(fit$call$id)) id <- FALSE  # there is no id to return
+  if (is.null(fit$call$cluster)) cluster <- FALSE
+
+  # if x or y is present, use it to set n
+  if (!is.null(ty)) n <- nrow(ty)
+  else if (!is.null(tx)) n <- nrow(tx)
+  else n <- NULL
+
+  coxms <- inherits(fit, "coxphms")
+  Terms <- fit$terms
+  if (!inherits(Terms, 'terms'))
+    stop("invalid terms component of fit")
+
+  # Avoid calling model.frame unless we have to: fill in weights and/or
+  #  offset when they were not present.  But we can only do it successfully
+  #  if we know n.
+  if (!is.null(n)) {
+    if (is.null(fit$call$weights)) twt <- rep(1,n)
+    if (is.null(attr(terms(fit), "offset"))) toff <- rep(0, n)
+  }
+
+  strat <- fit$strata
+  strats <- attr(Terms, "specials")$strata
+  if (length(strats)==0 && length(strat)==0 & !coxms) stratax <- FALSE
+
+  if ((y && is.null(ty)) || (x && is.null(tx)) ||
+      (weights && is.null(twt)) ||  cluster || id ||
+      (stratax && is.null(strat)) || (offset && is.null(toff)) ||
+      !is.null(fit$call$istate)) {
+    # get the model frame
+    mf <- stats::model.frame(fit)
+    n <- nrow(mf)
+
+    # Pull things out
+    if (weights) {
+      twt <- model.extract(mf, "weights")
+      if (is.null(twt)) twt <- rep(1.0, n)
+    }
+
+    if (offset) {
+      toff <- model.extract(mf, 'offset')
+      if (is.null(toff)) toff <- rep(0.0, n)
+    }
+    if (id) idx <- model.extract(mf, "id")
+    if (cluster) clusterx <- model.extract(mf, "cluster")
+
+    if (inherits(fit, "coxphms")) {
+      # we need to call stacker
+      idx <- model.extract(mf, "id")
+      istate <- model.extract(mf, "istate")
+      ty <- model.response(mf)
+      if (is.null(fit$timefix) || fit$timefix) ty <- aeqSurv(ty)
+      check <- survcheck2(ty, idx, istate)
+      tx <- model.matrix.coxph(fit, data=mf)
+      if (length(strats)) {
+        temp <- untangle.specials(Terms, 'strata', 1)
+        strat <- as.integer(strata(mf[temp$vars], shortlabel=T))
+      }
+      else strat <- NULL
+      # Now expand the data
+      xstack <- stacker(fit$cmap, fit$smap, as.integer(check$istate), tx, ty,
+                        strat, check$states)
+      tx <- xstack$X
+      ty <- xstack$Y
+      strat <- xstack$strata
+      stratax <- TRUE
+      if (offset) toff <- toff[xstack$rindex]
+      if (weights) twt  <- twt[xstack$rindex]
+      if (id) idx <- idx[xstack$rindex]
+      if (cluster) clusterx <- clusterx[xstack$rindex]
+
+      # And last, toss missing values, which had been deferred
+      ismiss <- is.nan(ty) | apply(is.na(tx), 1, any)
+      if (offset) ismiss <- ismiss | is.nan(toff)
+      if (weights) ismiss <- ismiss | is.nan(twt)
+      if (any(ismiss)) {
+        if (offset) toff <- toff[!ismiss]
+        if (weights) twt  <- twt[!ismiss]
+        if (y) ty<- ty[!ismiss]
+        if (x) tx <- tx[!ismiss,,drop=FALSE]
+        if (stratax) strat <- strat[!ismiss]
+        if (id) idx <- idx[!ismiss]
+        if (cluster) clusterx <- clusterx[!ismiss]
+      }
+    }
+    else { # not multi-state, or everything was there
+      if (y && is.null(ty)) {
+        ty <- model.extract(mf, "response")
+        if (is.null(fit$timefix) || fit$timefix) ty <- aeqSurv(ty)
+      }
+
+      # strata was saved in the fit if and only if x was
+      if ((x || stratax) && is.null(tx)) {
+        if (stratax) {
+          temp <- untangle.specials(Terms, 'strata', 1)
+          strat <- strata(mf[temp$vars], shortlabel=T)
+        }
+        tx <- model.matrix.coxph(fit, data=mf)
+      }
+    }
+  }
+
+  temp <- list()
+  if (y) temp$y <- ty
+  if (x) temp$x <- tx
+  if (stratax)  temp$strata <- strat
+  if (offset)  temp$offset <- toff
+  if (weights) temp$weights <- twt
+  if (id) temp$id <- idx
+  if (cluster) temp$cluster <- clusterx
+  temp
+}
+
+model.matrix.coxph <- function(object, data=NULL,
+                               contrast.arg=object$contrasts, ...) {
+  #
+  # If the object has an "x" component, return it, unless a new
+  #   data set is given
+  if (is.null(data) && !is.null(object[['x']]))
+    return(object[['x']]) #don't match "xlevels"
+
+  Terms <- delete.response(object$terms)
+  if (is.null(data)) mf <- stats::model.frame(object)
+  else {
+    if (is.null(attr(data, "terms")))
+      mf <- stats::model.frame(Terms, data, xlev=object$xlevels)
+    else mf <- data  #assume "data" is already a model frame
+  }
+
+  cluster <- attr(Terms, "specials")$cluster
+  if (length(cluster)) {
+    temp <- untangle.specials(Terms, "cluster")
+    dropterms <- temp$terms
+  }
+  else dropterms <- NULL
+
+  strats <- attr(Terms, "specials")$strata
+  hasinteractions <- FALSE
+  if (length(strats)) {
+    stemp <- untangle.specials(Terms, 'strata', 1)
+    if (length(stemp$vars)==1) strata.keep <- mf[[stemp$vars]]
+    else strata.keep <- strata(mf[,stemp$vars], shortlabel=TRUE)
+    istrat <- as.integer(strata.keep)
+
+    for (i in stemp$vars) {  #multiple strata terms are allowed
+      # The factors attr has one row for each variable in the frame, one
+      #   col for each term in the model.  Pick rows for each strata
+      #   var, and find if it participates in any interactions.
+      if (any(attr(Terms, 'order')[attr(Terms, "factors")[i,] >0] >1))
+        hasinteractions <- TRUE
+    }
+    if (!hasinteractions) dropterms <- c(dropterms, stemp$terms)
+  } else istrat <- NULL
+
+
+  if (length(dropterms)) {
+    Terms2 <- Terms[-dropterms]
+    X <- model.matrix(Terms2, mf, constrasts.arg=contrast.arg)
+    # we want to number the terms wrt the original model matrix
+    temp <- attr(X, "assign")
+    shift <- sort(dropterms)
+    for (i in seq(along.with=shift))
+      temp <- temp + 1*(shift[i] <= temp)
+    attr(X, "assign") <- temp
+  }
+  else X <- model.matrix(Terms, mf, contrasts.arg=contrast.arg)
+
+  # drop the intercept after the fact, and also drop strata if necessary
+  Xatt <- attributes(X)
+  if (hasinteractions) adrop <- c(0, untangle.specials(Terms, "strata")$terms)
+  else adrop <- 0
+  xdrop <- Xatt$assign %in% adrop  #columns to drop (always the intercept)
+  X <- X[, !xdrop, drop=FALSE]
+  attr(X, "assign") <- Xatt$assign[!xdrop]
+  attr(X, "contrasts") <- Xatt$contrasts
+  X
 }

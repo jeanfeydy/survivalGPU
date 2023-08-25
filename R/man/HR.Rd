@@ -4,7 +4,7 @@
 \alias{HR}
 \title{Hazard Ratio for WCE model}
 \usage{
-HR(object, vecnum, vecdenom, level = 0.95, without_bootstrap = FALSE)
+HR(object, vecnum, vecdenom, level = 0,95, without_bootstrap = FALSE)
 }
 \arguments{
 \item{object}{wceGPU object.}

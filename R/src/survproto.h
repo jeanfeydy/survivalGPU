@@ -5,7 +5,10 @@
 SEXP agmart3(SEXP nused2,  SEXP surv2,  SEXP score2, SEXP weight2,
              SEXP strata2, SEXP sort12, SEXP sort22, SEXP method2);
 
-             void chinv2  (double **matrix, int n);
+SEXP agscore2(SEXP y2, SEXP covar2, SEXP strata2,
+              SEXP score2,   SEXP weights2, SEXP method2);
+
+void chinv2  (double **matrix, int n);
 
              int cholesky2(double **matrix, int n, double toler);
 
@@ -18,6 +21,13 @@ SEXP agmart3(SEXP nused2,  SEXP surv2,  SEXP score2, SEXP weight2,
              void coxmart(int   *sn,     int   *method,    double *time,
                           int   *status, int   * strata,   double *score,
                           double *wt,    double *expect);
+
+             void coxscho(int   *nusedx,    int   *nvarx,    double *y,
+                          double *covar2,    double *score,    int   *strata,
+                          int   *method2,   double *work);
+
+             SEXP coxscore2(SEXP y2,       SEXP covar2,   SEXP strata2,
+                            SEXP score2,   SEXP weights2, SEXP method2);
 
              double **dmatrix(double *array, int nrow, int ncol);
 

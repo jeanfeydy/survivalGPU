@@ -8,13 +8,16 @@
 
 static const R_CallMethodDef Callentries[] = {
   {"agmart3", (DL_FUNC) &agmart3, 8},
+  {"agscore2", (DL_FUNC) &agscore2, 6},
   {"coxcount1", (DL_FUNC) &coxcount1, 2},
   {"coxcount2", (DL_FUNC) &coxcount2, 4},
+  {"coxscore2", (DL_FUNC) &coxscore2, 6},
   {NULL, NULL, 0}
 };
 
 static const R_CMethodDef Centries[] = {
   {"coxmart",    (DL_FUNC) &coxmart,  8},
+  {"coxscho",    (DL_FUNC) &coxscho, 8},
   {NULL, NULL, 0}
 };
 
