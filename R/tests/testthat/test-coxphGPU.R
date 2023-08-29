@@ -134,6 +134,69 @@ test_that("Coxph counting - residuals", {
   )
 })
 
+test_that("Coxph counting - resid method", {
+  expect_equal(
+    round(resid(coxph), 3),
+    round(resid(coxphGPU_bootstrap), 3)
+  )
+})
+
+test_that("Coxph counting - resid method score type", {
+  expect_equal(
+    round(resid(coxph, type = "score"), 2),
+    round(resid(coxphGPU_bootstrap, type = "score"), 2)
+  )
+})
+
+test_that("Coxph counting - resid method schoenfeld type", {
+  expect_equal(
+    round(resid(coxph, type = "schoenfeld"), 2),
+    round(resid(coxphGPU_bootstrap, type = "schoenfeld"), 2)
+  )
+})
+
+test_that("Coxph counting - predict method survival type", {
+  expect_equal(
+    round(predict(coxph, type = "survival"), 3),
+    round(predict(coxphGPU, type = "survival"), 3)
+  )
+})
+
+test_that("Coxph counting - predict method lp type", {
+  expect_equal(
+    round(predict(coxph, type = "lp"), 3),
+    round(predict(coxphGPU, type = "lp"), 3)
+  )
+})
+
+test_that("Coxph counting - predict method lp type - linears.predictors check", {
+  expect_equal(
+    round(coxphGPU$linear.predictors, 5),
+    round(predict(coxphGPU, type = "lp"), 5)
+  )
+})
+
+test_that("Coxph counting - predict method risk type", {
+  expect_equal(
+    round(predict(coxph, type = "risk"), 3),
+    round(predict(coxphGPU, type = "risk"), 3)
+  )
+})
+
+test_that("Coxph counting - predict method expected type", {
+  expect_equal(
+    round(predict(coxph, type = "expected"), 3),
+    round(predict(coxphGPU, type = "expected"), 3)
+  )
+})
+
+# test_that("Coxph counting - predict method terms type", {
+#   expect_equal(
+#     round(predict(coxph, type = "terms"), 3),
+#     round(predict(coxphGPU, type = "terms"), 3)
+#   )
+# })
+
 test_that("Coxph right - residuals", {
   expect_equal(
     round(coxph_right$residuals, 2),
@@ -141,14 +204,37 @@ test_that("Coxph right - residuals", {
   )
 })
 
+test_that("Coxph right - resid method schoenfeld type", {
+  expect_equal(
+    round(resid(coxph_right, type = "schoenfeld"), 2),
+    round(resid(coxphGPU_right, type = "schoenfeld"), 2)
+  )
+})
+
+
+test_that("Coxph right - predict method survival type", {
+  expect_equal(
+    round(predict(coxph_right, type = "survival"), 3),
+    round(predict(coxphGPU_right, type = "survival"), 3)
+  )
+})
+
+# test_that("Coxph right - predict method risk type", {
+#   expect_equal(
+#     round(predict(coxph_right, type = "risk"), 3),
+#     round(predict(coxphGPU_right, type = "risk"), 3)
+#   )
+# })
+
+
+
 ################################################################################
 
 # Cox model with no iterations
 coxphGPU_no_iter <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
                              drugdata,
                              ties = ties,
-                             iter.max = 0
-)
+                             iter.max = 0)
 
 test_that("No Newton iterations - Null Coefs", {
   expect_equal(
@@ -161,8 +247,7 @@ test_that("No Newton iterations - Null Coefs", {
 coxphGPU_right_drugdata2 <- coxphGPU(Surv(Stop, Event) ~ sex + age,
                                      drugdata2,
                                      ties = ties,
-                                     bootstrap = 1
-)
+                                     bootstrap = 1)
 
 test_that("CoxphGPU counting/right distinct - Coefs", {
   expect_equal(
@@ -212,6 +297,21 @@ test_that("CoxphGPU counting with strata - Coefs", {
 #   )
 # })
 
+
+test_that("CoxphGPU counting with strata - predict", {
+  expect_equal(
+    round(predict(coxph_strata, type = "survival"), 3),
+    round(predict(coxphGPU_strata, type = "survival"), 3)
+  )
+})
+
+test_that("CoxphGPU counting with strata - new data", {
+  expect_equal(
+    round(predict(coxph_strata, newdata = head(drugdata)), 3),
+    round(predict(coxphGPU_strata, newdata = head(drugdata)), 3)
+  )
+})
+
 ################################################################################
 
 # snapshot
@@ -253,6 +353,7 @@ test1 <- data.frame(time = c(1,1,6,6,8,9),
 temp <- temp2 <- matrix(0, nrow = 6, ncol = 4,
                         dimnames = list(1:6, c("iter", "beta", "loglik", "H")))
 
+# routine précise ? car bug aléatoire
 convergence_warning <- capture_warnings(
   for (i in 0:5) {
     # coxph (add expect_warning for devtools::test())
@@ -271,7 +372,7 @@ convergence_warning <- capture_warnings(
   }
 )
 
-test_that("Cpnvergence warnings ?", {
+test_that("Convergence warnings ?", {
   expect_match(convergence_warning,
                "Ran out of iterations and did not converge",
                all = TRUE)
@@ -297,3 +398,21 @@ test_that("test1 - H", {
     round(temp2[,"H"], 3)
   )
 })
+
+
+
+# check example ?predict.coxph
+
+lung2 <- lung |>
+  dplyr::mutate(status = status - 1) |>
+  tidyr::drop_na()
+fit <- coxph(Surv(time, status) ~ age + ph.ecog + strata(inst), lung2)
+# fit_gpu <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung2,bootstrap = 1) # error avec strata
+
+# #lung data set has status coded as 1/2
+# mresid <- (lung$status-1) - predict(fit, type='expected') #Martingale resid
+# predict(fit,type="lp")
+# predict(fit,type="expected")
+# predict(fit,type="risk",se.fit=TRUE)
+# predict(fit,type="terms",se.fit=TRUE)
+

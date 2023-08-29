@@ -16,6 +16,8 @@ static const R_CallMethodDef Callentries[] = {
 };
 
 static const R_CMethodDef Centries[] = {
+  {"agsurv4",    (DL_FUNC) &agsurv4,    6},
+  {"agsurv5",    (DL_FUNC) &agsurv5,   10},
   {"coxmart",    (DL_FUNC) &coxmart,  8},
   {"coxscho",    (DL_FUNC) &coxscho, 8},
   {NULL, NULL, 0}
