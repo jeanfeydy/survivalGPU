@@ -2218,6 +2218,7 @@ predict.coxphGPU <- function(object, newdata,
           xbar <- rbind(0, afit$xbar)[j1+1,,drop=F]
           if (ncol(y)==2) {
             dt <- (chaz * x[indx,]) - xbar
+            dt <- dt[,-1] # remove intercept
             se[indx] <- sqrt(varh + rowSums((dt %*% object$var) *dt)) *
               risk[indx]
           }
@@ -2317,9 +2318,9 @@ predict.coxphGPU <- function(object, newdata,
     }
 
     if (type=='lp' || type=='risk') {
-      if (use.x) pred <- drop(newx %*% coef) + offset
+      if (use.x) pred <- drop(matrix(newx[,-1]) %*% coef) + offset # remove intercept
       else pred <- object$linear.predictors
-      if (se.fit) se <- sqrt(rowSums((newx %*% object$var) *newx))
+      if (se.fit) se <- sqrt(rowSums((matrix(newx[,-1]) %*% object$var) * matrix(newx[,-1])))
 
       if (type=='risk') {
         pred <- exp(pred)
