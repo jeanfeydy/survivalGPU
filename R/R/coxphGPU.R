@@ -1094,7 +1094,15 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     fit$coef_bootstrap <- coef_bootstrap
   }
 
-  fit$class <- "coxphGPU"
+  # structure(
+  #   fit,
+  #   ...,
+  #   class = c(class, "coxph")
+  # )
+  #fit$class <- c(class, "coxph")
+  #fit$class <- "coxphGPU"
+  #fit$class <- "coxph"
+  fit$class <- c("coxphGPU", "coxph")
 
   if(type == "counting"){
 
@@ -1375,133 +1383,148 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
 ## coxphGPU Methods ------------------------
 
+
 #' Print method for coxphGPU object
 #'
-#' @param object coxphGPU object
-#' @param digits digits
-#' @param signif.stars Stars to see signif
-#' @param ... additional argument(s) for methods.
 #' @exportS3Method print coxphGPU
-#' @noRd
+#' @inherit survival::print.coxph
 print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
                            signif.stars = FALSE) {
-  if (!is.null(cl <- x$call)) {
-    cat("Call:\n")
-    dput(cl)
-    cat("\n")
-  }
-  if (!is.null(x$fail)) {
-    cat(" Coxph failed.", x$fail, "\n")
-    return()
-  }
-  savedig <- options(digits = digits)
-  on.exit(options(savedig))
 
-  # coef <- matrix(x$coefficients[1, ])
-  coef <- x$coefficients
-  # if (length(x$var[[1]]) > 1) {
-  #   se <- matrix(sqrt(diag(x$var[[1]])))
-  # } else {
-  #   se <- sqrt(x$var[[1]])
-  # }
-  se <- sqrt(diag(x$var))
-  if (is.null(coef) | is.null(se)) {
-    stop("Input is not valid")
-  }
+  NextMethod("print", x)
 
-  if (is.null(x$naive.var)) {
-    tmp <- cbind(
-      coef, exp(coef), se, coef / se,
-      pchisq((coef / se)^2, 1, lower.tail = FALSE)
-    )
-    dimnames(tmp) <- list(names(coef), c(
-      "coef", "exp(coef)",
-      "se(coef)", "z", "p"
-    ))
-  } else {
-    nse <- sqrt(diag(x$naive.var))
-    tmp <- cbind(
-      coef, exp(coef), nse, se, coef / se,
-      pchisq((coef / se)^2, 1, lower.tail = FALSE)
-    )
-    dimnames(tmp) <- list(names(coef), c(
-      "coef", "exp(coef)",
-      "se(coef)", "robust se", "z", "p"
-    ))
-  }
-
-  if (inherits(x, "coxphms")) {
-    # print it group by group
-    # lazy: I don't want to type x$cmap many times
-    #  remove transitions with no covariates
-    cmap <- x$cmap[, colSums(x$cmap) > 0, drop = FALSE]
-    cname <- colnames(cmap)
-    printed <- rep(FALSE, length(cname))
-    for (i in 1:length(cname)) {
-      # if multiple colums of tmat are identical, only print that
-      #  set of coefficients once
-      if (!printed[i]) {
-        j <- apply(cmap, 2, function(x) all(x == cmap[, i]))
-        printed[j] <- TRUE
-
-        tmp2 <- tmp[cmap[, i], , drop = FALSE]
-        names(dimnames(tmp2)) <- c(paste(cname[j], collapse = ", "), "")
-        # restore character row names
-        rownames(tmp2) <- rownames(cmap)[cmap[, i] > 0]
-        stats::printCoefmat(tmp2,
-                     digits = digits, P.values = TRUE,
-                     has.Pvalue = TRUE,
-                     signif.stars = signif.stars, ...
-        )
-        cat("\n")
-      }
-    }
-
-    cat(" States: ", paste(paste(seq(along.with = x$states), x$states, sep = "= "),
-                           collapse = ", "
-    ), "\n")
-    # cat(" States: ", paste(x$states, collapse=", "), '\n')
-    if (FALSE) { # alternate forms, still deciding which I like
-      stemp <- x$states
-      names(stemp) <- 1:length(stemp)
-      print(stemp, quote = FALSE)
-    }
-  } else {
-    stats::printCoefmat(tmp,
-                 digits = digits, P.values = TRUE, has.Pvalue = TRUE,
-                 signif.stars = signif.stars, ...
-    )
-  }
-
-  logtest <- -2 * (x$loglik_init[1] - x$loglik[1])
-  if (is.null(x$df)) {
-    df <- sum(!is.na(coef))
-  } else {
-    df <- round(sum(x$df), 2)
-  }
-  cat("\n")
-  cat("Likelihood ratio test=", format(round(logtest, 2)), "  on ",
-      df, " df,", " p=",
-      format.pval(pchisq(logtest, df, lower.tail = FALSE), digits = digits),
-      "\n",
-      sep = ""
-  )
-  omit <- x$na.action
-  cat("n=", x$n)
-  if (!is.null(x$nevent)) {
-    cat(", number of events=", x$nevent, "\n")
-  } else {
-    cat("\n")
-  }
-  if (length(omit)) {
-    cat("\   (", naprint(omit), ")\n", sep = "")
-  }
   if (x$nbootstraps > 1) {
-    cat("\n--- Other results with bootstrap with summary() ---")
-  }
-  invisible(x)
-
+        cat("\n--- Other results with bootstrap with summary() ---")
+      }
 }
+
+# #' Print method for coxphGPU object
+# #'
+# #' @param object coxphGPU object
+# #' @param digits digits
+# #' @param signif.stars Stars to see signif
+# #' @param ... additional argument(s) for methods.
+# #' @exportS3Method print coxphGPU
+# #' @noRd
+# print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
+#                            signif.stars = FALSE) {
+#   if (!is.null(cl <- x$call)) {
+#     cat("Call:\n")
+#     dput(cl)
+#     cat("\n")
+#   }
+#   if (!is.null(x$fail)) {
+#     cat(" Coxph failed.", x$fail, "\n")
+#     return()
+#   }
+#   savedig <- options(digits = digits)
+#   on.exit(options(savedig))
+#
+#   # coef <- matrix(x$coefficients[1, ])
+#   coef <- x$coefficients
+#   # if (length(x$var[[1]]) > 1) {
+#   #   se <- matrix(sqrt(diag(x$var[[1]])))
+#   # } else {
+#   #   se <- sqrt(x$var[[1]])
+#   # }
+#   se <- sqrt(diag(x$var))
+#   if (is.null(coef) | is.null(se)) {
+#     stop("Input is not valid")
+#   }
+#
+#   if (is.null(x$naive.var)) {
+#     tmp <- cbind(
+#       coef, exp(coef), se, coef / se,
+#       pchisq((coef / se)^2, 1, lower.tail = FALSE)
+#     )
+#     dimnames(tmp) <- list(names(coef), c(
+#       "coef", "exp(coef)",
+#       "se(coef)", "z", "p"
+#     ))
+#   } else {
+#     nse <- sqrt(diag(x$naive.var))
+#     tmp <- cbind(
+#       coef, exp(coef), nse, se, coef / se,
+#       pchisq((coef / se)^2, 1, lower.tail = FALSE)
+#     )
+#     dimnames(tmp) <- list(names(coef), c(
+#       "coef", "exp(coef)",
+#       "se(coef)", "robust se", "z", "p"
+#     ))
+#   }
+#
+#   if (inherits(x, "coxphms")) {
+#     # print it group by group
+#     # lazy: I don't want to type x$cmap many times
+#     #  remove transitions with no covariates
+#     cmap <- x$cmap[, colSums(x$cmap) > 0, drop = FALSE]
+#     cname <- colnames(cmap)
+#     printed <- rep(FALSE, length(cname))
+#     for (i in 1:length(cname)) {
+#       # if multiple colums of tmat are identical, only print that
+#       #  set of coefficients once
+#       if (!printed[i]) {
+#         j <- apply(cmap, 2, function(x) all(x == cmap[, i]))
+#         printed[j] <- TRUE
+#
+#         tmp2 <- tmp[cmap[, i], , drop = FALSE]
+#         names(dimnames(tmp2)) <- c(paste(cname[j], collapse = ", "), "")
+#         # restore character row names
+#         rownames(tmp2) <- rownames(cmap)[cmap[, i] > 0]
+#         stats::printCoefmat(tmp2,
+#                      digits = digits, P.values = TRUE,
+#                      has.Pvalue = TRUE,
+#                      signif.stars = signif.stars, ...
+#         )
+#         cat("\n")
+#       }
+#     }
+#
+#     cat(" States: ", paste(paste(seq(along.with = x$states), x$states, sep = "= "),
+#                            collapse = ", "
+#     ), "\n")
+#     # cat(" States: ", paste(x$states, collapse=", "), '\n')
+#     if (FALSE) { # alternate forms, still deciding which I like
+#       stemp <- x$states
+#       names(stemp) <- 1:length(stemp)
+#       print(stemp, quote = FALSE)
+#     }
+#   } else {
+#     stats::printCoefmat(tmp,
+#                  digits = digits, P.values = TRUE, has.Pvalue = TRUE,
+#                  signif.stars = signif.stars, ...
+#     )
+#   }
+#
+#   logtest <- -2 * (x$loglik_init[1] - x$loglik[1])
+#   if (is.null(x$df)) {
+#     df <- sum(!is.na(coef))
+#   } else {
+#     df <- round(sum(x$df), 2)
+#   }
+#   cat("\n")
+#   cat("Likelihood ratio test=", format(round(logtest, 2)), "  on ",
+#       df, " df,", " p=",
+#       format.pval(pchisq(logtest, df, lower.tail = FALSE), digits = digits),
+#       "\n",
+#       sep = ""
+#   )
+#   omit <- x$na.action
+#   cat("n=", x$n)
+#   if (!is.null(x$nevent)) {
+#     cat(", number of events=", x$nevent, "\n")
+#   } else {
+#     cat("\n")
+#   }
+#   if (length(omit)) {
+#     cat("\   (", naprint(omit), ")\n", sep = "")
+#   }
+#   if (x$nbootstraps > 1) {
+#     cat("\n--- Other results with bootstrap with summary() ---")
+#   }
+#   invisible(x)
+#
+# }
 
 
 #' Summary method for coxphGPU object
@@ -1529,138 +1552,23 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
 #' @exportS3Method summary coxphGPU
 #' @rdname coxphGPU
 summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
-  cox <- object
 
-  cov_names <- names(cox$coefficients)
-  # beta <- matrix(cox$coefficients[1, ] * scale)
-  beta <- cox$coefficients * scale
-  if (is.null(cox$coefficients)) { # Null model
-    return(object) # The summary method is the same as print in this case
-  }
-  nabeta <- !(is.na(beta)) # non-missing coefs
-  beta2 <- beta[nabeta]
-  if (is.null(beta) | is.null(cox$var)) {
-    stop("Input is not valid")
-  }
-  # se <- matrix(sqrt(diag(cox$var[[1]])) * scale)
-  se <- sqrt(diag(cox$var)) * scale
-  if (!is.null(cox$naive.var)) nse <- sqrt(diag(cox$naive.var))
+  survival_summary <- NextMethod("summary", object)
+  survival_summary$nbootstraps <- object$nbootstraps
+  survival_summary$conf.int_level = conf.int
 
-  rval <- list(
-    call = cox$call,
-    # fail=cox$fail,
-    # na.action=cox$na.action,
-    n = cox$n,
-    loglik = cox$loglik,
-    nbootstraps = cox$nbootstraps,
-    conf.int_level = conf.int
-  )
-  if (!is.null(cox$nevent)) rval$nevent <- cox$nevent
+    if (object$nbootstraps > 1) {
+      probs <- c((1 - conf.int) / 2, 1 - (1 - conf.int) / 2)
 
-  if (is.null(cox$naive.var)) {
-    tmp <- cbind(
-      beta, exp(beta), se, beta / se,
-      pchisq((beta / se)^2, 1, lower.tail = FALSE)
-    )
-    dimnames(tmp) <- list(cov_names, c(
-      "coef",
-      "exp(coef)",
-      "se(coef)",
-      "z",
-      "Pr(>|z|)"
-    ))
-  } else {
-    tmp <- cbind(
-      beta, exp(beta), nse, se, beta / se,
-      pchisq((beta / se)^2, 1, lower.tail = FALSE)
-    )
-    dimnames(tmp) <- list(cov_names, c(
-      "coef",
-      "exp(coef)",
-      "se(coef)",
-      "robust se",
-      "z",
-      "Pr(>|z|)"
-    ))
-  }
-  rval$coefficients <- tmp
+      # confidence Interval for coefficients (default 95%)
+      survival_summary$conf.int_bootstrap <- apply(object$coef_bootstrap, 2, stats::quantile, p = probs)
 
-  if (conf.int) {
-    z <- qnorm((1 + conf.int) / 2, 0, 1)
-    tmp <- cbind(
-      exp(beta),
-      exp(-beta),
-      exp(beta - z * se),
-      exp(beta + z * se)
-    )
-    dimnames(tmp) <- list(cov_names, c(
-      "exp(coef)",
-      "exp(-coef)",
-      paste("lower .", round(100 * conf.int, 2), sep = ""),
-      paste("upper .", round(100 * conf.int, 2), sep = "")
-    ))
-    rval$conf.int <- tmp
-  }
+    }
 
-  if (object$nbootstraps > 1) {
-    probs <- c((1 - conf.int) / 2, 1 - (1 - conf.int) / 2)
+  class(survival_summary) <- c("summary.coxphGPU", "summary.coxph")
+  return(survival_summary)
 
-    # confidence Interval for coefficients (default 95%)
-    rval$conf.int_bootstrap <- apply(object$coef_bootstrap, 2, stats::quantile, p = probs)
-
-    # # confidence Interval for loglik (default 95%)
-    # rval$loglik_CI = stats::quantile(object$loglik, p = probs)
-  }
-
-  df <- length(beta2)
-
-  logtest <- -2 * (cox$loglik_init[1] - cox$loglik[1])
-
-  rval$logtest <- c(
-    test = logtest,
-    df = df,
-    pvalue = pchisq(logtest, df, lower.tail = FALSE)
-  )
-  rval$sctest <- c(
-    test = cox$score[1],
-    df = df,
-    pvalue = pchisq(cox$score[1], df, lower.tail = FALSE)
-  )
-  rval$rsq <- c(
-    rsq = 1 - exp(-logtest / cox$n),
-    maxrsq = 1 - exp(2 * cox$loglik_init[1] / cox$n)
-  )
-  rval$waldtest <- c(
-    test = as.vector(round(cox$wald.test[1], 2)),
-    df = df,
-    pvalue = pchisq(as.vector(cox$wald.test[1]), df,
-                    lower.tail = FALSE
-    )
-  )
-
-  if (!is.null(cox$rscore)) {
-    rval$robscore <- c(
-      test = cox$rscore[1],
-      df = df,
-      pvalue = pchisq(cox$rscore[1], df, lower.tail = FALSE)
-    )
-  }
-  rval$used.robust <- !is.null(cox$naive.var)
-
-  if (!is.null(cox$concordance)) {
-    # throw away the extra info, in the name of backwards compatability
-    rval$concordance <- cox$concordance[[1]][6:7]
-    names(rval$concordance) <- c("C", "se(C)")
-  }
-  if (inherits(cox, "coxphms")) {
-    rval$cmap <- cox$cmap
-    rval$states <- cox$states
-  }
-
-  class(rval) <- "summary.coxphGPU"
-  return(rval)
 }
-
 
 
 #' Print summary for coxphGPU object
@@ -1675,113 +1583,300 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
 print.summary.coxphGPU <- function(x, ...,
                                    digits = max(getOption("digits") - 3, 3),
                                    signif.stars = getOption("show.signif.stars")) {
-  # x = rval
-  if (!is.null(x$call)) {
-    cat("Call:\n")
-    dput(x$call)
-    cat("\n")
-  }
-  if (!is.null(x$fail)) {
-    cat(" Coxreg failed.", x$fail, "\n")
-    return()
-  }
 
-  if (x$nbootstraps > 1) {
-    cat("Results without bootstrap :\n\n")
-  }
-  savedig <- options(digits = digits)
-  on.exit(options(savedig))
-
-  omit <- x$na.action
-  cat("  n=", x$n)
-  if (!is.null(x$nevent)) {
-    cat(", number of events=", x$nevent, "\n")
-  } else {
-    cat("\n")
-  }
-  if (length(omit)) {
-    cat("   (", naprint(omit), ")\n", sep = "")
-  }
-
-  if (nrow(x$coefficients) == 0) { # Null model
-    cat("   Null model\n")
-    return()
-  }
-
-  if (!is.null(x$coefficients)) {
-    cat("\n")
-    stats::printCoefmat(x$coefficients,
-                 digits = digits,
-                 signif.stars = signif.stars, ...
-    )
-  }
-  if (!is.null(x$conf.int)) {
-    cat("\n")
-    print(x$conf.int)
-  }
-
-  cat("\n")
-
-  if (!is.null(x$concordance)) {
-    cat(
-      "Concordance=", format(round(x$concordance[1], 3)),
-      " (se =", format(round(x$concordance[2], 3)), ")\n"
-    )
-  }
-  cat(
-    "Rsquare=", format(round(x$rsq["rsq"], 3)),
-    "  (max possible=", format(round(x$rsq["maxrsq"], 3)),
-    ")\n"
-  )
-
-  pdig <- max(1, getOption("digits") - 4) # default it too high IMO
-  cat("Likelihood ratio test= ", format(round(x$logtest["test"], 2)), "  on ",
-      x$logtest["df"], " df,", "   p=",
-      format.pval(x$logtest["pvalue"], digits = pdig),
-      "\n",
-      sep = ""
-  )
-
-  cat("Wald test            = ", format(round(x$waldtest["test"], 2)), "  on ",
-      x$waldtest["df"], " df,", "   p=",
-      format.pval(x$waldtest["pvalue"], digits = pdig),
-      "\n",
-      sep = ""
-  )
-  cat("Score (logrank) test = ", format(round(x$sctest["test"], 2)), "  on ",
-      x$sctest["df"], " df,", "   p=",
-      format.pval(x$sctest["pvalue"], digits = pdig),
-      sep = ""
-  )
-  if (is.null(x$robscore)) {
-    cat("\n\n")
-  } else {
-    cat(",   Robust = ", format(round(x$robscore["test"], 2)),
-        "  p=",
-        format.pval(x$robscore["pvalue"], digits = pdig), "\n\n",
-        sep = ""
-    )
-  }
-
-  if (x$used.robust) {
-    cat(
-      "  (Note: the likelihood ratio and score tests",
-      "assume independence of\n     observations within a cluster,",
-      "the Wald and robust score tests do not).\n"
-    )
-  }
-  invisible()
+  NextMethod("print", object)
 
   if (x$nbootstraps > 1) {
     cat(" ---------------- \n")
     cat(paste0(
-      "Confidence interval with ", x$nbootstraps,
+      "Confidence interval with ",
+      x$nbootstraps,
       " bootstraps for exp(coef), conf.level = ",
       x$conf.int_level, " :\n"
     ))
     print(signif(t(exp(x$conf.int_bootstrap))))
   }
+
 }
+
+# #' Summary method for coxphGPU object
+# #'
+# #' Use `summary()` method to see confidence interval for covariates with two
+# #' process : normal distribution and bootstrap (if `bootstrap > 1`).
+# #' @param object a coxphGPU object
+# #' @param conf.int level for computation of the confidence intervals.
+# #' @param scale vector of scale factors for the coefficients, defaults to 1. The
+# #'   printed coefficients, se, and confidence intervals will be associated with
+# #'   one scale unit.
+# #' @param ... additional argument(s) for methods.
+# #'
+# #' @return With `summary()` :
+# #' * `conf.int`:                  a matrix with one row for each coefficient,
+# #' containing the confidence limits for exp(coef).
+# #' * `conf.int_bootstrap`:        confidence limits for exp(coef) determined by
+# #' bootstrap
+# #' * `logtest, sctest, waldtest`: the overall likelihood ratio, score, and Wald
+# #' test statistics for the model
+# #' * `concordance`:               the concordance statistic and its standard
+# #' error
+# #' * `rsq`:                       an approximate R^2 based on Nagelkirke
+# #' (Biometrika 1991).
+# #' @exportS3Method summary coxphGPU
+# #' @rdname coxphGPU
+# summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
+#   cox <- object
+#
+#   cov_names <- names(cox$coefficients)
+#   # beta <- matrix(cox$coefficients[1, ] * scale)
+#   beta <- cox$coefficients * scale
+#   if (is.null(cox$coefficients)) { # Null model
+#     return(object) # The summary method is the same as print in this case
+#   }
+#   nabeta <- !(is.na(beta)) # non-missing coefs
+#   beta2 <- beta[nabeta]
+#   if (is.null(beta) | is.null(cox$var)) {
+#     stop("Input is not valid")
+#   }
+#   # se <- matrix(sqrt(diag(cox$var[[1]])) * scale)
+#   se <- sqrt(diag(cox$var)) * scale
+#   if (!is.null(cox$naive.var)) nse <- sqrt(diag(cox$naive.var))
+#
+#   rval <- list(
+#     call = cox$call,
+#     # fail=cox$fail,
+#     # na.action=cox$na.action,
+#     n = cox$n,
+#     loglik = cox$loglik,
+#     nbootstraps = cox$nbootstraps,
+#     conf.int_level = conf.int
+#   )
+#   if (!is.null(cox$nevent)) rval$nevent <- cox$nevent
+#
+#   if (is.null(cox$naive.var)) {
+#     tmp <- cbind(
+#       beta, exp(beta), se, beta / se,
+#       pchisq((beta / se)^2, 1, lower.tail = FALSE)
+#     )
+#     dimnames(tmp) <- list(cov_names, c(
+#       "coef",
+#       "exp(coef)",
+#       "se(coef)",
+#       "z",
+#       "Pr(>|z|)"
+#     ))
+#   } else {
+#     tmp <- cbind(
+#       beta, exp(beta), nse, se, beta / se,
+#       pchisq((beta / se)^2, 1, lower.tail = FALSE)
+#     )
+#     dimnames(tmp) <- list(cov_names, c(
+#       "coef",
+#       "exp(coef)",
+#       "se(coef)",
+#       "robust se",
+#       "z",
+#       "Pr(>|z|)"
+#     ))
+#   }
+#   rval$coefficients <- tmp
+#
+#   if (conf.int) {
+#     z <- qnorm((1 + conf.int) / 2, 0, 1)
+#     tmp <- cbind(
+#       exp(beta),
+#       exp(-beta),
+#       exp(beta - z * se),
+#       exp(beta + z * se)
+#     )
+#     dimnames(tmp) <- list(cov_names, c(
+#       "exp(coef)",
+#       "exp(-coef)",
+#       paste("lower .", round(100 * conf.int, 2), sep = ""),
+#       paste("upper .", round(100 * conf.int, 2), sep = "")
+#     ))
+#     rval$conf.int <- tmp
+#   }
+#
+#   if (object$nbootstraps > 1) {
+#     probs <- c((1 - conf.int) / 2, 1 - (1 - conf.int) / 2)
+#
+#     # confidence Interval for coefficients (default 95%)
+#     rval$conf.int_bootstrap <- apply(object$coef_bootstrap, 2, stats::quantile, p = probs)
+#
+#     # # confidence Interval for loglik (default 95%)
+#     # rval$loglik_CI = stats::quantile(object$loglik, p = probs)
+#   }
+#
+#   df <- length(beta2)
+#
+#   logtest <- -2 * (cox$loglik_init[1] - cox$loglik[1])
+#
+#   rval$logtest <- c(
+#     test = logtest,
+#     df = df,
+#     pvalue = pchisq(logtest, df, lower.tail = FALSE)
+#   )
+#   rval$sctest <- c(
+#     test = cox$score[1],
+#     df = df,
+#     pvalue = pchisq(cox$score[1], df, lower.tail = FALSE)
+#   )
+#   rval$rsq <- c(
+#     rsq = 1 - exp(-logtest / cox$n),
+#     maxrsq = 1 - exp(2 * cox$loglik_init[1] / cox$n)
+#   )
+#   rval$waldtest <- c(
+#     test = as.vector(round(cox$wald.test[1], 2)),
+#     df = df,
+#     pvalue = pchisq(as.vector(cox$wald.test[1]), df,
+#                     lower.tail = FALSE
+#     )
+#   )
+#
+#   if (!is.null(cox$rscore)) {
+#     rval$robscore <- c(
+#       test = cox$rscore[1],
+#       df = df,
+#       pvalue = pchisq(cox$rscore[1], df, lower.tail = FALSE)
+#     )
+#   }
+#   rval$used.robust <- !is.null(cox$naive.var)
+#
+#   if (!is.null(cox$concordance)) {
+#     # throw away the extra info, in the name of backwards compatability
+#     rval$concordance <- cox$concordance[[1]][6:7]
+#     names(rval$concordance) <- c("C", "se(C)")
+#   }
+#   if (inherits(cox, "coxphms")) {
+#     rval$cmap <- cox$cmap
+#     rval$states <- cox$states
+#   }
+#
+#   class(rval) <- "summary.coxphGPU"
+#   return(rval)
+# }
+
+
+
+# #' Print summary for coxphGPU object
+# #'
+# #' @param x summary.coxphGPU object
+# #' @param digits significant digits to print
+# #' @param signif.stars show stars to highlight small p-values
+# #' @param ... additional argument(s) for methods.
+# #'
+# #' @exportS3Method print summary.coxphGPU
+# #' @noRd
+# print.summary.coxphGPU <- function(x, ...,
+#                                    digits = max(getOption("digits") - 3, 3),
+#                                    signif.stars = getOption("show.signif.stars")) {
+#   # x = rval
+#   if (!is.null(x$call)) {
+#     cat("Call:\n")
+#     dput(x$call)
+#     cat("\n")
+#   }
+#   if (!is.null(x$fail)) {
+#     cat(" Coxreg failed.", x$fail, "\n")
+#     return()
+#   }
+#
+#   if (x$nbootstraps > 1) {
+#     cat("Results without bootstrap :\n\n")
+#   }
+#   savedig <- options(digits = digits)
+#   on.exit(options(savedig))
+#
+#   omit <- x$na.action
+#   cat("  n=", x$n)
+#   if (!is.null(x$nevent)) {
+#     cat(", number of events=", x$nevent, "\n")
+#   } else {
+#     cat("\n")
+#   }
+#   if (length(omit)) {
+#     cat("   (", naprint(omit), ")\n", sep = "")
+#   }
+#
+#   if (nrow(x$coefficients) == 0) { # Null model
+#     cat("   Null model\n")
+#     return()
+#   }
+#
+#   if (!is.null(x$coefficients)) {
+#     cat("\n")
+#     stats::printCoefmat(x$coefficients,
+#                  digits = digits,
+#                  signif.stars = signif.stars, ...
+#     )
+#   }
+#   if (!is.null(x$conf.int)) {
+#     cat("\n")
+#     print(x$conf.int)
+#   }
+#
+#   cat("\n")
+#
+#   if (!is.null(x$concordance)) {
+#     cat(
+#       "Concordance=", format(round(x$concordance[1], 3)),
+#       " (se =", format(round(x$concordance[2], 3)), ")\n"
+#     )
+#   }
+#   cat(
+#     "Rsquare=", format(round(x$rsq["rsq"], 3)),
+#     "  (max possible=", format(round(x$rsq["maxrsq"], 3)),
+#     ")\n"
+#   )
+#
+#   pdig <- max(1, getOption("digits") - 4) # default it too high IMO
+#   cat("Likelihood ratio test= ", format(round(x$logtest["test"], 2)), "  on ",
+#       x$logtest["df"], " df,", "   p=",
+#       format.pval(x$logtest["pvalue"], digits = pdig),
+#       "\n",
+#       sep = ""
+#   )
+#
+#   cat("Wald test            = ", format(round(x$waldtest["test"], 2)), "  on ",
+#       x$waldtest["df"], " df,", "   p=",
+#       format.pval(x$waldtest["pvalue"], digits = pdig),
+#       "\n",
+#       sep = ""
+#   )
+#   cat("Score (logrank) test = ", format(round(x$sctest["test"], 2)), "  on ",
+#       x$sctest["df"], " df,", "   p=",
+#       format.pval(x$sctest["pvalue"], digits = pdig),
+#       sep = ""
+#   )
+#   if (is.null(x$robscore)) {
+#     cat("\n\n")
+#   } else {
+#     cat(",   Robust = ", format(round(x$robscore["test"], 2)),
+#         "  p=",
+#         format.pval(x$robscore["pvalue"], digits = pdig), "\n\n",
+#         sep = ""
+#     )
+#   }
+#
+#   if (x$used.robust) {
+#     cat(
+#       "  (Note: the likelihood ratio and score tests",
+#       "assume independence of\n     observations within a cluster,",
+#       "the Wald and robust score tests do not).\n"
+#     )
+#   }
+#   invisible()
+#
+#   if (x$nbootstraps > 1) {
+#     cat(" ---------------- \n")
+#     cat(paste0(
+#       "Confidence interval with ", x$nbootstraps,
+#       " bootstraps for exp(coef), conf.level = ",
+#       x$conf.int_level, " :\n"
+#     ))
+#     print(signif(t(exp(x$conf.int_bootstrap))))
+#   }
+# }
 
 
 #' Coef method for coxphGPU object
@@ -1825,184 +1920,218 @@ residuals.coxphGPU <- function(object, ...,
                                collapse = FALSE,
                                weighted = (type %in% c("dfbeta", "dfbetas"))){
 
-  type <- match.arg(type)
-  otype <- type
-  if (type=='dfbeta' || type=='dfbetas') {
-    otype <- type   # used for error messge
-    type <- 'score'
-    if (missing(weighted))
-      weighted <- TRUE  # different default for this case
-  }
-  if (type=='scaledsch') type<-'schoenfeld'
+  NextMethod("residuals", object)
 
-  n <- length(object$residuals)
-  rr <- object$residuals
-  y <- object$y
-  x <- object[['x']]  # avoid matching object$xlevels
-  vv <- drop(object$naive.var)
-  if (is.null(vv)) vv <- drop(object$var)
-  weights <- object$weights
-  if (is.null(weights)) weights <- rep(1,n)
-  strat <- object$strata
-  method <- object$method
-  if (method=='exact' && (type=='score' || type=='schoenfeld'))
-    stop(paste(otype, 'residuals are not available for the exact method'))
-
-  if (type == 'martingale' || type == 'partial')
-    rr <- object$residuals
-  else {
-    # I need Y, and perhaps the X matrix (and strata)
-    Terms <- object$terms
-    if (!inherits(Terms, 'terms'))
-      stop("invalid terms component of object")
-    strats <- attr(Terms, "specials")$strata
-    if (is.null(y)  ||  (is.null(x) && type!= 'deviance') ||
-        inherits(object, "coxphms")) {
-      temp <- coxph.getdata(object, y=TRUE, x=TRUE, stratax=TRUE)
-      y <- temp$y
-      x <- temp$x
-      strat <- temp$strata
-    }
-
-    ny <- ncol(y)
-    status <- y[,ny,drop=TRUE]
-
-    if (type != 'deviance') {
-      nstrat <- as.numeric(strat)
-      nvar <- ncol(x)
-      if (is.null(strat)) {
-        ord <- order(y[,ny-1], -status)
-        newstrat <- rep(0,n)
-      }
-      else {
-        ord <- order(nstrat, y[,ny-1], -status)
-        newstrat <- c(diff(as.numeric(nstrat[ord]))!=0 ,1)
-      }
-      newstrat[n] <- 1
-
-      # sort the data
-      x <- x[ord,]
-      y <- y[ord,]
-      score <- exp(object$linear.predictors)[ord]
-    }
-  }
-
-  #
-  # Now I have gotton the data that I need-- do the work
-  #
-  if (type == 'schoenfeld') {
-    if (ny == 2) {
-      mintime <- min(y[,1])
-      if (mintime < 0) y <- cbind(2*mintime -1, y)
-      else             y <- cbind(-1,y)
-    }
-    temp <- .C("coxscho", n = as.integer(n),
-               as.integer(nvar),
-               as.double(y),
-               resid = as.double(x),
-               as.double(score * weights[ord]),
-               as.integer(newstrat),
-               as.integer(method == 'efron'),
-               double(3*nvar) )
-
-    deaths <- y[,3]==1
-
-    if (nvar == 1) rr <- temp$resid[deaths]
-    else         rr <- matrix(temp$resid[deaths], ncol=nvar) #pick rows
-    if (weighted) rr <- rr * weights[deaths]
-
-    if (length(strats)) attr(rr, "strata")  <- table((strat[ord])[deaths])
-    time <- c(y[deaths,2])  # 'c' kills all of the attributes
-    if (is.matrix(rr)) dimnames(rr)<- list(time, names(object$coefficients))
-    else               names(rr) <- time
-
-    if (otype == 'scaledsch') {
-      ndead <- sum(deaths)
-      coef <- ifelse(is.na(object$coefficients), 0, object$coefficients)
-      if (nvar == 1) rr <- rr * vv * ndead + coef
-      else {
-        cname <- colnames(rr)  # preserve column names
-        rr <- drop(rr %*% vv *ndead + rep(coef, each=nrow(rr)))
-        colnames(rr) <- cname
-      }
-    }
-    return(rr)
-  }
-
-  if (type == 'score') {
-    storage.mode(y) <- storage.mode(x) <- "double"
-    storage.mode(newstrat) <- "integer"
-    storage.mode(score) <- storage.mode(weights) <- "double"
-    if (ny == 2) {
-      resid <- .Call("coxscore2",
-                     y,
-                     x,
-                     newstrat,
-                     score,
-                     weights[ord],
-                     as.integer(method=='efron'))
-    }
-    else {
-      resid <- .Call("agscore2",
-                     y,
-                     x,
-                     newstrat,
-                     score,
-                     weights[ord],
-                     as.integer(method=='efron'))
-    }
-
-    if (nvar >1) {
-      rr <- matrix(0, n, nvar)
-      rr[ord,] <- resid
-      dimnames(rr) <- list(names(object$residuals),
-                           names(object$coefficients))
-    }
-    else rr[ord] <- resid
-
-    if      (otype == 'dfbeta') {
-      if (is.matrix(rr)) rr <- rr %*% vv
-      else               rr <- rr * vv
-    }
-    else if (otype == 'dfbetas') {
-      if (is.matrix(rr))  rr <- (rr %*% vv) %*% diag(sqrt(1/diag(vv)))
-      else                rr <- rr * sqrt(vv)
-    }
-  }
-
-  #
-  # Multiply up by case weights (which will be 1 for unweighted)
-  #
-  if (weighted) rr <- rr * weights
-
-  #Expand out the missing values in the result
-  if (!is.null(object$na.action)) {
-    rr <- naresid(object$na.action, rr)
-    if (is.matrix(rr)) n <- nrow(rr)
-    else               n <- length(rr)
-    if (type == 'deviance') status <- naresid(object$na.action, status)
-  }
-
-  if (type=="partial"){
-    # This needs to be done after the naresid expansion, since the
-    #   predict function will have done naresid expansion, so that
-    #   the lengths match
-    rr <- rr + predict(object, type = "terms")
-  }
-
-  # Collapse if desired
-  if (!missing(collapse)) {
-    if (length(collapse) !=n) stop("Wrong length for 'collapse'")
-    rr <- drop(rowsum(rr, collapse))
-    if (type == 'deviance') status <- drop(rowsum(status, collapse))
-  }
-
-  # Deviance residuals are computed after collapsing occurs
-  if (type == 'deviance')
-    sign(rr) *sqrt(-2* (rr+
-                          ifelse(status==0, 0, status*log(status-rr))))
-  else rr
 }
+
+# #' Residuals method for coxphGPU
+# #'
+# #' Calculates martingale, deviance, score or Schoenfeld residuals for a Cox
+# #' proportional hazards model.
+# #'
+# #' @param object coxphGPU object.
+# #' @param ... additional argument(s) for methods.
+# #' @param type character string indicating the type of residual desired.
+# #'   Possible values are "martingale", "deviance", "score", "schoenfeld",
+# #'   "dfbeta"', "dfbetas", "scaledsch" and "partial". Only enough of the string
+# #'   to determine a unique match is required.
+# #' @param collapse vector indicating which rows to collapse (sum) over. In
+# #'   time-dependent models more than one row data can pertain to a single
+# #'   individual. If there were 4 individuals represented by 3, 1, 2 and 4 rows
+# #'   of data respectively, then collapse=c(1,1,1, 2, 3,3, 4,4,4,4) could be used
+# #'   to obtain per subject rather than per observation residuals.
+# #' @param weighted if TRUE and the model was fit with case weights, then the
+# #'   weighted residuals are returned.
+# #'
+# #' @seealso [residuals.coxph()]
+# #'
+# #' @exportS3Method residuals coxphGPU
+# residuals.coxphGPU <- function(object, ...,
+#                                type = c("martingale", "deviance", "score",
+#                                         "schoenfeld", "dfbeta", "dfbetas",
+#                                         "scaledsch", "partial"),
+#                                collapse = FALSE,
+#                                weighted = (type %in% c("dfbeta", "dfbetas"))){
+#
+#   type <- match.arg(type)
+#   otype <- type
+#   if (type=='dfbeta' || type=='dfbetas') {
+#     otype <- type   # used for error messge
+#     type <- 'score'
+#     if (missing(weighted))
+#       weighted <- TRUE  # different default for this case
+#   }
+#   if (type=='scaledsch') type<-'schoenfeld'
+#
+#   n <- length(object$residuals)
+#   rr <- object$residuals
+#   y <- object$y
+#   x <- object[['x']]  # avoid matching object$xlevels
+#   vv <- drop(object$naive.var)
+#   if (is.null(vv)) vv <- drop(object$var)
+#   weights <- object$weights
+#   if (is.null(weights)) weights <- rep(1,n)
+#   strat <- object$strata
+#   method <- object$method
+#   if (method=='exact' && (type=='score' || type=='schoenfeld'))
+#     stop(paste(otype, 'residuals are not available for the exact method'))
+#
+#   if (type == 'martingale' || type == 'partial')
+#     rr <- object$residuals
+#   else {
+#     # I need Y, and perhaps the X matrix (and strata)
+#     Terms <- object$terms
+#     if (!inherits(Terms, 'terms'))
+#       stop("invalid terms component of object")
+#     strats <- attr(Terms, "specials")$strata
+#     if (is.null(y)  ||  (is.null(x) && type!= 'deviance') ||
+#         inherits(object, "coxphms")) {
+#       temp <- coxph.getdata(object, y=TRUE, x=TRUE, stratax=TRUE)
+#       y <- temp$y
+#       x <- temp$x
+#       strat <- temp$strata
+#     }
+#
+#     ny <- ncol(y)
+#     status <- y[,ny,drop=TRUE]
+#
+#     if (type != 'deviance') {
+#       nstrat <- as.numeric(strat)
+#       nvar <- ncol(x)
+#       if (is.null(strat)) {
+#         ord <- order(y[,ny-1], -status)
+#         newstrat <- rep(0,n)
+#       }
+#       else {
+#         ord <- order(nstrat, y[,ny-1], -status)
+#         newstrat <- c(diff(as.numeric(nstrat[ord]))!=0 ,1)
+#       }
+#       newstrat[n] <- 1
+#
+#       # sort the data
+#       x <- x[ord,]
+#       y <- y[ord,]
+#       score <- exp(object$linear.predictors)[ord]
+#     }
+#   }
+#
+#   #
+#   # Now I have gotton the data that I need-- do the work
+#   #
+#   if (type == 'schoenfeld') {
+#     if (ny == 2) {
+#       mintime <- min(y[,1])
+#       if (mintime < 0) y <- cbind(2*mintime -1, y)
+#       else             y <- cbind(-1,y)
+#     }
+#     temp <- .C("coxscho", n = as.integer(n),
+#                as.integer(nvar),
+#                as.double(y),
+#                resid = as.double(x),
+#                as.double(score * weights[ord]),
+#                as.integer(newstrat),
+#                as.integer(method == 'efron'),
+#                double(3*nvar) )
+#
+#     deaths <- y[,3]==1
+#
+#     if (nvar == 1) rr <- temp$resid[deaths]
+#     else         rr <- matrix(temp$resid[deaths], ncol=nvar) #pick rows
+#     if (weighted) rr <- rr * weights[deaths]
+#
+#     if (length(strats)) attr(rr, "strata")  <- table((strat[ord])[deaths])
+#     time <- c(y[deaths,2])  # 'c' kills all of the attributes
+#     if (is.matrix(rr)) dimnames(rr)<- list(time, names(object$coefficients))
+#     else               names(rr) <- time
+#
+#     if (otype == 'scaledsch') {
+#       ndead <- sum(deaths)
+#       coef <- ifelse(is.na(object$coefficients), 0, object$coefficients)
+#       if (nvar == 1) rr <- rr * vv * ndead + coef
+#       else {
+#         cname <- colnames(rr)  # preserve column names
+#         rr <- drop(rr %*% vv *ndead + rep(coef, each=nrow(rr)))
+#         colnames(rr) <- cname
+#       }
+#     }
+#     return(rr)
+#   }
+#
+#   if (type == 'score') {
+#     storage.mode(y) <- storage.mode(x) <- "double"
+#     storage.mode(newstrat) <- "integer"
+#     storage.mode(score) <- storage.mode(weights) <- "double"
+#     if (ny == 2) {
+#       resid <- .Call("coxscore2",
+#                      y,
+#                      x,
+#                      newstrat,
+#                      score,
+#                      weights[ord],
+#                      as.integer(method=='efron'))
+#     }
+#     else {
+#       resid <- .Call("agscore2",
+#                      y,
+#                      x,
+#                      newstrat,
+#                      score,
+#                      weights[ord],
+#                      as.integer(method=='efron'))
+#     }
+#
+#     if (nvar >1) {
+#       rr <- matrix(0, n, nvar)
+#       rr[ord,] <- resid
+#       dimnames(rr) <- list(names(object$residuals),
+#                            names(object$coefficients))
+#     }
+#     else rr[ord] <- resid
+#
+#     if      (otype == 'dfbeta') {
+#       if (is.matrix(rr)) rr <- rr %*% vv
+#       else               rr <- rr * vv
+#     }
+#     else if (otype == 'dfbetas') {
+#       if (is.matrix(rr))  rr <- (rr %*% vv) %*% diag(sqrt(1/diag(vv)))
+#       else                rr <- rr * sqrt(vv)
+#     }
+#   }
+#
+#   #
+#   # Multiply up by case weights (which will be 1 for unweighted)
+#   #
+#   if (weighted) rr <- rr * weights
+#
+#   #Expand out the missing values in the result
+#   if (!is.null(object$na.action)) {
+#     rr <- naresid(object$na.action, rr)
+#     if (is.matrix(rr)) n <- nrow(rr)
+#     else               n <- length(rr)
+#     if (type == 'deviance') status <- naresid(object$na.action, status)
+#   }
+#
+#   if (type=="partial"){
+#     # This needs to be done after the naresid expansion, since the
+#     #   predict function will have done naresid expansion, so that
+#     #   the lengths match
+#     rr <- rr + predict(object, type = "terms")
+#   }
+#
+#   # Collapse if desired
+#   if (!missing(collapse)) {
+#     if (length(collapse) !=n) stop("Wrong length for 'collapse'")
+#     rr <- drop(rowsum(rr, collapse))
+#     if (type == 'deviance') status <- drop(rowsum(status, collapse))
+#   }
+#
+#   # Deviance residuals are computed after collapsing occurs
+#   if (type == 'deviance')
+#     sign(rr) *sqrt(-2* (rr+
+#                           ifelse(status==0, 0, status*log(status-rr))))
+#   else rr
+# }
+
 
 
 #' Predict method for coxphGPU
@@ -2042,334 +2171,376 @@ predict.coxphGPU <- function(object, newdata,
                              se.fit=FALSE, na.action=na.pass,
                              terms=names(object$assign), collapse,
                              reference=c("strata", "sample", "zero"), ...) {
-  if (!inherits(object, 'coxphGPU'))
-    stop("Primary argument much be a coxph object")
 
-  Call <- match.call()
-  type <-match.arg(type)
-  if (type=="survival") {
-    survival <- TRUE
-    type <- "expected"  #this is to stop lots of "or" statements
-  }
-  else survival <- FALSE
+  NextMethod("predict", object)
 
-  n <- object$n
-  Terms <-  object$terms
-
-  if (!missing(terms)) {
-    if (is.numeric(terms)) {
-      if (any(terms != floor(terms) |
-              terms > length(object$assign) |
-              terms <1)) stop("Invalid terms argument")
-    }
-    else if (any(is.na(match(terms, names(object$assign)))))
-      stop("a name given in the terms argument not found in the model")
-  }
-
-  # I will never need the cluster argument, if present delete it.
-  #  Terms2 are terms I need for the newdata (if present), y is only
-  #  needed there if type == 'expected'
-  if (length(attr(Terms, 'specials')$cluster)) {
-    temp <- untangle.specials(Terms, 'cluster', 1)
-    Terms  <- drop.special(Terms, attr(Terms, "specials")$cluster)
-  }
-
-  if (type != 'expected') Terms2 <- delete.response(Terms)
-  else Terms2 <- Terms
-
-  has.strata <- !is.null(attr(Terms, 'specials')$strata)
-  has.offset <- !is.null(attr(Terms, 'offset'))
-  has.weights <- any(names(object$call) == 'weights')
-  na.action.used <- object$na.action
-  n <- length(object$residuals)
-
-  if (missing(reference) && type=="terms") reference <- "sample"
-  else reference <- match.arg(reference)
-  have.mf <- FALSE
-  if (type == "expected") {
-    y <- object[['y']]
-    if (is.null(y)) {  # very rare case
-      mf <- stats::model.frame(object)
-      y <-  model.extract(mf, 'response')
-      have.mf <- TRUE  #for the logic a few lines below, avoid double work
-    }
-  }
-
-  # This will be needed if there are strata, and is cheap to compute
-  strat.term <- untangle.specials(Terms, "strata")
-  if (se.fit || type=='terms' || (!missing(newdata) && type=="expected") ||
-      (has.strata && (reference=="strata") || type=="expected") ||
-      (reference=="zero" && any(object[["means"]] !=0))) {
-    use.x <- TRUE
-    if (is.null(object[['x']]) || has.weights || has.offset ||
-        (has.strata && is.null(object$strata))) {
-      # I need the original model frame
-      if (!have.mf) mf <- stats::model.frame(object)
-      if (nrow(mf) != n)
-        stop("Data is not the same size as it was in the original fit")
-      x <- model.matrix(object, data=mf)
-      if (has.strata) {
-        if (!is.null(object$strata)) oldstrat <- object$strata
-        else {
-          if (length(strat.term$vars)==1) oldstrat <- mf[[strat.term$vars]]
-          else oldstrat <- strata(mf[,strat.term$vars], shortlabel=TRUE)
-        }
-      }
-      else oldstrat <- rep(0L, n)
-
-      weights <- model.weights(mf)
-      if (is.null(weights)) weights <- rep(1.0, n)
-      offset <- model.offset(mf)
-      if (is.null(offset))  offset  <- 0
-    }
-    else {
-      x <- object[['x']]
-      if (has.strata) oldstrat <- object$strata
-      else oldstrat <- rep(0L, n)
-      weights <-  rep(1.,n)
-      offset <-   0
-    }
-  }
-  else {
-    # I won't need strata in this case either
-    if (has.strata) {
-      Terms2  <- drop.special(Terms2, attr(Terms2, "specials")$strata)
-      has.strata <- FALSE  #remaining routine never needs to look
-    }
-    oldstrat <- rep(0L, n)
-    offset <- 0
-    use.x <- FALSE
-  }
-  if (!missing(newdata)) {
-    use.x <- TRUE  #we do use an X matrix later
-    tcall <- Call[c(1, match(c("newdata", "collapse"), names(Call), nomatch=0))]
-    names(tcall)[2] <- 'data'  #rename newdata to data
-    tcall$formula <- Terms2  #version with no response
-    tcall$na.action <- na.action #always present, since there is a default
-    tcall[[1L]] <- quote(stats::model.frame)  # change the function called
-
-    if (!is.null(attr(Terms, "specials")$strata) && !has.strata) {
-      temp.lev <- object$xlevels
-      temp.lev[strat.term$vars] <- NULL
-      tcall$xlev <- temp.lev
-    }
-    else tcall$xlev <- object$xlevels
-    mf2 <- eval(tcall, parent.frame())
-
-    collapse <- model.extract(mf2, "collapse")
-    n2 <- nrow(mf2)
-
-    if (has.strata) {
-      if (length(strat.term$vars)==1) newstrat <- mf2[[strat.term$vars]]
-      else newstrat <- strata(mf2[,strat.term$vars], shortlabel=TRUE)
-      if (any(is.na(match(levels(newstrat), levels(oldstrat)))))
-        stop("New data has a strata not found in the original model")
-      else newstrat <- factor(newstrat, levels=levels(oldstrat)) #give it all
-      if (length(strat.term$terms))
-        newx <- model.matrix(Terms2[-strat.term$terms], mf2,
-                             contr=object$contrasts)[,-1,drop=FALSE]
-      else newx <- model.matrix(Terms2, mf2,
-                                contr=object$contrasts)[,-1,drop=FALSE]
-    }
-    else {
-      newx <- model.matrix(Terms2, mf2,
-                           contr=object$contrasts)[,-1,drop=FALSE]
-      newstrat <- rep(0L, nrow(mf2))
-    }
-
-    newoffset <- model.offset(mf2)
-    if (is.null(newoffset)) newoffset <- 0
-    if (type== 'expected') {
-      newy <- model.response(mf2)
-      if (attr(newy, 'type') != attr(y, 'type'))
-        stop("New data has a different survival type than the model")
-    }
-    na.action.used <- attr(mf2, 'na.action')
-  }
-  else n2 <- n
-  if (type=="expected") {
-    if (missing(newdata))
-      pred <- y[,ncol(y)] - object$residuals
-    if (!missing(newdata) || se.fit) {
-      ustrata <- unique(oldstrat)
-      risk <- exp(object$linear.predictors)
-      x <- x - rep(object$means, each=nrow(x))  #subtract from each column
-      if (missing(newdata)) #se.fit must be true
-        se <- double(n)
-      else {
-        pred <- se <- double(nrow(mf2))
-        newx <- newx - rep(object$means, each=nrow(newx))
-        newrisk <- c(exp(newx %*% object$coef) + newoffset)
-      }
-
-      survtype<- ifelse(object$method=='efron', 3,2)
-      for (i in ustrata) {
-        indx <- which(oldstrat == i)
-        afit <- agsurv(y[indx,,drop=F], x[indx,,drop=F],
-                       weights[indx], risk[indx],
-                       survtype, survtype)
-        afit.n <- length(afit$time)
-        if (missing(newdata)) {
-          # In this case we need se.fit, nothing else
-          j1 <- approx(afit$time, 1:afit.n, y[indx,1], method='constant',
-                       f=0, yleft=0, yright=afit.n)$y
-          chaz <- c(0, afit$cumhaz)[j1 +1]
-          varh <- c(0, cumsum(afit$varhaz))[j1 +1]
-          xbar <- rbind(0, afit$xbar)[j1+1,,drop=F]
-          if (ncol(y)==2) {
-            dt <- (chaz * x[indx,]) - xbar
-            dt <- dt[,-1] # remove intercept
-            se[indx] <- sqrt(varh + rowSums((dt %*% object$var) *dt)) *
-              risk[indx]
-          }
-          else {
-            j2 <- approx(afit$time, 1:afit.n, y[indx,2], method='constant',
-                         f=0, yleft=0, yright=afit.n)$y
-            chaz2 <- c(0, afit$cumhaz)[j2 +1]
-            varh2 <- c(0, cumsum(afit$varhaz))[j2 +1]
-            xbar2 <- rbind(0, afit$xbar)[j2+1,,drop=F]
-            dt <- (chaz * x[indx,]) - xbar
-            v1 <- varh +  rowSums((dt %*% object$var) *dt)
-            dt2 <- (chaz2 * x[indx,]) - xbar2
-            v2 <- varh2 + rowSums((dt2 %*% object$var) *dt2)
-            se[indx] <- sqrt(v2-v1)* risk[indx]
-          }
-        }
-
-        else {
-          #there is new data
-          use.x <- TRUE
-          indx2 <- which(newstrat == i)
-          j1 <- approx(afit$time, 1:afit.n, newy[indx2,1],
-                       method='constant', f=0, yleft=0, yright=afit.n)$y
-          chaz <-c(0, afit$cumhaz)[j1+1]
-          pred[indx2] <- chaz * newrisk[indx2]
-          if (se.fit) {
-            varh <- c(0, cumsum(afit$varhaz))[j1+1]
-            xbar <- rbind(0, afit$xbar)[j1+1,,drop=F]
-          }
-          if (ncol(y)==2) {
-            if (se.fit) {
-              dt <- (chaz * newx[indx2,]) - xbar
-              se[indx2] <- sqrt(varh + rowSums((dt %*% object$var) *dt)) *
-                newrisk[indx2]
-            }
-          }
-          else {
-            j2 <- approx(afit$time, 1:afit.n, newy[indx2,2],
-                         method='constant', f=0, yleft=0, yright=afit.n)$y
-            chaz2 <- approx(-afit$time, afit$cumhaz, -newy[indx2,2],
-                            method="constant", rule=2, f=0)$y
-            chaz2 <-c(0, afit$cumhaz)[j2+1]
-            pred[indx2] <- (chaz2 - chaz) * newrisk[indx2]
-
-            if (se.fit) {
-              varh2 <- c(0, cumsum(afit$varhaz))[j1+1]
-              xbar2 <- rbind(0, afit$xbar)[j1+1,,drop=F]
-              dt <- (chaz * newx[indx2,]) - xbar
-              dt2 <- (chaz2 * newx[indx2,]) - xbar2
-
-              v2 <- varh2 + rowSums((dt2 %*% object$var) *dt2)
-              v1 <- varh +  rowSums((dt %*% object$var) *dt)
-              se[indx2] <- sqrt(v2-v1)* risk[indx2]
-            }
-          }
-        }
-      }
-    }
-    if (survival) { #it actually was type= survival, do one more step
-      if (se.fit) se <- se * exp(-pred)
-      pred <- exp(-pred)  # probablility of being in state 0
-    }
-  }
-  else {
-    if (is.null(object$coefficients))
-      coef<-numeric(0)
-    else {
-      # Replace any NA coefs with 0, to stop NA in the linear predictor
-      coef <- ifelse(is.na(object$coefficients), 0, object$coefficients)
-    }
-
-    if (missing(newdata)) {
-      offset <- offset - mean(offset)
-      if (has.strata && any(is.na(oldstrat))) is.na(newx) <- is.na(oldstrat)
-      if (has.strata && reference=="strata") {
-        # We can't use as.integer(oldstrat) as an index, if oldstrat is
-        #   a factor variable with unrepresented levels as.integer could
-        #   give 1,2,5 for instance.
-        xmeans <- rowsum(x*weights, oldstrat)/c(rowsum(weights, oldstrat))
-        newx <- x - xmeans[match(oldstrat,row.names(xmeans)),]
-      }
-      else if (use.x) {
-        if (reference == "zero") newx <- x
-        else newx <- x - rep(object$means, each=nrow(x))
-      }
-    }
-    else {
-      offset <- newoffset - mean(offset)
-      if (has.strata && any(is.na(newstrat))) is.na(newx) <- is.na(newstrat)
-      if (has.strata && reference=="strata") {
-        xmeans <- rowsum(x*weights, oldstrat)/c(rowsum(weights, oldstrat))
-        newx_colnames <- colnames(newx)
-        newx <- newx - xmeans[match(newstrat, row.names(xmeans)),newx_colnames]
-      }
-      else if (reference!= "zero")
-        newx <- newx - rep(object$means, each=nrow(newx))
-    }
-
-    if (type=='lp' || type=='risk') {
-      if (use.x) pred <- drop(matrix(newx[,-1]) %*% coef) + offset # remove intercept
-      else pred <- object$linear.predictors
-      if (se.fit) se <- sqrt(rowSums((matrix(newx[,-1]) %*% object$var) * matrix(newx[,-1])))
-
-      if (type=='risk') {
-        pred <- exp(pred)
-        if (se.fit) se <- se * sqrt(pred)  # standard Taylor series approx
-      }
-    }
-    else if (type=='terms') {
-      asgn <- object$assign
-      nterms<-length(asgn)
-      pred<-matrix(ncol=nterms,nrow=NROW(newx))
-      dimnames(pred) <- list(rownames(newx), names(asgn))
-      if (se.fit) se <- pred
-
-      for (i in 1:nterms) {
-        tt <- asgn[[i]]
-        tt <- tt[!is.na(object$coefficients[tt])]
-        xtt <- newx[,tt, drop=F]
-        pred[,i] <- xtt %*% object$coefficient[tt]
-        if (se.fit)
-          se[,i] <- sqrt(rowSums((xtt %*% object$var[tt,tt]) *xtt))
-      }
-      pred <- pred[,terms, drop=F]
-      if (se.fit) se <- se[,terms, drop=F]
-
-      attr(pred, 'constant') <- sum(object$coefficients*object$means, na.rm=T)
-    }
-  }
-  if (type != 'terms') {
-    pred <- drop(pred)
-    if (se.fit) se <- drop(se)
-  }
-
-  if (!is.null(na.action.used)) {
-    pred <- napredict(na.action.used, pred)
-    if (is.matrix(pred)) n <- nrow(pred)
-    else               n <- length(pred)
-    if(se.fit) se <- napredict(na.action.used, se)
-  }
-
-  if (!missing(collapse) && !is.null(collapse)) {
-    if (length(collapse) != n2) stop("Collapse vector is the wrong length")
-    pred <- rowsum(pred, collapse)  # in R, rowsum is a matrix, always
-    if (se.fit) se <- sqrt(rowsum(se^2, collapse))
-    if (type != 'terms') {
-      pred <- drop(pred)
-      if (se.fit) se <- drop(se)
-    }
-  }
-
-  if (se.fit) list(fit=pred, se.fit=se)
-  else pred
 }
+
+# #' Predict method for coxphGPU
+# #'
+# #' Compute fitted values and regression terms for a model fitted by coxphGPU
+# #'
+# #' @param object coxphGPU object
+# #' @param newdata Optional new data at which to do predictions. If absent
+# #'   predictions are for the data frame used in the original fit. When coxph has
+# #'   been called with a formula argument created in another context, i.e., coxph
+# #'   has been called within another function and the formula was passed as an
+# #'   argument to that function, there can be problems finding the data set.
+# #' @param type the type of predicted value. Choices are the linear predictor
+# #'   ("lp"), the risk score exp(lp) ("risk"), the expected number of events
+# #'   given the covariates and follow-up time ("expected"), and the terms of the
+# #'   linear predictor ("terms"). The survival probability for a subject is equal
+# #'   to exp(-expected).
+# #' @param se.fit if TRUE, pointwise standard errors are produced for the
+# #'   predictions.
+# #' @param na.action applies only when the newdata argument is present, and
+# #'   defines the missing value action for the new data. The default is to
+# #'   include all observations. When there is no newdata, then the behavior of
+# #'   missing is dictated by the na.action option of the original fit.
+# #' @param terms if type="terms", this argument can be used to specify which
+# #'   terms should be included; the default is all.
+# #' @param collapse optional vector of subject identifiers. If specified, the
+# #'   output will contain one entry per subject rather than one entry per
+# #'   observation.
+# #' @param reference reference for centering predictions
+# #' @param ... for methods
+# #'
+# #' @seealso [predict.coxph()]
+# #'
+# #' @exportS3Method predict coxphGPU
+# predict.coxphGPU <- function(object, newdata,
+#                              type=c("lp", "risk", "expected", "terms", "survival"),
+#                              se.fit=FALSE, na.action=na.pass,
+#                              terms=names(object$assign), collapse,
+#                              reference=c("strata", "sample", "zero"), ...) {
+#   if (!inherits(object, 'coxphGPU'))
+#     stop("Primary argument much be a coxph object")
+#
+#   Call <- match.call()
+#   type <-match.arg(type)
+#   if (type=="survival") {
+#     survival <- TRUE
+#     type <- "expected"  #this is to stop lots of "or" statements
+#   }
+#   else survival <- FALSE
+#
+#   n <- object$n
+#   Terms <-  object$terms
+#
+#   if (!missing(terms)) {
+#     if (is.numeric(terms)) {
+#       if (any(terms != floor(terms) |
+#               terms > length(object$assign) |
+#               terms <1)) stop("Invalid terms argument")
+#     }
+#     else if (any(is.na(match(terms, names(object$assign)))))
+#       stop("a name given in the terms argument not found in the model")
+#   }
+#
+#   # I will never need the cluster argument, if present delete it.
+#   #  Terms2 are terms I need for the newdata (if present), y is only
+#   #  needed there if type == 'expected'
+#   if (length(attr(Terms, 'specials')$cluster)) {
+#     temp <- untangle.specials(Terms, 'cluster', 1)
+#     Terms  <- drop.special(Terms, attr(Terms, "specials")$cluster)
+#   }
+#
+#   if (type != 'expected') Terms2 <- delete.response(Terms)
+#   else Terms2 <- Terms
+#
+#   has.strata <- !is.null(attr(Terms, 'specials')$strata)
+#   has.offset <- !is.null(attr(Terms, 'offset'))
+#   has.weights <- any(names(object$call) == 'weights')
+#   na.action.used <- object$na.action
+#   n <- length(object$residuals)
+#
+#   if (missing(reference) && type=="terms") reference <- "sample"
+#   else reference <- match.arg(reference)
+#   have.mf <- FALSE
+#   if (type == "expected") {
+#     y <- object[['y']]
+#     if (is.null(y)) {  # very rare case
+#       mf <- stats::model.frame(object)
+#       y <-  model.extract(mf, 'response')
+#       have.mf <- TRUE  #for the logic a few lines below, avoid double work
+#     }
+#   }
+#
+#   # This will be needed if there are strata, and is cheap to compute
+#   strat.term <- untangle.specials(Terms, "strata")
+#   if (se.fit || type=='terms' || (!missing(newdata) && type=="expected") ||
+#       (has.strata && (reference=="strata") || type=="expected") ||
+#       (reference=="zero" && any(object[["means"]] !=0))) {
+#     use.x <- TRUE
+#     if (is.null(object[['x']]) || has.weights || has.offset ||
+#         (has.strata && is.null(object$strata))) {
+#       # I need the original model frame
+#       if (!have.mf) mf <- stats::model.frame(object)
+#       if (nrow(mf) != n)
+#         stop("Data is not the same size as it was in the original fit")
+#       x <- model.matrix(object, data=mf)
+#       if (has.strata) {
+#         if (!is.null(object$strata)) oldstrat <- object$strata
+#         else {
+#           if (length(strat.term$vars)==1) oldstrat <- mf[[strat.term$vars]]
+#           else oldstrat <- strata(mf[,strat.term$vars], shortlabel=TRUE)
+#         }
+#       }
+#       else oldstrat <- rep(0L, n)
+#
+#       weights <- model.weights(mf)
+#       if (is.null(weights)) weights <- rep(1.0, n)
+#       offset <- model.offset(mf)
+#       if (is.null(offset))  offset  <- 0
+#     }
+#     else {
+#       x <- object[['x']]
+#       if (has.strata) oldstrat <- object$strata
+#       else oldstrat <- rep(0L, n)
+#       weights <-  rep(1.,n)
+#       offset <-   0
+#     }
+#   }
+#   else {
+#     # I won't need strata in this case either
+#     if (has.strata) {
+#       Terms2  <- drop.special(Terms2, attr(Terms2, "specials")$strata)
+#       has.strata <- FALSE  #remaining routine never needs to look
+#     }
+#     oldstrat <- rep(0L, n)
+#     offset <- 0
+#     use.x <- FALSE
+#   }
+#   if (!missing(newdata)) {
+#     use.x <- TRUE  #we do use an X matrix later
+#     tcall <- Call[c(1, match(c("newdata", "collapse"), names(Call), nomatch=0))]
+#     names(tcall)[2] <- 'data'  #rename newdata to data
+#     tcall$formula <- Terms2  #version with no response
+#     tcall$na.action <- na.action #always present, since there is a default
+#     tcall[[1L]] <- quote(stats::model.frame)  # change the function called
+#
+#     if (!is.null(attr(Terms, "specials")$strata) && !has.strata) {
+#       temp.lev <- object$xlevels
+#       temp.lev[strat.term$vars] <- NULL
+#       tcall$xlev <- temp.lev
+#     }
+#     else tcall$xlev <- object$xlevels
+#     mf2 <- eval(tcall, parent.frame())
+#
+#     collapse <- model.extract(mf2, "collapse")
+#     n2 <- nrow(mf2)
+#
+#     if (has.strata) {
+#       if (length(strat.term$vars)==1) newstrat <- mf2[[strat.term$vars]]
+#       else newstrat <- strata(mf2[,strat.term$vars], shortlabel=TRUE)
+#       if (any(is.na(match(levels(newstrat), levels(oldstrat)))))
+#         stop("New data has a strata not found in the original model")
+#       else newstrat <- factor(newstrat, levels=levels(oldstrat)) #give it all
+#       if (length(strat.term$terms))
+#         newx <- model.matrix(Terms2[-strat.term$terms], mf2,
+#                              contr=object$contrasts)[,-1,drop=FALSE]
+#       else newx <- model.matrix(Terms2, mf2,
+#                                 contr=object$contrasts)[,-1,drop=FALSE]
+#     }
+#     else {
+#       newx <- model.matrix(Terms2, mf2,
+#                            contr=object$contrasts)[,-1,drop=FALSE]
+#       newstrat <- rep(0L, nrow(mf2))
+#     }
+#
+#     newoffset <- model.offset(mf2)
+#     if (is.null(newoffset)) newoffset <- 0
+#     if (type== 'expected') {
+#       newy <- model.response(mf2)
+#       if (attr(newy, 'type') != attr(y, 'type'))
+#         stop("New data has a different survival type than the model")
+#     }
+#     na.action.used <- attr(mf2, 'na.action')
+#   }
+#   else n2 <- n
+#   if (type=="expected") {
+#     if (missing(newdata))
+#       pred <- y[,ncol(y)] - object$residuals
+#     if (!missing(newdata) || se.fit) {
+#       ustrata <- unique(oldstrat)
+#       risk <- exp(object$linear.predictors)
+#       x <- x - rep(object$means, each=nrow(x))  #subtract from each column
+#       if (missing(newdata)) #se.fit must be true
+#         se <- double(n)
+#       else {
+#         pred <- se <- double(nrow(mf2))
+#         newx <- newx - rep(object$means, each=nrow(newx))
+#         newrisk <- c(exp(newx %*% object$coef) + newoffset)
+#       }
+#
+#       survtype<- ifelse(object$method=='efron', 3,2)
+#       for (i in ustrata) {
+#         indx <- which(oldstrat == i)
+#         afit <- agsurv(y[indx,,drop=F], x[indx,,drop=F],
+#                        weights[indx], risk[indx],
+#                        survtype, survtype)
+#         afit.n <- length(afit$time)
+#         if (missing(newdata)) {
+#           # In this case we need se.fit, nothing else
+#           j1 <- approx(afit$time, 1:afit.n, y[indx,1], method='constant',
+#                        f=0, yleft=0, yright=afit.n)$y
+#           chaz <- c(0, afit$cumhaz)[j1 +1]
+#           varh <- c(0, cumsum(afit$varhaz))[j1 +1]
+#           xbar <- rbind(0, afit$xbar)[j1+1,,drop=F]
+#           if (ncol(y)==2) {
+#             dt <- (chaz * x[indx,]) - xbar
+#             dt <- dt[,-1] # remove intercept
+#             se[indx] <- sqrt(varh + rowSums((dt %*% object$var) *dt)) *
+#               risk[indx]
+#           }
+#           else {
+#             j2 <- approx(afit$time, 1:afit.n, y[indx,2], method='constant',
+#                          f=0, yleft=0, yright=afit.n)$y
+#             chaz2 <- c(0, afit$cumhaz)[j2 +1]
+#             varh2 <- c(0, cumsum(afit$varhaz))[j2 +1]
+#             xbar2 <- rbind(0, afit$xbar)[j2+1,,drop=F]
+#             dt <- (chaz * x[indx,]) - xbar
+#             v1 <- varh +  rowSums((dt %*% object$var) *dt)
+#             dt2 <- (chaz2 * x[indx,]) - xbar2
+#             v2 <- varh2 + rowSums((dt2 %*% object$var) *dt2)
+#             se[indx] <- sqrt(v2-v1)* risk[indx]
+#           }
+#         }
+#
+#         else {
+#           #there is new data
+#           use.x <- TRUE
+#           indx2 <- which(newstrat == i)
+#           j1 <- approx(afit$time, 1:afit.n, newy[indx2,1],
+#                        method='constant', f=0, yleft=0, yright=afit.n)$y
+#           chaz <-c(0, afit$cumhaz)[j1+1]
+#           pred[indx2] <- chaz * newrisk[indx2]
+#           if (se.fit) {
+#             varh <- c(0, cumsum(afit$varhaz))[j1+1]
+#             xbar <- rbind(0, afit$xbar)[j1+1,,drop=F]
+#           }
+#           if (ncol(y)==2) {
+#             if (se.fit) {
+#               dt <- (chaz * newx[indx2,]) - xbar
+#               se[indx2] <- sqrt(varh + rowSums((dt %*% object$var) *dt)) *
+#                 newrisk[indx2]
+#             }
+#           }
+#           else {
+#             j2 <- approx(afit$time, 1:afit.n, newy[indx2,2],
+#                          method='constant', f=0, yleft=0, yright=afit.n)$y
+#             chaz2 <- approx(-afit$time, afit$cumhaz, -newy[indx2,2],
+#                             method="constant", rule=2, f=0)$y
+#             chaz2 <-c(0, afit$cumhaz)[j2+1]
+#             pred[indx2] <- (chaz2 - chaz) * newrisk[indx2]
+#
+#             if (se.fit) {
+#               varh2 <- c(0, cumsum(afit$varhaz))[j1+1]
+#               xbar2 <- rbind(0, afit$xbar)[j1+1,,drop=F]
+#               dt <- (chaz * newx[indx2,]) - xbar
+#               dt2 <- (chaz2 * newx[indx2,]) - xbar2
+#
+#               v2 <- varh2 + rowSums((dt2 %*% object$var) *dt2)
+#               v1 <- varh +  rowSums((dt %*% object$var) *dt)
+#               se[indx2] <- sqrt(v2-v1)* risk[indx2]
+#             }
+#           }
+#         }
+#       }
+#     }
+#     if (survival) { #it actually was type= survival, do one more step
+#       if (se.fit) se <- se * exp(-pred)
+#       pred <- exp(-pred)  # probablility of being in state 0
+#     }
+#   }
+#   else {
+#     if (is.null(object$coefficients))
+#       coef<-numeric(0)
+#     else {
+#       # Replace any NA coefs with 0, to stop NA in the linear predictor
+#       coef <- ifelse(is.na(object$coefficients), 0, object$coefficients)
+#     }
+#
+#     if (missing(newdata)) {
+#       offset <- offset - mean(offset)
+#       if (has.strata && any(is.na(oldstrat))) is.na(newx) <- is.na(oldstrat)
+#       if (has.strata && reference=="strata") {
+#         # We can't use as.integer(oldstrat) as an index, if oldstrat is
+#         #   a factor variable with unrepresented levels as.integer could
+#         #   give 1,2,5 for instance.
+#         xmeans <- rowsum(x*weights, oldstrat)/c(rowsum(weights, oldstrat))
+#         newx <- x - xmeans[match(oldstrat,row.names(xmeans)),]
+#       }
+#       else if (use.x) {
+#         if (reference == "zero") newx <- x
+#         else newx <- x - rep(object$means, each=nrow(x))
+#       }
+#     }
+#     else {
+#       offset <- newoffset - mean(offset)
+#       if (has.strata && any(is.na(newstrat))) is.na(newx) <- is.na(newstrat)
+#       if (has.strata && reference=="strata") {
+#         xmeans <- rowsum(x*weights, oldstrat)/c(rowsum(weights, oldstrat))
+#         newx_colnames <- colnames(newx)
+#         newx <- newx - xmeans[match(newstrat, row.names(xmeans)),newx_colnames]
+#       }
+#       else if (reference!= "zero")
+#         newx <- newx - rep(object$means, each=nrow(newx))
+#     }
+#
+#     if (type=='lp' || type=='risk') {
+#       if (use.x) pred <- drop(matrix(newx[,-1]) %*% coef) + offset # remove intercept
+#       else pred <- object$linear.predictors
+#       if (se.fit) se <- sqrt(rowSums((matrix(newx[,-1]) %*% object$var) * matrix(newx[,-1])))
+#
+#       if (type=='risk') {
+#         pred <- exp(pred)
+#         if (se.fit) se <- se * sqrt(pred)  # standard Taylor series approx
+#       }
+#     }
+#     else if (type=='terms') {
+#       asgn <- object$assign
+#       nterms<-length(asgn)
+#       pred<-matrix(ncol=nterms,nrow=NROW(newx))
+#       dimnames(pred) <- list(rownames(newx), names(asgn))
+#       if (se.fit) se <- pred
+#
+#       for (i in 1:nterms) {
+#         tt <- asgn[[i]]
+#         tt <- tt[!is.na(object$coefficients[tt])]
+#         xtt <- newx[,tt, drop=F]
+#         pred[,i] <- xtt %*% object$coefficient[tt]
+#         if (se.fit)
+#           se[,i] <- sqrt(rowSums((xtt %*% object$var[tt,tt]) *xtt))
+#       }
+#       pred <- pred[,terms, drop=F]
+#       if (se.fit) se <- se[,terms, drop=F]
+#
+#       attr(pred, 'constant') <- sum(object$coefficients*object$means, na.rm=T)
+#     }
+#   }
+#   if (type != 'terms') {
+#     pred <- drop(pred)
+#     if (se.fit) se <- drop(se)
+#   }
+#
+#   if (!is.null(na.action.used)) {
+#     pred <- napredict(na.action.used, pred)
+#     if (is.matrix(pred)) n <- nrow(pred)
+#     else               n <- length(pred)
+#     if(se.fit) se <- napredict(na.action.used, se)
+#   }
+#
+#   if (!missing(collapse) && !is.null(collapse)) {
+#     if (length(collapse) != n2) stop("Collapse vector is the wrong length")
+#     pred <- rowsum(pred, collapse)  # in R, rowsum is a matrix, always
+#     if (se.fit) se <- sqrt(rowsum(se^2, collapse))
+#     if (type != 'terms') {
+#       pred <- drop(pred)
+#       if (se.fit) se <- drop(se)
+#     }
+#   }
+#
+#   if (se.fit) list(fit=pred, se.fit=se)
+#   else pred
+# }
