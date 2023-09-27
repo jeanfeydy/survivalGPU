@@ -1078,8 +1078,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   fit <- list(
     coefficients = coef,
     var = var,
-    loglik = c(coxfit$loglik),
-    loglik_init = c(coxfit$`loglik init`),
+    loglik = c(coxfit$`loglik init`, coxfit$loglik),
+    # loglik = c(coxfit$loglik),
+    # loglik_init = c(coxfit$`loglik init`),
     score = c(coxfit$`sctest_init`),
     means = c(coxfit$means),
     iter = c(coxfit$iter)

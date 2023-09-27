@@ -104,6 +104,16 @@ summary(coxphGPU_bootstrap)
 ```
 
 
+### Forestplot
+
+You can use `ggforest()` function from `survminer` package to plot forestplot for Cox PH model. The confidence interval plotted is the confidence interval by the normal distribution (not bootstrap)
+
+```{r}
+library(survminer)
+ggforest(model = coxphGPU_bootstrap,
+         data = drugdata)
+```
+
 ### WCE
 
 WCE allows modeling the cumulative effects of time-varying exposures, weighted according to their relative proximity in time and represented by time-dependent covariates. Currently, the weight function is estimated by the Cox proportional hazards model. To build a model, you can use the `wceGPU` function in the same way as the `WCE::WCE` function from WCE package.

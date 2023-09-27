@@ -101,14 +101,14 @@ test_that("Coxph right - Covar matrix", {
 test_that("Coxph counting - log likelihood", {
   expect_equal(
     round(coxph$loglik[2], 2),
-    round(coxphGPU_bootstrap$loglik, 2)
+    round(coxphGPU_bootstrap$loglik[2], 2)
   )
 })
 
 test_that("Coxph right - log likelihood", {
   expect_equal(
     round(coxph_right$loglik[2], 2),
-    round(coxphGPU_right$loglik, 2)
+    round(coxphGPU_right$loglik[2], 2)
   )
 })
 
@@ -368,7 +368,7 @@ convergence_warning <- capture_warnings(
                       iter.max = i)
 
     temp[i+1,] <- c(tfit$iter, coef(tfit), tfit$loglik[2], 1/vcov(tfit))
-    temp2[i+1,] <- c(tfit2$iter, coef(tfit2), tfit2$loglik, 1/tfit2$var)
+    temp2[i+1,] <- c(tfit2$iter, coef(tfit2), tfit2$loglik[2], 1/tfit2$var)
   }
 )
 
