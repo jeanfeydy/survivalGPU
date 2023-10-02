@@ -93,7 +93,8 @@ Event variables.
 coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   data = drugdata,
   bootstrap = n_bootstrap,
-  batchsize = batchsize
+  batchsize = batchsize,
+  ties = "efron"
 )
 ```
 
@@ -104,34 +105,73 @@ confidence interval for estimated coefficients with bootstrap.
 summary(coxphGPU_bootstrap)
 #> Call:
 #> coxphGPU.default(formula = Surv(Start, Stop, Event) ~ sex + age, 
-#>     data = drugdata, bootstrap = n_bootstrap, batchsize = batchsize)
-#> 
-#> Results without bootstrap :
+#>     data = drugdata, ties = "efron", bootstrap = n_bootstrap, 
+#>     batchsize = batchsize)
 #> 
 #>   n= 77038, number of events= 383 
 #> 
 #>         coef exp(coef) se(coef)     z Pr(>|z|)    
-#> sex 0.620635  1.860108 0.117783 5.269 1.37e-07 ***
-#> age 0.010696  1.010754 0.003964 2.698  0.00697 ** 
+#> sex 0.619201  1.857443 0.117770 5.258 1.46e-07 ***
+#> age 0.010671  1.010728 0.003963 2.692  0.00709 ** 
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #>     exp(coef) exp(-coef) lower .95 upper .95
-#> sex     1.860     0.5376     1.477     2.343
+#> sex     1.857     0.5384     1.475     2.340
 #> age     1.011     0.9894     1.003     1.019
 #> 
 #> Concordance= 0.59  (se = 0.018 )
-#> Rsquare= 0   (max possible= 0.049 )
-#> Likelihood ratio test= 33.88  on 2 df,   p=4e-08
-#> Wald test            = 36.27  on 2 df,   p=1e-08
-#> Score (logrank) test = 37.27  on 2 df,   p=8e-09
+#> Likelihood ratio test= 33.73  on 2 df,   p=5e-08
+#> Wald test            = 36.1  on 2 df,   p=1e-08
+#> Score (logrank) test = 37.09  on 2 df,   p=9e-09
 #> 
 #>  ---------------- 
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
-#>      2.5% 97.5%
-#> sex 1.506 2.269
-#> age 1.004 1.020
+#>        2.5%   97.5%
+#> sex 1.48769 2.35963
+#> age 1.00234 1.01867
 ```
+
+#### Test the Proportional Hazards Assumption
+
+You can test the proportional hazards assumption for a Cox regression
+with `survival::cox.zph()`.
+
+``` r
+cox.zph(coxphGPU_bootstrap)
+#>          chisq df    p
+#> sex    0.00319  1 0.95
+#> age    0.63109  1 0.43
+#> GLOBAL 0.64378  2 0.72
+```
+
+Plot scaled Schoenfeld residuals against the time for each covariates
+with `ggcoxzph()` function from `survminer` package.
+
+``` r
+survminer::ggcoxzph(cox.zph(coxphGPU_bootstrap))
+```
+
+<img src="man/figures/README-unnamed-chunk-6-1.png" width="70%" />
+
+#### Forestplot
+
+Also with the `survminer` package, you can use `ggforest()` function to
+plot forestplot for Cox PH model. The confidence interval plotted is the
+confidence interval by the normal distribution (not bootstrap)
+
+``` r
+survminer::ggforest(model = coxphGPU_bootstrap,
+                    data = drugdata)
+```
+
+<img src="man/figures/README-unnamed-chunk-7-1.png" width="70%" />
+
+#### Survival Curves
+
+Is it possible to check Kaplan-Meier survival estimates with
+`survival::survfit()` function. After you can use
+`survminer::ggsurvplot()` to plot a survival curve.
 
 ### WCE
 
@@ -159,24 +199,6 @@ possible to have confidence interval with bootstrap.
 
 ``` r
 summary(wce_gpu_bootstrap)
-#> Estimated coefficients for the covariates :
-#>       coef CI 2.5 % CI 97.5 % exp(coef) se(coef)   z     p    
-#> age 0.0116   0.0038    0.0194    1.0116   0.0040 2.9 0.004 ** 
-#> sex 0.6876   0.4546    0.9206    1.9889   0.1189 5.8 7e-09 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
-#> Number of events : 383
-#> Partial log-Likelihoods : -1891.64
-#> BIC : 3824.92
-#> 
-#>  ---------------- 
-#> With bootstrap (50 bootstraps), conf.level = 0.95 :
-#> 
-#> CI of estimates :
-#>           2.5%     97.5%
-#> age 0.00340716 0.0193621
-#> sex 0.44109100 0.9042010
 ```
 
 The risk function can be plot, and if you added bootstrap, confidence
@@ -185,8 +207,6 @@ band intervals will be visible.
 ``` r
 plot(wce_gpu_bootstrap)
 ```
-
-<img src="man/figures/README-wceGPU_plot-1.png" width="70%" />
 
 ## References
 

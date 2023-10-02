@@ -17,41 +17,65 @@
 )
 }
 \arguments{
-\item{object}{coxphGPU object}
+\item{object}{the results of a coxphGPU fit.}
 
-\item{newdata}{Optional new data at which to do predictions. If absent
-predictions are for the data frame used in the original fit. When coxph has
-been called with a formula argument created in another context, i.e., coxph
-has been called within another function and the formula was passed as an
-argument to that function, there can be problems finding the data set.}
+\item{newdata}{
+  Optional new data at which to do predictions.
+  If absent predictions are for the  data frame used in the original
+  fit. 
+  When coxph has been called with a formula argument created in another
+  context, i.e., coxph has been called within another function and the
+  formula was passed as an argument to that function, there can be
+  problems finding the data set.  See the note below.
+}
 
-\item{type}{the type of predicted value. Choices are the linear predictor
-("lp"), the risk score exp(lp) ("risk"), the expected number of events
-given the covariates and follow-up time ("expected"), and the terms of the
-linear predictor ("terms"). The survival probability for a subject is equal
-to exp(-expected).}
+\item{type}{
+the type of predicted value. 
+Choices are the linear predictor (\code{"lp"}), the risk score exp(lp)
+(\code{"risk"}), 
+the expected number of events given the covariates and follow-up time 
+(\code{"expected"}), and the terms of the linear predictor
+(\code{"terms"}).
+The survival probability for a subject is equal to exp(-expected).
+}
 
-\item{se.fit}{if TRUE, pointwise standard errors are produced for the
-predictions.}
+\item{se.fit}{
+if TRUE, pointwise standard errors are produced for the predictions. 
+}
 
-\item{na.action}{applies only when the newdata argument is present, and
-defines the missing value action for the new data. The default is to
-include all observations. When there is no newdata, then the behavior of
-missing is dictated by the na.action option of the original fit.}
+\item{na.action}{
+  applies only when the \code{newdata} argument is present, and defines
+  the missing value action for the new data.  The default is to include
+  all observations.
+  When there is no newdata, then the behavior of missing is dictated by
+  the na.action option of the original fit.}
 
-\item{terms}{if type="terms", this argument can be used to specify which
-terms should be included; the default is all.}
+\item{terms}{
+if type="terms", this argument can be used to specify which terms should be 
+included; the default is all. 
+}
 
-\item{collapse}{optional vector of subject identifiers. If specified, the
-output will contain one entry per subject rather than one entry per
-observation.}
+\item{collapse}{
+optional vector of subject identifiers.  
+If specified, the output will contain one entry per subject rather than one 
+entry per observation. 
+}
 
-\item{reference}{reference for centering predictions}
+\item{reference}{reference for centering predictions, see details below}
 
-\item{...}{for methods}
+\item{...}{For future methods}
 }
 \description{
 Compute fitted values and regression terms for a model fitted by coxphGPU
+}
+\examples{
+library(survival)
+options(na.action = na.exclude) # retain NA in predictions
+fit <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung)
+predict(fit, type = "lp")
+predict(fit, type = "expected")
+predict(fit, type = "risk", se.fit = TRUE)
+predict(fit, type = "terms", se.fit = TRUE)
 }
 \seealso{
 \code{\link[=predict.coxph]{predict.coxph()}}

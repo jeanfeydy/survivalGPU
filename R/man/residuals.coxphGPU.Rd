@@ -14,27 +14,50 @@
 )
 }
 \arguments{
-\item{object}{coxphGPU object.}
+\item{object}{
+an object inheriting from class \code{coxph}, representing a fitted Cox
+regression model.
+Typically this is the output from the \code{coxph} function.
+}
 
-\item{...}{additional argument(s) for methods.}
+\item{...}{other unused arguments}
 
-\item{type}{character string indicating the type of residual desired.
-Possible values are "martingale", "deviance", "score", "schoenfeld",
-"dfbeta"', "dfbetas", "scaledsch" and "partial". Only enough of the string
-to determine a unique match is required.}
+\item{type}{
+character string indicating the type of residual desired.
+Possible values are \code{"martingale"}, \code{"deviance"}, \code{"score"}, \code{"schoenfeld"},
+"dfbeta"', \code{"dfbetas"}, \code{"scaledsch"} and \code{"partial"}.
+Only enough of the string to determine a unique match is required.
+}
 
-\item{collapse}{vector indicating which rows to collapse (sum) over. In
-time-dependent models more than one row data can pertain to a single
-individual. If there were 4 individuals represented by 3, 1, 2 and 4 rows
-of data respectively, then collapse=c(1,1,1, 2, 3,3, 4,4,4,4) could be used
-to obtain per subject rather than per observation residuals.}
+\item{collapse}{
+vector indicating which rows to collapse (sum) over.
+In time-dependent models more than one row data can pertain
+to a single individual.
+If there were 4 individuals represented by 3, 1, 2 and 4 rows of data
+respectively, then \code{collapse=c(1,1,1, 2, 3,3, 4,4,4,4)} could be used to
+obtain per subject rather than per observation residuals.
+}
 
-\item{weighted}{if TRUE and the model was fit with case weights, then the
-weighted residuals are returned.}
+\item{weighted}{
+if \code{TRUE} and the model was fit with case weights, then the weighted
+residuals are returned.
+}
 }
 \description{
-Calculates martingale, deviance, score or Schoenfeld residuals for a Cox
-proportional hazards model.
+Calculates martingale, deviance, score or Schoenfeld residuals for a
+Cox proportional hazards model.
+}
+\examples{
+library(survival)
+fit <- coxphGPU(Surv(start, stop, event) ~ age + surgery,
+                data = heart)
+
+# Martingale residuals
+mresid <- resid(fit, collapse = heart$id)
+}
+\references{
+T. Therneau, P. Grambsch, and T. Fleming. "Martingale based residuals
+for survival models", \emph{Biometrika}, March 1990.
 }
 \seealso{
 \code{\link[=residuals.coxph]{residuals.coxph()}}

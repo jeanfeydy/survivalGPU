@@ -93,7 +93,8 @@ You can realize the Cox model with the `coxphGPU` function, which is written in 
 coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   data = drugdata,
   bootstrap = n_bootstrap,
-  batchsize = batchsize
+  batchsize = batchsize,
+  ties = "efron"
 )
 ```
 
@@ -104,21 +105,38 @@ summary(coxphGPU_bootstrap)
 ```
 
 
-### Forestplot
+#### Test the Proportional Hazards Assumption
 
-You can use `ggforest()` function from `survminer` package to plot forestplot for Cox PH model. The confidence interval plotted is the confidence interval by the normal distribution (not bootstrap)
+You can test the proportional hazards assumption for a Cox regression with `survival::cox.zph()`.
 
 ```{r}
-library(survminer)
-ggforest(model = coxphGPU_bootstrap,
-         data = drugdata)
+cox.zph(coxphGPU_bootstrap)
 ```
+
+Plot scaled Schoenfeld residuals against the time for each covariates with `ggcoxzph()` function from `survminer` package.
+
+```{r}
+survminer::ggcoxzph(cox.zph(coxphGPU_bootstrap))
+```
+
+#### Forestplot
+
+Also with the `survminer` package, you can use `ggforest()` function to plot forestplot for Cox PH model. The confidence interval plotted is the confidence interval by the normal distribution (not bootstrap)
+
+```{r}
+survminer::ggforest(model = coxphGPU_bootstrap,
+                    data = drugdata)
+```
+
+#### Survival Curves
+
+Is it possible to check Kaplan-Meier survival estimates with `survival::survfit()` function. After you can use `survminer::ggsurvplot()` to plot a survival curve.
 
 ### WCE
 
 WCE allows modeling the cumulative effects of time-varying exposures, weighted according to their relative proximity in time and represented by time-dependent covariates. Currently, the weight function is estimated by the Cox proportional hazards model. To build a model, you can use the `wceGPU` function in the same way as the `WCE::WCE` function from WCE package.
 
-```{r wceGPU}
+```{r wceGPU, eval=FALSE}
 wce_gpu_bootstrap <- wceGPU(
   data = drugdata, nknots = 1, cutoff = 90, id = "Id",
   event = "Event", start = "Start", stop = "Stop",
@@ -130,13 +148,13 @@ wce_gpu_bootstrap <- wceGPU(
 
 In the summary, there are estimated coefficients for the covariates with his confidence interval, calculated with var-covariance matrix, and information to see the significance of the covariates. It's also possible to have confidence interval with bootstrap.
 
-```{r}
+```{r, eval=FALSE}
 summary(wce_gpu_bootstrap)
 ```
 
 The risk function can be plot, and if you added bootstrap, confidence band intervals will be visible.
 
-```{r wceGPU_plot}
+```{r wceGPU_plot, eval=FALSE}
 plot(wce_gpu_bootstrap)
 ```
 

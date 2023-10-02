@@ -190,10 +190,25 @@ test_that("Coxph counting - predict method expected type", {
   )
 })
 
+
+test_that("Coxph counting - predict method expected type - se.fit", {
+  expect_equal(
+    round(predict(coxph, type = "expected", se.fit = TRUE)[[2]], 3),
+    round(predict(coxphGPU, type = "expected", se.fit = TRUE)[[2]], 3)
+  )
+})
+
 # test_that("Coxph counting - predict method terms type", {
 #   expect_equal(
 #     round(predict(coxph, type = "terms"), 3),
 #     round(predict(coxphGPU, type = "terms"), 3)
+#   )
+# })
+#
+# test_that("Coxph counting - predict method terms type - se.fit", {
+#   expect_equal(
+#     round(predict(coxph, type = "terms", se.fit = TRUE)[[2]], 3),
+#     round(predict(coxphGPU, type = "terms", se.fit = TRUE)[[2]], 3)
 #   )
 # })
 
@@ -401,18 +416,18 @@ test_that("test1 - H", {
 
 
 
-# check example ?predict.coxph
-
-lung2 <- lung |>
-  dplyr::mutate(status = status - 1) |>
-  tidyr::drop_na()
-fit <- coxph(Surv(time, status) ~ age + ph.ecog + strata(inst), lung2)
-# fit_gpu <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung2,bootstrap = 1) # error avec strata
-
-# #lung data set has status coded as 1/2
-# mresid <- (lung$status-1) - predict(fit, type='expected') #Martingale resid
-# predict(fit,type="lp")
-# predict(fit,type="expected")
-# predict(fit,type="risk",se.fit=TRUE)
-# predict(fit,type="terms",se.fit=TRUE)
+# # check example ?predict.coxph
+# lung2 <- lung |>
+#   dplyr::mutate(status = status - 1) |>
+#   tidyr::drop_na()
+# fit <- coxph(Surv(time, status) ~ age + ph.ecog + strata(inst), lung2)
+# fit_gpu <- coxphGPU(Surv(time, status) ~ age + strata(test), lung3, bootstrap = 1)
+# fit_gpu <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung2, bootstrap = 1) # error avec strata (quand type right)
+#
+# # #lung data set has status coded as 1/2
+# # mresid <- (lung$status-1) - predict(fit, type='expected') #Martingale resid
+# # predict(fit,type="lp")
+# # predict(fit,type="expected")
+# # predict(fit,type="risk",se.fit=TRUE)
+# # predict(fit,type="terms",se.fit=TRUE)
 
