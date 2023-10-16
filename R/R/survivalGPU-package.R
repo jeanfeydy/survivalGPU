@@ -44,6 +44,6 @@ use_survivalGPU <- function() {
 #' @examples
 #' use_cuda()
 use_cuda <- function() {
-  survivalgpu <- use_survivalGPU()
+  # survivalgpu <- use_survivalGPU()
   return(survivalgpu$use_cuda)
 }

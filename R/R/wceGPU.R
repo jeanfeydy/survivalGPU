@@ -126,7 +126,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                            aic = FALSE, id, event, start, stop, expos,
                            covariates = NULL, nbootstraps = 1, batchsize = 0,
                            confint = 0.95, controls = NULL, ...) {
-  survivalgpu <- use_survivalGPU()
+  # survivalgpu <- use_survivalGPU()
   wce_R <- survivalgpu$wce_R
 
   # Minor changes for python inputs
