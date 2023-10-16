@@ -1,0 +1,94 @@
+---
+title: "Weighted Cumulative Exposure : Signal detection"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Weighted Cumulative Exposure : Signal detection}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+présenter Weighted Cumulative Exposure[^wce] model ...
+
+
+Let's make an example with `drugdata` dataset from WCE package. Before load `survivalGPU`, use your virtual python environment (see `vignette("python_connect")`).
+
+```{r}
+library(reticulate)
+use_virtualenv(virtualenv = "survivalGPU")
+```
+
+
+```{r example, echo = FALSE}
+library(survivalGPU)
+library(WCE)
+
+data(drugdata)
+head(drugdata)
+```
+
+Check if CUDA is detected :
+
+```{r}
+use_cuda()
+```
+
+By default, functions run with GPU if detected. Then we specify the number of bootstrap, and consequently the batchsize argument, according to CUDA drivers detection.
+
+```{r}
+if (use_cuda()) {
+  n_bootstrap <- 1000
+  batchsize <- 200
+} else {
+  n_bootstrap <- 50
+  batchsize <- 10
+}
+```
+
+
+WCE allows modeling the cumulative effects of time-varying exposures, weighted according to their relative proximity in time and represented by time-dependent covariates. Currently, the weight function is estimated by the Cox proportional hazards model. To build a model, you can use the `wceGPU` function in the same way as the `WCE::WCE` function from WCE package.
+
+```{r wceGPU, eval=FALSE}
+wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+                            event = "Event", start = "Start", stop = "Stop",
+                            expos = "dose", covariates = c("age", "sex"),
+                            constrained = FALSE, aic = FALSE, confint = 0.95,
+                            nbootstraps = n_bootstrap, batchsize = batchsize)
+```
+
+In the summary, there are estimated coefficients for the covariates with his confidence interval, calculated with var-covariance matrix, and information to see the significance of the covariates. It's also possible to have confidence interval with bootstrap.
+
+```{r, eval=FALSE}
+summary(wce_gpu_bootstrap)
+```
+
+The risk function can be plot, and if you added bootstrap, confidence band intervals will be visible.
+
+```{r wceGPU_plot, eval=FALSE}
+plot(wce_gpu_bootstrap)
+```
+
+
+## Hazards Ratios
+
+Expliquer HR et IC bootstrap
+
+```{r, eval=FALSE}
+# cutoff at 90 in the WCE model
+exposed   <- rep(1, 90)
+unexposed <- rep(0, 90)
+
+HR(wce_gpu_bootstrap, exposed, unexposed)
+```
+
+
+## References
+
+[^wce]: Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov 30;28(27):3437-53.  

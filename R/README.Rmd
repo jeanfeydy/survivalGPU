@@ -16,26 +16,31 @@ knitr::opts_chunk$set(
 # survivalGPU <img src="man/figures/logo.png" align="right" height="139" />
 
 <!-- badges: start -->
+[![R-CMD-check](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 The survivalGPU library allows you to perform survival analyzes using the resources of Graphic Processing Units (GPU) in order to accelerate the speed of calculations. Currently, two models have been implemented :  
 
-* `coxphGPU()` for Cox[^cox1] [^cox2] model  
-* `wceGPU()` for Weighted Cumulative Exposure[^wce] model  
+* Cox Proportional Hazards regression model  
+* Weighted Cumulative Exposure model  
 
 It's also possible to use the library without having Graphics Processing Units (with CPU).
 
 ## Installation
 
-### Requirements
+survivalGPU is a package based on a package written in python, dependant on the `reticulate` R package. To use it, it's necessary to have installed some python libraries such as `torch`, `torch-scatter`, and `pykeops`. To use survivalGPU, you can create a virtual python environment through `reticulate`. It's highly recommended to not to use the default python executable. 
 
-Python packages :  
+```{r, eval=FALSE}
+library(reticulate)
 
-* pytorch
-* pytorch-scatter
-* pykeops (for WCE model)
+virtualenv_create("survivalGPU")
+virtualenv_install("survivalGPU", packages = c("torch", "torch_scatter",
+                                               "pykeops", "matplotlib",
+                                               "beartype", "jaxtyping"))
+# torch takes a long time to set up
+```
 
-Actually, survivalGPU is not available for Windows.  
+To configure properly and understand your python environment, check `vignette("python_connect")`  
 
 survivalGPU require submodules : you can install the development version of survivalGPU from [GitHub](https://github.com/) with `install_git_with_submodule()`:
 
@@ -47,29 +52,39 @@ install_git_with_submodule <- function(x, subdir) {
   system(paste("git clone --recursive", shQuote(x), shQuote(install_dir)))
   
   # change name for windows install
-  file.rename(file.path(install_dir,"R/inst/python/survivalgpu"),
-              file.path(install_dir,"R/inst/python/survivalgpu_submodule"))
-  file.copy(file.path(install_dir,"python/survivalgpu"),
-            file.path(install_dir,"R/inst/python"), recursive=TRUE)
+  file.rename(file.path(install_dir, "R/inst/python/survivalgpu"),
+              file.path(install_dir, "R/inst/python/survivalgpu_submodule"))
+  file.copy(file.path(install_dir, "python/survivalgpu"),
+            file.path(install_dir, "R/inst/python"), recursive = TRUE)
   
-  devtools::install(file.path(file.path(install_dir,subdir)))
+  devtools::install(file.path(file.path(install_dir, subdir)))
 }
 
 install_git_with_submodule("https://github.com/jeanfeydy/survivalGPU",
-                           subdir="R")
+                           subdir = "R")
 ```
 
-> **Warning**: survivalGPU is a package dependant of python, and it's necessary to have installed the `reticulate` R package. To manage your python or miniconda configuration, check vignette("python_connect").
+> **Warning**: Currently, survivalGPU is not available for Windows.  
 
-## Examples
+## Example
 
-Let's make an example with `drugdata` dataset from WCE package.
+Let's make a small example for a Cox PH model with `lung` cancer dataset from `survival` package. Before load `survivalGPU`, use your virtual python environment (see above or `vignette("python_connect")`).
 
-```{r example}
+```{r}
+library(reticulate)
+use_virtualenv(virtualenv = "survivalGPU")
+```
+
+
+```{r example, message=FALSE}
 library(survivalGPU)
 library(survival)
-library(WCE)
-data(drugdata)
+```
+
+Check if CUDA is detected :
+
+```{r}
+use_cuda()
 ```
 
 By default, functions run with GPU if detected. Then we specify the number of bootstrap, and consequently the batchsize argument, according to CUDA drivers detection.
@@ -84,83 +99,36 @@ if (use_cuda()) {
 }
 ```
 
-
-### Cox
-
-You can realize the Cox model with the `coxphGPU` function, which is written in the same way as the `survival::coxph` function from survival package, with a Surv object in the formula, containing Start, Stop and Event variables.
+You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula.
 
 ```{r coxphGPU}
-coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-  data = drugdata,
-  bootstrap = n_bootstrap,
-  batchsize = batchsize,
-  ties = "efron"
-)
+coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
+                               data = lung,
+                               bootstrap = n_bootstrap,
+                               batchsize = batchsize,
+                               ties = "breslow")
 ```
 
-You obtain with `summary` all results for initial model, and a confidence interval for estimated coefficients with bootstrap. 
+With `summary` method, you obtain results for initial model, and a confidence interval by normal distribution process. A confidence interval is also estimated for coefficients by bootstrap (if bootstrap > 1 in your coxphGPU object). 
 
 ```{r}
 summary(coxphGPU_bootstrap)
 ```
 
-
-#### Test the Proportional Hazards Assumption
-
-You can test the proportional hazards assumption for a Cox regression with `survival::cox.zph()`.
+To visualize your model, you can plot adjusted survival curves with `survminer::ggadjustedcurves()`.
 
 ```{r}
-cox.zph(coxphGPU_bootstrap)
+survminer::ggadjustedcurves(coxphGPU_bootstrap,
+                            variable = "sex",
+                            data = lung)
 ```
 
-Plot scaled Schoenfeld residuals against the time for each covariates with `ggcoxzph()` function from `survminer` package.
+If you have no model, it's possible to estimate survival curves with Kaplan-Meier estimation by `survival::survfit()`, and you can use `survminer::ggsurvplot()` to plot a Kaplan-Meier survival curve.  
 
-```{r}
-survminer::ggcoxzph(cox.zph(coxphGPU_bootstrap))
-```
+Moreover, it's possible to evaluate proportional hazards assumption, and plot a forestplot of your model. All is explain in the `vignette("coxPH")`.
 
-#### Forestplot
+## Vignettes
 
-Also with the `survminer` package, you can use `ggforest()` function to plot forestplot for Cox PH model. The confidence interval plotted is the confidence interval by the normal distribution (not bootstrap)
-
-```{r}
-survminer::ggforest(model = coxphGPU_bootstrap,
-                    data = drugdata)
-```
-
-#### Survival Curves
-
-Is it possible to check Kaplan-Meier survival estimates with `survival::survfit()` function. After you can use `survminer::ggsurvplot()` to plot a survival curve.
-
-### WCE
-
-WCE allows modeling the cumulative effects of time-varying exposures, weighted according to their relative proximity in time and represented by time-dependent covariates. Currently, the weight function is estimated by the Cox proportional hazards model. To build a model, you can use the `wceGPU` function in the same way as the `WCE::WCE` function from WCE package.
-
-```{r wceGPU, eval=FALSE}
-wce_gpu_bootstrap <- wceGPU(
-  data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-  event = "Event", start = "Start", stop = "Stop",
-  expos = "dose", covariates = c("age", "sex"),
-  constrained = FALSE, aic = FALSE, confint = 0.95,
-  nbootstraps = n_bootstrap, batchsize = batchsize
-)
-```
-
-In the summary, there are estimated coefficients for the covariates with his confidence interval, calculated with var-covariance matrix, and information to see the significance of the covariates. It's also possible to have confidence interval with bootstrap.
-
-```{r, eval=FALSE}
-summary(wce_gpu_bootstrap)
-```
-
-The risk function can be plot, and if you added bootstrap, confidence band intervals will be visible.
-
-```{r wceGPU_plot, eval=FALSE}
-plot(wce_gpu_bootstrap)
-```
-
-
-## References
-
-[^cox1]: Andersen, P. and Gill, R. (1982). Cox's regression model for counting processes, a large sample study. Annals of Statistics 10, 1100-1120.  
-[^cox2]: Therneau, T., Grambsch, P., Modeling Survival Data: Extending the Cox Model. Springer-Verlag, 2000.  
-[^wce]: Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov 30;28(27):3437-53.  
+* `vignette("coxPH")`  
+* `vignette("WCE")`  
+* `vignette("python_connect")`  
