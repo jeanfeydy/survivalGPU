@@ -963,23 +963,55 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   if (type == "counting") { # if Surv object is counting type
     stop <- ytemp[2]
     event <- ytemp[3]
+
+    data <- data.frame(time = y2,
+                       status = Y[,3])
+
   } else { # if Surv object is right (Without Start in Surv)
     stop <- ytemp[1]
     event <- ytemp[2]
+
+    data <- data.frame(time = time,
+                       status = status)
   }
 
-  # Covariables
-  covar <- assign
 
-  # remove NA for coxph_R
-  keep_col <- c(stop, event, colnames(X))
-  data <- as.data.frame(data)[,keep_col]
+  data <- cbind(data, X)
+  names(data)[1] <- stop
+  names(data)[2] <- event
+
+
+  # return(list(y1=y1,
+  #             y=y2,
+  #             x = X,
+  #             event = Y[,3]))
+
+  # Covariables
+  #covar <- assign
+  covar <- colnames(X)
+
+
+  # # remove NA for coxph_R
+  # #keep_col <- c(stop, event, colnames(X))
+  # keep_col <- c(stop, event, names(covar))
+  # data_real <- as.data.frame(data)[,keep_col]
+
+
+
+
+  # return(list(data_real = data_real,
+  #             data= data))
+  # return(list(dataset = as.data.frame(data),
+  #             y = Y,
+  #             stime=stime,
+  #             sstat=sstat,
+  #             x = X))
 
   # data <- quote(options()$na.action)
   data <- na.omit(data)
 
   # Python coxph
-  survivalgpu <- use_survivalGPU()
+  # survivalgpu <- use_survivalGPU() # change due to .onload
   coxph_R <- survivalgpu$coxph_R
   coxfit <- coxph_R(data,
                     stop,
