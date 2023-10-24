@@ -16,11 +16,13 @@ Imports:
     reticulate,
     stats,
     survival,
+    testthat (>= 3.0.0),
     utils
 Suggests: 
+    dplyr,
     knitr,
     rmarkdown,
-    testthat (>= 3.0.0),
+    survminer,
     WCE
 Config/testthat/edition: 3
 VignetteBuilder: knitr
