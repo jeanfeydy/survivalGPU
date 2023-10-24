@@ -197,7 +197,9 @@ class CoxPHSurvivalAnalysis:
         # Vector of inital values of the Newton iteration.
         # Zero for all variables by default.
         if init is None:
-            init_tensor = torch.zeros((n_batch, n_covariates), dtype=float32, device=device)
+            init_tensor = torch.zeros(
+                (n_batch, n_covariates), dtype=float32, device=device
+            )
 
         else:
             init_tensor = torch.tensor(init, dtype=float32, device=device)
@@ -254,7 +256,6 @@ class CoxPHSurvivalAnalysis:
                     init_tensor = torch.tensor(init, dtype=float32, device=device)
                     assert init_tensor.shape == (n_covariates,)
                     init_tensor = init_tensor.repeat(len(bootstrap) * n_batch, 1)
-
 
                 res = newton(
                     loss=loss(bootstrap=bootstrap),
@@ -328,7 +329,6 @@ class CoxPHSurvivalAnalysis:
             scattered_coef = coef.view(len(bootstrap), 1, -1)
 
         else:
-
             # N.B.: Naive implementation with an indexing operation as in
             #
             if False:
@@ -347,7 +347,6 @@ class CoxPHSurvivalAnalysis:
                 dataset.n_intervals,
                 dataset.n_covariates,
             )
-
 
         X = dataset.covariates  # (I, D)
         # (B, I, D) * (1, I, D) -> (B, I, D)
@@ -411,7 +410,6 @@ class CoxPHSurvivalAnalysis:
             self.bootstrap_coef_ = numpy(self.bootstrap_coef_)
 
 
-
 # Functional Numpy API, called by our R wrapper:
 def coxph_numpy(
     *,
@@ -472,7 +470,7 @@ def coxph_numpy(
         doscale=doscale,
         verbosity=verbosity,
     )
-    
+
     # Configure 'start' according to survtype ('counting' or 'right')
     if survtype == "counting":
         start = times - 1
@@ -492,7 +490,7 @@ def coxph_numpy(
 
     # Step 5: turn the list of dicts into a dicts of concatenated results ==========
     output = {
-        "means" : model.means_,
+        "means": model.means_,
         "coef": model.coef_,
         "std": model.std_,
         "loglik init": model.loglik_init_,
@@ -501,7 +499,7 @@ def coxph_numpy(
         "u": model.score_,
         "imat": model.imat_,
         "hessian": model.hessian_,
-        "iter": model.iter_
+        "iter": model.iter_,
     }
 
     if hasattr(model, "bootstrap_coef_"):
@@ -512,6 +510,7 @@ def coxph_numpy(
 
 # Python >= 3.7:
 from contextlib import nullcontext
+
 
 def coxph_R(
     data,
@@ -531,6 +530,7 @@ def coxph_R(
     if ties == "efron":
         # Raise Warning and change to "breslow"
         import warnings
+
         warnings.warn(
             "Efron ties are not yet supported in our new implementation. "
             "Switching to the 'breslow' approximation."
@@ -540,14 +540,12 @@ def coxph_R(
     if profile is not None:
         print("Profile trace:", profile)
         print("use_cuda:", use_cuda)
-        myprof = torch.autograd.profiler.profile(
-            use_cuda=use_cuda
-        )
+        myprof = torch.autograd.profiler.profile(use_cuda=use_cuda)
     else:
         myprof = nullcontext()
 
     if strata is not None:
-      strata = np.array(strata, dtype=np.int64)
+        strata = np.array(strata, dtype=np.int64)
 
     with myprof as prof:
         times = np.array(data[stop], dtype=np.int64)

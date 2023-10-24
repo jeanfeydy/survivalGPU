@@ -34,8 +34,9 @@ challenges = [
             [4, 0, 0.0, 1.0],
             [5, 1, 4.0, 1.0],
         ]
-    )
+    ),
 ]
+
 
 @pytest.mark.skip()
 @given(
@@ -73,7 +74,7 @@ def test_doscale_identity(*, ties, alpha, mode, example):
     for attr in dir(models[0]):
         if attr.endswith("_") and not attr.endswith("__"):
             for m in models[1:]:
-                if attr in ["score_"]: #"coef_", "imat_", "std_", "hessian_"]:
+                if attr in ["score_"]:  # "coef_", "imat_", "std_", "hessian_"]:
                     continue
                 print(attr)
                 assert_allclose(

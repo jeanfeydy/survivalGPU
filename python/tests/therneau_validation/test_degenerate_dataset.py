@@ -32,6 +32,7 @@ def my_dataset(
         ensure_one_death=True,
     )
 
+
 @pytest.mark.skip()
 @given(
     n_patients=st.integers(min_value=1, max_value=10),
@@ -100,7 +101,7 @@ def test_onlydeath(
     for key in ref_model.keys():
         if key in ["iter_", "hessian_"]:
             continue
-        #if ref_model["iter_"] == 1:
+        # if ref_model["iter_"] == 1:
         #    continue
         np.testing.assert_allclose(
             getattr(model, key),

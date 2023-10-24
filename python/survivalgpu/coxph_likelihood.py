@@ -431,7 +431,8 @@ def coxph_objective(
                 last_batch_strata = last_batch_strata.view(n_groups)
 
                 assert torch.all(
-                    cumsums[:, ~last_batch_strata] > offsets_per_group[:, ~last_batch_strata]
+                    cumsums[:, ~last_batch_strata]
+                    > offsets_per_group[:, ~last_batch_strata]
                 )
 
                 group_scores = torch.where(
@@ -460,7 +461,9 @@ def coxph_objective(
 
         # TODO: Update Efron too!
         elif ties == "efron":
-            raise NotImplementedError("We are currently re-writing the Efron approximation rule with support for batches and strata.")
+            raise NotImplementedError(
+                "We are currently re-writing the Efron approximation rule with support for batches and strata."
+            )
             # groups_scores is (B,T*2)
             group_scores = group_logsumexp(
                 values=weighted_scores,
