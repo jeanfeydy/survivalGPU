@@ -15,7 +15,8 @@ knitr::opts_chunk$set(
   comment = "#>",
   fig.align = "center",
   fig.height = 3.5,
-  fig.width = 5
+  fig.width = 5,
+  eval = FALSE
 )
 ```
 

@@ -56,11 +56,15 @@ You obtain with `summary` all results for initial model, and a confidence interv
 summary(coxphGPU_bootstrap)
 ```
 
+
+coxphGPU are objects that inherit from a coxph object, so it's possible to use other packages that use coxph objects, such as `survminer` to draw some visualisations for Cox results.
+
 ## Survival Curves
 
 You can plot adjusted survival curves with `survminer::ggadjustedcurves()`.
 
 ```{r}
+# requireNamespace("survminer", quietly = TRUE)
 survminer::ggadjustedcurves(coxphGPU_bootstrap,
                             variable = "sex",
                             data = data)
