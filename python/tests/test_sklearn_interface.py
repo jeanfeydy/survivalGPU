@@ -45,12 +45,16 @@ def test_coxph_shapes(*, n_covariates, n_patients, n_batch, n_strata, max_durati
     assert model.coef_.shape == (n_batch, n_covariates)
 
 
-@pytest.mark.skip()
 def test_wce_shapes():
     """Tests the shapes of the WCESurvivalAnalysis attributes."""
 
-    ds = load_drugs(n_drugs=1, n_patients=1, n_times=1)
+    ds = load_drugs(n_drugs=1, n_patients=1, max_duration=1)
     model = WCESurvivalAnalysis(cutoff=10, order=3, n_knots=1)
-    model.fit(ds.covariates, ds.times, events=ds.events)
+    model.fit(
+        covariates=ds.covariates, 
+        stop=ds.stop,
+        start=ds.start,
+        events=ds.events,
+        )
 
     assert model is not None
