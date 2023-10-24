@@ -7,25 +7,16 @@
 \method{print}{coxphGPU}(x, ..., digits = max(1L, getOption("digits") - 3L), signif.stars = FALSE)
 }
 \arguments{
-\item{...}{
-The object will also contain the following, for documentation see the \code{lm} 
-object: \code{terms}, \code{assign}, \code{formula}, \code{call}, and, optionally, \code{x}, \code{y}, 
-and/or \code{frame}. 
-}
+\item{x}{coxphGPU object}
+
+\item{...}{For future methods}
+
+\item{digits}{significant digits to print}
+
+\item{signif.stars}{
+    Show stars to highlight small p-values
+  }
 }
 \description{
-This class of objects is returned by the \code{coxph} class of functions 
-to represent a fitted proportional hazards model. 
-Objects of this class have methods for the functions \code{print}, 
-\code{summary}, \code{residuals}, \code{predict} and \code{survfit}.
-}
-\section{Components}{
-
-The following components must be included in a legitimate \code{coxph} 
-object. 
-
-}
-
-\seealso{
-\code{\link[survival]{coxph}},  \code{\link[survival]{coxph.detail}},  \code{\link[survival]{cox.zph}},  \code{\link[survival]{residuals.coxph}},  \code{\link[survival]{survfit}},  \code{\link[survival]{survreg}}.
+Produces a printed summary of a fitted coxph model
 }

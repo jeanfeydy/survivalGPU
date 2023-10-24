@@ -48,12 +48,14 @@ Calculates martingale, deviance, score or Schoenfeld residuals for a
 Cox proportional hazards model.
 }
 \examples{
+\dontrun{
 library(survival)
 fit <- coxphGPU(Surv(start, stop, event) ~ age + surgery,
                 data = heart)
 
 # Martingale residuals
 mresid <- resid(fit, collapse = heart$id)
+}
 }
 \references{
 T. Therneau, P. Grambsch, and T. Fleming. "Martingale based residuals

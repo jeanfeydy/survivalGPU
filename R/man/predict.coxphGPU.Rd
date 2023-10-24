@@ -69,6 +69,7 @@ entry per observation.
 Compute fitted values and regression terms for a model fitted by coxphGPU
 }
 \examples{
+\dontrun{
 library(survival)
 options(na.action = na.exclude) # retain NA in predictions
 fit <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung)
@@ -76,6 +77,7 @@ predict(fit, type = "lp")
 predict(fit, type = "expected")
 predict(fit, type = "risk", se.fit = TRUE)
 predict(fit, type = "terms", se.fit = TRUE)
+}
 }
 \seealso{
 \code{\link[=predict.coxph]{predict.coxph()}}

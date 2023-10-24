@@ -1016,7 +1016,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   coxfit <- coxph_R(data,
                     stop,
                     event,
-                    covar,
+                    if(length(covar) == 1) list(covar)else covar,
                     ties = ties,
                     survtype = type,
                     strata = strata,
@@ -1396,7 +1396,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 #' Print method for coxphGPU object
 #'
 #' @exportS3Method print coxphGPU
-#' @inherit survival::print.coxph
+#' @inherit survival::print.summary.coxph
+#' @param x coxphGPU object
 print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
                            signif.stars = FALSE) {
 
@@ -1461,7 +1462,7 @@ print.summary.coxphGPU <- function(x, ...,
                                    digits = max(getOption("digits") - 3, 3),
                                    signif.stars = getOption("show.signif.stars")) {
 
-  NextMethod("print", object)
+  NextMethod("print", x)
 
   if (x$nbootstraps > 1) {
     cat(" ---------------- \n")
@@ -1497,12 +1498,14 @@ coef.coxphGPU <- function(object, ...) {
 #'
 #' @exportS3Method residuals coxphGPU
 #' @examples
+#' \dontrun{
 #' library(survival)
 #' fit <- coxphGPU(Surv(start, stop, event) ~ age + surgery,
 #'                 data = heart)
 #'
 #' # Martingale residuals
 #' mresid <- resid(fit, collapse = heart$id)
+#' }
 residuals.coxphGPU <- function(object, ...,
                                type = c("martingale", "deviance", "score",
                                         "schoenfeld", "dfbeta", "dfbetas",
@@ -1527,6 +1530,7 @@ residuals.coxphGPU <- function(object, ...,
 #'
 #' @exportS3Method predict coxphGPU
 #' @examples
+#' \dontrun{
 #' library(survival)
 #' options(na.action = na.exclude) # retain NA in predictions
 #' fit <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung)
@@ -1534,6 +1538,7 @@ residuals.coxphGPU <- function(object, ...,
 #' predict(fit, type = "expected")
 #' predict(fit, type = "risk", se.fit = TRUE)
 #' predict(fit, type = "terms", se.fit = TRUE)
+#' }
 predict.coxphGPU <- function(object, newdata,
                              type = c("lp", "risk", "expected", "terms", "survival"),
                              se.fit = FALSE, na.action = na.pass,

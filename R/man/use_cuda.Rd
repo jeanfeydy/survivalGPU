@@ -11,5 +11,7 @@ Specifies wether you are using GPUs or not. If TRUE, CUDA drivers are
 detected, and you are using GPU.
 }
 \examples{
+\dontrun{
 use_cuda()
+}
 }
