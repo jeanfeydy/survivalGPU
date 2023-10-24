@@ -12,7 +12,7 @@ terms.inner <- function(x) {
       terms.inner(x[[2]])
     }
   } else if (inherits(x, "call") &&
-    (x[[1]] != as.name("$") && x[[1]] != as.name("["))) {
+             (x[[1]] != as.name("$") && x[[1]] != as.name("["))) {
     if (x[[1]] == "+" || x[[1]] == "*" || x[[1]] == "-" || x[[1]] == ":") {
       # terms in a model equation, unary minus only has one argument
       if (length(x) == 3) {
@@ -61,15 +61,15 @@ drop.special <- function(termobj, i, addparen = FALSE) {
   #   It's a crude fix and causes the formula to look different
   if (addparen) {
     newformula <- reformulate(paste0("(", newterms, ")"),
-      response = rvar,
-      intercept = attr(termobj, "intercept"),
-      env = environment(termobj)
+                              response = rvar,
+                              intercept = attr(termobj, "intercept"),
+                              env = environment(termobj)
     )
   } else {
     newformula <- reformulate(newterms,
-      response = rvar,
-      intercept = attr(termobj, "intercept"),
-      env = environment(termobj)
+                              response = rvar,
+                              intercept = attr(termobj, "intercept"),
+                              env = environment(termobj)
     )
   }
   if (length(newformula) == 0L) newformula <- "1"
@@ -166,8 +166,8 @@ rightslash <- function(x) {
     if (x[[1]] == as.name("/")) {
       return(list(x[[2]], x[[3]]))
     } else if (x[[1]] == as.name("+") || (x[[1]] == as.name("-") && length(x) == 3) ||
-      x[[1]] == as.name("*") || x[[1]] == as.name(":") ||
-      x[[1]] == as.name("%in%")) {
+               x[[1]] == as.name("*") || x[[1]] == as.name(":") ||
+               x[[1]] == as.name("%in%")) {
       temp <- rightslash(x[[3]])
       if (is.list(temp)) {
         x[[3]] <- temp[[1]]
@@ -735,8 +735,8 @@ surv2data <- function(mf, check = FALSE) {
       temp <- survcheck(y3 ~ 1, id = id3, istate = itemp)
     } else {
       temp <- survcheck(y3 ~ 1,
-        id = id3,
-        istate = factor(itemp, 1:length(states), states)
+                        id = id3,
+                        istate = factor(itemp, 1:length(states), states)
       )
     }
   }
@@ -783,7 +783,7 @@ survcheck2 <- function(y, id, istate = NULL, istate0 = "(s0)") {
   # the next few line are a debug for my code; survcheck2 is not visible
   #  to users so only survival can call it directly
   if (!is.Surv(y) || is.null(attr(y, "states")) ||
-    any(y[, ncol(y)] > length(attr(y, "states")))) {
+      any(y[, ncol(y)] > length(attr(y, "states")))) {
     stop("survcheck2 called with an invalid y argument")
   }
   to.names <- c(attr(y, "states"), "(censored)")

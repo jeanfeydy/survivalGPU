@@ -92,7 +92,7 @@ Avec le bootstrap, la fonction effectue autant de modèles que de bootstrap dema
 
 In the same idea as the Cox model, `wceGPU` uses the same arguments as the `WCE::WCE` function. The summary changes slightly with the appearance of confidence intervals without bootstrap for the estimators of the covariates.
 
-```{r}
+```{r, eval=FALSE}
 wce_gpu <- wceGPU(
   data = drugdata, nknots = 1, cutoff = 90, id = "Id",
   event = "Event", start = "Start", stop = "Stop",
@@ -105,13 +105,13 @@ summary(wce_gpu)
 
 We can display the risk function of the model in order to observe the weights attributed to each time until the defined cutoff.
 
-```{r}
+```{r, eval=FALSE}
 plot(wce_gpu)
 ```
 
 By applying `wceGPU()` with bootstrap, we obtain the confidence intervals for the estimates of the covariates and the risk function on each time, in addition to the information on the initial model without bootstrap.
 
-```{r}
+```{r, eval=FALSE}
 wce_gpu_bootstrap <- wceGPU(
   data = drugdata, nknots = 1, cutoff = 90, id = "Id",
   event = "Event", start = "Start", stop = "Stop",
@@ -125,7 +125,7 @@ summary(wce_gpu_bootstrap)
 
 Now we can see the estimated risk function with the confidence intervals thanks to the bootstrap.
 
-```{r}
+```{r, eval=FALSE}
 plot(wce_gpu_bootstrap)
 ```
 

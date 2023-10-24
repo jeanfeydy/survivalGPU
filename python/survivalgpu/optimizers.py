@@ -26,6 +26,7 @@ class NewtonResult:
         jac: Float32Tensor["batch dim"],
         hess: Float32Tensor["batch dim dim"],
         score_test_init: Float32Tensor["batch"],
+        iterations,
     ):
         self.fun = fun
         self.fun_init = fun_init
@@ -33,6 +34,7 @@ class NewtonResult:
         self.jac = jac
         self.hess = hess
         self.score_test_init = score_test_init
+        self.iterations = iterations
 
         if False:
             # N.B.: using cholesky_inverse guarantees the symmetry of the result:
@@ -167,4 +169,5 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):
         jac=grads.detach(),
         hess=hessians.detach(),
         score_test_init=score_test.detach(),
+        iterations=it,
     )

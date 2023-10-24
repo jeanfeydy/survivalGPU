@@ -16,29 +16,41 @@ knitr::opts_chunk$set(
 ```
 
 
-survivalGPU is a package based on a package written in python, dependant on the `reticulate` R package. To use it, it's necessary to have installed `torch`, `torch-scatter`, and `pykeops` packages in your python environment. Moreover, it's possible to check through `reticulate` the python executable, and to check if the packages mentioned above are installed.
+survivalGPU is a package based on a package written in python, dependant on the `reticulate` R package. To use it, it's necessary to have installed some python libraries such as `torch`, `torch-scatter`, and `pykeops` in your python environment.
 
+Maybe it's installed in your python default system, but it's better if your create your own virtualenv for your project. Let's make the steps to configure properly a virtual python envrironment to use `survivalGPU` in R.
 
-```{r setup}
+```{r}
 library(reticulate)
+
+# you create the 'survivalGPU' environment
+virtualenv_create("survivalGPU")
+virtualenv_list()
+# you can check python libraries in this python environment
+py_list_packages(envname = "survivalGPU") # numpy by default
+
+# now, install all the survivalgpu python dependencies
+virtualenv_install("survivalGPU", packages = c("torch", "torch_scatter",
+                                               "pykeops", "matplotlib",
+                                               "beartype", "jaxtyping"))
+py_list_packages(envname = "survivalGPU")
 ```
 
 
 ```{r}
-# Check your python executable
-py_config()
-py_exe()
+#  /!\ Restart your R session  /!\
+library(reticulate)
 
-# Check installed packages in your python environment
-py_list_packages()
+# Check if it's the correct python executable
+py_discover_config()
+use_virtualenv(virtualenv = "survivalGPU")
+py_config()
 ```
 
-Attention, if you don't have install the `reticluate` R package, install it (with `install.packages("reticulate")`). During installation, R will offer you to install miniconda. If you accept, be careful because your python executable & pyhton home will change for your new miniconda environment by default, without torch, torch-scatter and pykeops. You can install them in miniconda, or you can change your python environment after starting a new R session. I recommend to not install miniconda to use the python environment on which we are used to working.
+
+As you can see, you're connect at your survivalGPU python environment. So now, if you load `survivalGPU` R package after exec `reticulate::use_virtualenv(virtualenv = "survivalGPU")`, the package will use this python environment.  
+
+
+Attention, if you don't have install the `reticluate` R package, install it (with `install.packages("reticulate")`). During installation, R will offer you to install miniconda. If you accept, be careful because your python executable & python home will change for your new miniconda environment. You can change your python environment after starting a new R session.  
 
 Check the [`reticulate` R documentation](https://rstudio.github.io/reticulate/articles/versions.html) to see other options to manage your python configuration.
-
-```{r}
-# Test survivalGPU import, and the use of CUDA for GPU support
-library(survivalGPU)
-use_cuda()
-```

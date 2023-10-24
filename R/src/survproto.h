@@ -5,7 +5,7 @@
 SEXP agmart3(SEXP nused2,  SEXP surv2,  SEXP score2, SEXP weight2,
              SEXP strata2, SEXP sort12, SEXP sort22, SEXP method2);
 
-             void chinv2  (double **matrix, int n);
+void chinv2  (double **matrix, int n);
 
              int cholesky2(double **matrix, int n, double toler);
 

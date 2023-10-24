@@ -27,19 +27,38 @@ aeq <- function(x,y) all.equal(as.vector(x), as.vector(y))
 #
 
 # Right process
-fit0 <- coxph(Surv(time, status)~ x, test1, iter=0, ties=ties)
-fit  <- coxph(Surv(time, status) ~x, test1, ties=ties)
+fit0 <- coxph(Surv(time, status) ~ x, test1, iter = 0, ties = ties)
+fit  <- coxph(Surv(time, status) ~ x, test1, ties = ties)
+fit0_gpu <- coxphGPU(Surv(time, status)~ x, test1, iter = 0, ties = ties)
+fit_gpu  <- coxphGPU(Surv(time, status) ~ x, test1, ties = ties)
 
 # Counting process
-fit0b <- coxph(Surv(start, stop, status) ~ x, test1b, iter=0, ties=ties)
-fitb  <- coxph(Surv(start, stop, status) ~x, test1b, ties=ties)
-fit0b_gpu <- coxphGPU(Surv(start, stop, status) ~ x, test1b, iter.max=0, ties=ties)
-fitb_gpu <- coxphGPU(Surv(start, stop, status) ~ x, test1b, ties=ties)
+fit0b <- coxph(Surv(start, stop, status) ~ x, test1b, iter = 0, ties = ties)
+fitb  <- coxph(Surv(start, stop, status) ~ x, test1b, ties = ties)
+fit0b_gpu <- coxphGPU(Surv(start, stop, status) ~ x, test1b, iter.max = 0, ties = ties)
+fitb_gpu <- coxphGPU(Surv(start, stop, status) ~ x, test1b, ties = ties)
 
 # offset feature
-fitc  <- coxph(Surv(time, status) ~ offset(fit$coef*x), test1, ties=ties)
-fitd  <- coxph(Surv(start, stop, status) ~ offset(fit$coef*x), test1b, ties=ties)
+fitc  <- coxph(Surv(time, status) ~ offset(fit$coef*x), test1, ties = ties)
+fitd  <- coxph(Surv(start, stop, status) ~ offset(fit$coef*x), test1b, ties = ties)
 #fitd_gpu  <- coxphGPU(Surv(start, stop, status) ~ offset(fit$coef*x), test1b) # offset feature not yet implemented in coxphGPU
+
+
+# Tests - check coefs between coxph and coxphGPU
+
+test_that("Check coefs between right process - No iter", {
+  expect_equal(
+    as.vector(fit0$coef),
+    as.vector(fit0_gpu$coef)
+  )
+})
+
+test_that("Check coefs between right process", {
+  expect_equal(
+    as.vector(round(fit$coef,3)),
+    as.vector(round(fit_gpu$coef,3))
+  )
+})
 
 test_that("Check coefs between counting process - No iter", {
   expect_equal(

@@ -9,25 +9,29 @@ coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
          batchsize = 0, init, all.results = FALSE, control,
          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
 
-\method{summary}{coxphGPU}(object, ..., conf.int = 0.95, scale = 1)
+\method{summary}{coxphGPU}(object, ..., conf.int = 0,95, scale = 1)
 }
 \arguments{
 \item{formula}{a formula object, with the response on the left of a ~
 operator, and the terms on the right. The response must be a survival
-object as returned by the \code{survival::Surv} function. For the moment,
-\code{coxphGPU()} only manages the counting type for \code{Surv} object, i.e. two
-\code{time} argument in the function (Surv(time = start, time2 = stop, event)
-for example)}
+object as returned by the Surv function.}
 
-\item{data}{a data.frame in which to interpret the variables named in the
-formula.}
+\item{data}{
+    a data.frame in which to interpret the variables named in 
+    the \code{formula}, or in the \code{subset} and the \code{weights}
+    argument. 
+  }
 
-\item{ties}{a character string specifying the method for tie handling. If
-there are no tied death times all the methods are equivalent. Nearly all
-Cox regression programs use the Breslow method by default, but not this
-one. The Efron approximation is used as the default here, it is more
-accurate when dealing with tied death times, and is as efficient
-computationally.}
+\item{ties}{
+    a character string specifying the method for tie handling.  If there  
+    are no tied death times all the methods are equivalent.
+    The Efron approximation is used as the default, it is more 
+    accurate when dealing with tied death times, and is as efficient 
+    computationally. (But see below for multi-state models.)
+    The ``exact partial likelihood'' is 
+    equivalent to a conditional logistic model, and is appropriate when
+    the times are a small set of discrete values.
+  }
 
 \item{bootstrap}{Number of repeats for the bootstrap cross-validation.}
 
@@ -35,40 +39,59 @@ computationally.}
 Defaults to 0, which means that we handle all copies at once. If you run
 into out of memory errors, please consider using batchsize=100, 10 or 1.}
 
-\item{init}{Vector of initial values of the iteration. Default initial value
-is zero for all variables.}
+\item{init}{
+    vector of initial values of the iteration.  Default initial 
+    value is zero for all variables. 
+  }
 
 \item{all.results}{Post-processing calculations. If TRUE, coxphGPU returns
 linears.predictors, wald.test, concordance for all bootstraps. Default to
-FALSE if bootstrap.}
+FALSE if bootstraps.}
 
-\item{control}{Object of class coxph.control specifying iteration limit
-(iter.max argument) and other control options. Default is coxph.control(...).}
+\item{control}{
+    Object of class \code{\link[survival]{coxph.control}} specifying iteration limit
+    and other control options. Default is \code{coxph.control(...)}.
+  }
 
-\item{singular.ok}{logical value indicating how to handle collinearity in the
-model matrix. If TRUE, the program will automatically skip over columns of
-the X matrix that are linear combinations of earlier columns. In this case
-the coefficients for such columns will be NA, and the variance matrix will
-contain zeros. For ancillary calculations, such as the linear predictor,
-the missing coefficients are treated as zeros.}
+\item{singular.ok}{
+    logical value indicating how to handle collinearity in the model matrix. 
+    If \code{TRUE}, the program will automatically skip over columns of the X 
+    matrix that are linear combinations of earlier columns.  In this case the 
+    coefficients for such columns will be NA, and the variance matrix will 
+    contain zeros. For ancillary calculations, such as the linear
+    predictor, 
+    the missing coefficients are treated as zeros. 
+  }
 
-\item{model}{logical value: if TRUE, the model frame is returned in component
-model.}
+\item{model}{
+    logical value: if \code{TRUE}, the model frame is returned in component
+    \code{model}. 
+  }
 
-\item{x}{logical value: if TRUE, the x matrix is returned in component x.}
+\item{x}{
+    logical value: if \code{TRUE}, the x matrix is returned in
+    component \code{x}. 
+  }
 
-\item{y}{logical value: if TRUE, the response vector is returned in component
-y.}
+\item{y}{
+    logical value: if \code{TRUE}, the response vector is returned in
+    component \code{y}. 
+  }
 
-\item{...}{additional argument(s) for methods.}
+\item{...}{Other arguments for methods.}
 
 \item{object}{a coxphGPU object}
 
-\item{conf.int}{level for computation of the confidence intervals.}
+\item{conf.int}{
+    level for computation of the confidence intervals. 
+    If set to FALSE no confidence intervals are printed 
+  }
 
-\item{scale}{vector of scale factors for the coefficients, defaults to 1. The
-printed coefficients, se, and confidence intervals will be associated with
-one scale unit.}
+\item{scale}{
+    vector of scale factors for the coefficients, defaults to 1. 
+    The printed coefficients, se, and confidence intervals will be
+    associated with one scale unit. 
+  }
 }
 \value{
 A coxphGPU object representing the fit.
@@ -130,4 +153,7 @@ summary(coxph_bootstrap)
 \references{
 Therneau T (2021). \emph{A Package for Survival Analysis in R}. R
 package version 3.2-13
+}
+\seealso{
+\code{\link[survival:coxph]{survival::coxph()}}
 }

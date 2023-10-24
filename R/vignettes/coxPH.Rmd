@@ -1,0 +1,105 @@
+---
+title: "Cox Proportional Hazards regression"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Cox Proportional Hazards regression}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+Présenter le modèle de Cox[^cox1] [^cox2]
+
+
+
+Let's make an example with `lung` cancer dataset from survival package. Check `?survival::lung` if you want more explanations about this dataset. Before load `survivalGPU`, use your virtual python environment (see `vignette("python_connect")`).
+
+```{r}
+library(reticulate)
+use_virtualenv(virtualenv = "survivalGPU")
+```
+
+```{r setup, message=FALSE}
+library(survivalGPU)
+library(survival)
+```
+
+```{r}
+# ?survival::lung
+data <- lung
+data$status <- lung$status - 1 # event variable now coded in 0 - 1 (instead of 1 - 2)
+data$sex <- ifelse(lung$sex == 1, "Male", "Female")
+head(data)
+```
+
+You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula.
+
+```{r coxphGPU}
+coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
+                               data = data,
+                               bootstrap = 50,
+                               ties = "breslow")
+
+# bootstrap at 50 for this example, but normally it's more.
+```
+
+You obtain with `summary` all results for initial model, and a confidence interval for estimated coefficients with bootstrap. 
+
+```{r}
+summary(coxphGPU_bootstrap)
+```
+
+## Survival Curves
+
+You can plot adjusted survival curves with `survminer::ggadjustedcurves()`.
+
+```{r}
+survminer::ggadjustedcurves(coxphGPU_bootstrap,
+                            variable = "sex",
+                            data = data)
+```
+
+This plot shows you survival curves for each sex group, adjusted on the effects of age and ECOG performance score. The result of is plot is that the female survival rate is higher than the male survival rate in time.  
+
+If you have no model, it's possible to estimate survival curves with Kaplan-Meier estimation by `survival::survfit()`, and you can use `survminer::ggsurvplot()` to plot a Kaplan-Meier survival curve.
+
+## Test the Proportional Hazards Assumption
+
+You can test the proportional hazards assumption for a Cox regression with `survival::cox.zph()` :
+
+```{r}
+cox.zph(coxphGPU_bootstrap)
+```
+
+Rejection of the null hypothesis (correlation between the Schoenfeld residuals and ranked failure time is zero) leads to a conclusion that the PH assumption is violated.
+And plot scaled Schoenfeld residuals against the time for each covariates with `survminer::ggcoxzph()` function from `survminer` package.
+
+```{r, fig.height=10}
+survminer::ggcoxzph(cox.zph(coxphGPU_bootstrap))
+```
+
+If you see a violation of the PH assumption, you can test :  
+* interaction $covariate*time$ term (not currently implemented in `survivalGPU`)  
+* stratification  
+
+## Forestplot
+
+Also with the `survminer` package, you can use `survminer::ggforest()` function to plot forestplot for Cox PH model. The confidence interval plotted is the confidence interval by the normal distribution (not bootstrap)
+
+```{r}
+survminer::ggforest(model = coxphGPU_bootstrap,
+                    data = data)
+```
+
+
+## References
+
+[^cox1]: Andersen, P. and Gill, R. (1982). Cox's regression model for counting processes, a large sample study. Annals of Statistics 10, 1100-1120.  
+[^cox2]: Therneau, T., Grambsch, P., Modeling Survival Data: Extending the Cox Model. Springer-Verlag, 2000.  

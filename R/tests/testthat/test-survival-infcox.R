@@ -2,36 +2,39 @@ options(na.action=na.exclude) # preserve missings
 options(contrasts=c('contr.treatment', 'contr.poly')) #ensure constrast type
 library(survival)
 
+# TODO: remove this when the re-implementation of coxph is over
+# We currently do not support Efron ties, only Breslow
+ties <- "breslow"
+
+
 #
 # A test to exercise the "infinity" check on 2 variables
 #
 test3 <- data.frame(futime=1:12, fustat=c(1,0,1,0,1,0,0,0,0,0,0,0),
                     x1=rep(0:1,6), x2=c(rep(0,6), rep(1,6)))
 
-test3b <- data.frame(start = rep(0,12), futime=1:12, fustat=c(1,0,1,0,1,0,0,0,0,0,0,0),
-                    x1=rep(0:1,6), x2=c(rep(0,6), rep(1,6)))
-
 # This will produce a warning message, which is the point of the test.
 # The variance is close to singular and gives different answers
 #  on different machines
-expect_warning(fit3 <- coxph(Surv(futime, fustat) ~ x1 + x2, test3, iter=25))
-expect_warning(fit3b <- coxph(Surv(start, futime, fustat) ~ x1 + x2, test3b, iter=25))
+expect_warning(fit3 <- coxph(Surv(futime, fustat) ~ x1 + x2, test3, iter=25, ties = ties))
 
-# # Convergence error
-# fit3b_gpu <- coxphGPU(Surv(start, futime, fustat) ~ x1 + x2, test3b, iter.max=25)
-
-# Check warnings
+# Check warnings with survival::coxph
 test_that("warning right process", {
-  expect_warning(fit3 <- coxph(Surv(futime, fustat) ~ x1 + x2, test3, iter=25))
+  expect_warning(fit3 <- coxph(Surv(futime, fustat) ~ x1 + x2, test3, iter=25, ties = ties))
 })
 
-test_that("warning counting process", {
-  expect_warning(fit3b <- coxph(Surv(start, futime, fustat) ~ x1 + x2, test3b, iter=25))
-})
+# No warning with coxphGPU
+fit3_gpu <- coxphGPU(Surv(futime, fustat) ~ x1 + x2, test3, iter.max=25, ties = ties)
 
 
 all(fit3$coef < -22)
 all.equal(round(fit3$log, 4),c(-6.8669, -1.7918))
+
+test_that("check loglik", {
+  expect_equal(round(fit3$log, 4),
+               round(c(fit3_gpu$loglik_init, fit3_gpu$loglik), 4))
+})
+
 
 #
 # Actual solution
@@ -49,11 +52,6 @@ true <- function(beta) {
   loglik
 }
 
-all.equal(fit3$loglik[2], true(fit3$coef), check.attributes=FALSE)
-
-# test_that("log likelihood", {
-#   expect_equal(
-#     round(fit3$loglik[2], 3),
-#     round(fit3b_gpu$loglik, 3)
-#   )
-# })
+# Checks with coxph and coxphGPU (not the coefs but same loglik)
+all.equal(fit3$loglik[2], true(fit3$coef), check.attributes = FALSE)
+all.equal(fit3$loglik[2], true(fit3_gpu$coefficients), check.attributes = FALSE)
