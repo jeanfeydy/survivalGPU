@@ -997,8 +997,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   # data_real <- as.data.frame(data)[,keep_col]
 
 
-
-
   # return(list(data_real = data_real,
   #             data= data))
   # return(list(dataset = as.data.frame(data),
@@ -1008,7 +1006,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   #             x = X))
 
   # data <- quote(options()$na.action)
-  data <- na.omit(data)
+  # data <- na.omit(data)
 
   # Python coxph
   coxph_R <- survivalgpu$coxph_R
@@ -1021,10 +1019,10 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
                     strata = strata,
                     bootstrap = bootstrap,
                     batchsize = batchsize,
-                    maxiter = maxiter#,
-                    #init = init
+                    maxiter = maxiter,
+                    init = array(init)
   )
-  # maxiter = maxiter (add maxiter argument in coxph_R)
+
   # doscale
 
 
