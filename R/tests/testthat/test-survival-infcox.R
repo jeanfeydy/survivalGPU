@@ -1,3 +1,18 @@
+skip_if_no_python <- function() {
+  have_python <- reticulate::py_available(initialize = TRUE)
+  if(!have_python) testthat::skip("Python not available on system for testing")
+}
+
+skip_if_no_modules <- function() {
+  survivalgpu_python_dep <- c("torch", "torch_scatter",
+                              "pykeops", "matplotlib",
+                              "beartype", "jaxtyping")
+
+  py_module <- lapply(survivalgpu_python_dep, reticulate::py_module_available)
+  if(any(py_module == FALSE)){
+    testthat::skip("one or more modules not available for testing")
+  }
+}
 
 test_that("survival-infcox", {
   skip_if_no_python()

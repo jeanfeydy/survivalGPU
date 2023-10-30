@@ -1011,7 +1011,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   data <- na.omit(data)
 
   # Python coxph
-  # survivalgpu <- use_survivalGPU() # change due to .onload
   coxph_R <- survivalgpu$coxph_R
   coxfit <- coxph_R(data,
                     stop,

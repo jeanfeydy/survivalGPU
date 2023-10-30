@@ -16,21 +16,9 @@
 #'
 #' @author
 #' - [Jean FEYDY](https://www.jeanfeydy.com)
-#' - Alexis van STRAATEN
+#' - [Alexis van STRAATEN](https://alexis-vs.github.io/Portfolio/)
 #' @useDynLib survivalGPU, .registration = TRUE
 NULL
-
-
-
-#' Import of survivalgpu python package
-#' @noRd
-use_survivalGPU <- function() {
-  # Python path
-  python_path <- system.file("python", package = "survivalGPU")
-  survivalgpu <- reticulate::import_from_path("survivalgpu", path = python_path)
-
-  return(survivalgpu)
-}
 
 
 #' CUDA utilisation
@@ -46,6 +34,5 @@ use_survivalGPU <- function() {
 #' use_cuda()
 #' }
 use_cuda <- function() {
-  # survivalgpu <- use_survivalGPU()
   return(survivalgpu$use_cuda)
 }
