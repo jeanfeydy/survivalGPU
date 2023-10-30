@@ -15,7 +15,7 @@ wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
 
 \method{plot}{wceGPU}(x, ..., hist.covariates = FALSE)
 
-\method{confint}{wceGPU}(object, parm, level = 0,95, ..., digits = 3)
+\method{confint}{wceGPU}(object, parm, level = 0.95, ..., digits = 3)
 }
 \arguments{
 \item{data}{A data frame in an interval (long) format, in which each line

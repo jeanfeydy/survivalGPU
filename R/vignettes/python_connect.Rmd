@@ -30,9 +30,11 @@ virtualenv_list()
 py_list_packages(envname = "survivalGPU") # numpy by default
 
 # now, install all the survivalgpu python dependencies
-virtualenv_install("survivalGPU", packages = c("torch", "torch_scatter",
-                                               "pykeops", "matplotlib",
-                                               "beartype", "jaxtyping"))
+# install torch in first (it's necessary for torch_scatter and pykeops)
+virtualenv_install("survivalGPU", packages = c("torch"))
+virtualenv_install("survivalGPU", packages = c("torch_scatter", "pykeops",
+                                               "matplotlib", "beartype",
+                                               "jaxtyping"))
 py_list_packages(envname = "survivalGPU")
 ```
 

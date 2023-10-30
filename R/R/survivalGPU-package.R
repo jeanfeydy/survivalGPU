@@ -5,8 +5,10 @@
 #' @description Allows to perform survivals analysis on GPU with coxph and WCE
 #' models, and several features to use bootstrap and manage memory.
 #'
-#' To learn more about survivalGPU, start with the vignette :
-#' `vignette("survivalGPU")`
+#' To learn more about survivalGPU, see vignettes :
+#' `vignette("coxPH")`
+#' `vignette("WCE")`
+#' `vignette("python_connect")`
 #'
 #' @section Functions:
 #'

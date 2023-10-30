@@ -15,8 +15,7 @@ knitr::opts_chunk$set(
 ```
 
 
-présenter Weighted Cumulative Exposure[^wce] model ...
-
+The Weighted Cumulative Exposure model[^wce] is a flexible method for modeling cumulative effects of time-varying exposures, represented by time-dependent covariates in the Cox proportional hazards model.
 
 Let's make an example with `drugdata` dataset from WCE package. Before load `survivalGPU`, use your virtual python environment (see `vignette("python_connect")`).
 

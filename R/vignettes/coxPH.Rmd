@@ -10,13 +10,13 @@ vignette: >
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  eval = require("survminer")
 )
 ```
 
 
-Présenter le modèle de Cox[^cox1] [^cox2]
-
+The Cox Proportional Hazard model[^cox1] [^cox2] is a regression model generally used in medical research to check the association between time to event and one or more covariables.
 
 
 Let's make an example with `lung` cancer dataset from survival package. Check `?survival::lung` if you want more explanations about this dataset. Before load `survivalGPU`, use your virtual python environment (see `vignette("python_connect")`).
@@ -64,7 +64,6 @@ coxphGPU are objects that inherit from a coxph object, so it's possible to use o
 You can plot adjusted survival curves with `survminer::ggadjustedcurves()`.
 
 ```{r}
-# requireNamespace("survminer", quietly = TRUE)
 survminer::ggadjustedcurves(coxphGPU_bootstrap,
                             variable = "sex",
                             data = data)

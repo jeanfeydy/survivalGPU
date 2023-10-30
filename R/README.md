@@ -31,9 +31,10 @@ the default python executable.
 library(reticulate)
 
 virtualenv_create("survivalGPU")
-virtualenv_install("survivalGPU", packages = c("torch", "torch_scatter",
-                                               "pykeops", "matplotlib",
-                                               "beartype", "jaxtyping"))
+virtualenv_install("survivalGPU", packages = c("torch"))
+virtualenv_install("survivalGPU", packages = c("torch_scatter", "pykeops",
+                                               "matplotlib", "beartype",
+                                               "jaxtyping"))
 # torch takes a long time to set up
 ```
 
@@ -86,6 +87,7 @@ Check if CUDA is detected :
 
 ``` r
 use_cuda()
+#> [KeOps] Warning : cuda was detected, but driver API could not be initialized. Switching to cpu only.
 #> [1] FALSE
 ```
 
@@ -131,7 +133,7 @@ summary(coxphGPU_bootstrap)
 #> 
 #>              coef exp(coef)  se(coef)      z Pr(>|z|)    
 #> age      0.011041  1.011102  0.009267  1.191    0.233    
-#> sex     -0.551889  0.575861  0.167742 -3.290    0.001 ** 
+#> sex     -0.551890  0.575861  0.167742 -3.290    0.001 ** 
 #> ph.ecog  0.462947  1.588749  0.113574  4.076 4.58e-05 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
@@ -149,9 +151,9 @@ summary(coxphGPU_bootstrap)
 #>  ---------------- 
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>             2.5%    97.5%
-#> age     0.996991 1.026560
-#> sex     0.405905 0.782716
-#> ph.ecog 1.285360 1.898860
+#> age     0.991309 1.030620
+#> sex     0.397429 0.872966
+#> ph.ecog 1.237810 1.927180
 ```
 
 To visualize your model, you can plot adjusted survival curves with

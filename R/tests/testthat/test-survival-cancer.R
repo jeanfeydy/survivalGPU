@@ -189,11 +189,12 @@ test_that("survival-cancer", {
 
   # "." in formula with coxphGPU
   fit1_gpu <- coxphGPU(Surv(time, status_0_1) ~ . - meal.cal - wt.loss - inst - status, lung, ties = ties)
-  fit3_gpu <- coxphGPU(Surv(time, status_0_1) ~ age + sex + ph.ecog + ph.karno + pat.karno, lung, ties = ties)
+  fit2_gpu <- update(fit1_gpu, .~. - ph.karno)
+  fit3_gpu <- coxphGPU(Surv(time, status_0_1) ~ age + sex + ph.ecog + pat.karno, lung, ties = ties)
 
   test_that("Use of . in right coxphGPU formula - coefs", {
     expect_equal(
-      round(as.vector(coef(fit1_gpu)),5),
+      round(as.vector(coef(fit2_gpu)),5),
       round(as.vector(coef(fit3_gpu)),5)
     )
   })

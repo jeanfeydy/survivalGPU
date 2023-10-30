@@ -107,7 +107,7 @@ test_that("survival-book1", {
 
 
   fit0_gpu <-coxphGPU(Surv(time, status) ~x, test1, iter = 0, ties = 'breslow')
-  test_that("book1 - fit0 - loglik", {expect_equal(truth0$loglik, fit0_gpu$loglik)})
+  test_that("book1 - fit0 - loglik", {expect_equal(truth0$loglik, fit0_gpu$loglik[2])})
   test_that("book1 - fit0 - var", {expect_equal(1/truth0$imat, c(fit0_gpu$var))})
   test_that("book1 - fit0 - residuals", {expect_equal(truth0$mart, as.vector(fit0_gpu$resid[c(2:6,1)]))})
   # aeq(truth0$scho, resid(fit0, 'schoen')) # implémenter method resid
@@ -147,7 +147,7 @@ test_that("survival-book1", {
 
   truth <- byhand1(fit$coef, 0)
   aeq(truth$loglik, fit$loglik[2])
-  test_that("book1 - fit - loglik", {expect_equal(round(as.vector(truth$loglik), 4), round(fit_gpu$loglik, 4))})
+  test_that("book1 - fit - loglik", {expect_equal(round(as.vector(truth$loglik), 4), round(fit_gpu$loglik[2], 4))})
 
   aeq(1/truth$imat, fit$var)
   test_that("book1 - fit - var", {expect_equal(round(as.vector(1/truth$imat), 4), c(round(fit_gpu$var, 4)))})
@@ -187,12 +187,12 @@ test_that("survival-book1", {
   test_that("book1 - scho resid", {expect_equal(round(as.vector(resid(fit, 'scho')), 4), round(as.vector(resid(fit_gpu, type = "scho")), 4))})
 
   predict(fit, type='lp', se.fit=T)
-  test_that("book1 - predict - lp", {expect_equal(lapply(lapply(predict(fit, type='lp', se.fit=T), FUN = as.vector), FUN = round, 4),
+  test_that("book1 - predict - lp", {expect_equal(lapply(predict(fit, type='lp', se.fit=T), FUN = round, 4),
                                                   lapply(predict(fit_gpu, type='lp', se.fit=T), FUN = round, 4))})
 
 
   predict(fit, type='risk', se.fit=T)
-  test_that("book1 - predict - risk", {expect_equal(lapply(lapply(predict(fit, type='risk', se.fit=T), FUN = as.vector), FUN = round, 4),
+  test_that("book1 - predict - risk", {expect_equal(lapply(predict(fit, type='risk', se.fit=T), FUN = round, 4),
                                                     lapply(predict(fit_gpu, type='risk', se.fit=T), FUN = round, 4))})
 
   predict(fit, type='expected', se.fit=T)
@@ -201,7 +201,7 @@ test_that("survival-book1", {
                                                         lapply(lapply(predict(fit_gpu, type='expected', se.fit=T), FUN = as.vector), FUN = round, 4))})
 
   predict(fit, type='terms', se.fit=T)
-  test_that("book1 - predict - terms", {expect_equal(lapply(lapply(predict(fit, type='lp', se.fit=T), FUN = as.vector), FUN = round, 4),
+  test_that("book1 - predict - terms", {expect_equal(lapply(predict(fit, type='lp', se.fit=T), FUN = round, 4),
                                                      lapply(predict(fit_gpu, type='lp', se.fit=T), FUN = round, 4))})
 
   # summary(survfit(fit, list(x=2)))

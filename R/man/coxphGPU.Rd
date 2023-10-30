@@ -9,7 +9,7 @@ coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
          batchsize = 0, init, all.results = FALSE, control,
          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
 
-\method{summary}{coxphGPU}(object, ..., conf.int = 0,95, scale = 1)
+\method{summary}{coxphGPU}(object, ..., conf.int = 0.95, scale = 1)
 }
 \arguments{
 \item{formula}{a formula object, with the response on the left of a ~
@@ -24,13 +24,15 @@ object as returned by the Surv function.}
 
 \item{ties}{
     a character string specifying the method for tie handling.  If there  
-    are no tied death times all the methods are equivalent.
-    The Efron approximation is used as the default, it is more 
+    are no tied death times all the methods are equivalent. 
+    Nearly all Cox regression programs use the Breslow method by default, 
+    but not this one. 
+    The Efron approximation is used as the default here, it is more 
     accurate when dealing with tied death times, and is as efficient 
-    computationally. (But see below for multi-state models.)
+    computationally. 
     The ``exact partial likelihood'' is 
     equivalent to a conditional logistic model, and is appropriate when
-    the times are a small set of discrete values.
+    the times are a small set of discrete values.  See further below.
   }
 
 \item{bootstrap}{Number of repeats for the bootstrap cross-validation.}

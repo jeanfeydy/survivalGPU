@@ -9,8 +9,10 @@
 Allows to perform survivals analysis on GPU with coxph and WCE
 models, and several features to use bootstrap and manage memory.
 
-To learn more about survivalGPU, start with the vignette :
-\code{vignette("survivalGPU")}
+To learn more about survivalGPU, see vignettes :
+\code{vignette("coxPH")}
+\code{vignette("WCE")}
+\code{vignette("python_connect")}
 }
 \section{Functions}{
 
@@ -24,6 +26,6 @@ To learn more about survivalGPU, start with the vignette :
 \author{
 \itemize{
 \item \href{https://www.jeanfeydy.com}{Jean FEYDY}
-\item Alexis van STRAATEN
+\item \href{https://alexis-vs.github.io/Portfolio/}{Alexis van STRAATEN}
 }
 }

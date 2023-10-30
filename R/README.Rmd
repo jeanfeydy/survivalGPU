@@ -34,9 +34,10 @@ survivalGPU is a package based on a package written in python, dependant on the 
 library(reticulate)
 
 virtualenv_create("survivalGPU")
-virtualenv_install("survivalGPU", packages = c("torch", "torch_scatter",
-                                               "pykeops", "matplotlib",
-                                               "beartype", "jaxtyping"))
+virtualenv_install("survivalGPU", packages = c("torch"))
+virtualenv_install("survivalGPU", packages = c("torch_scatter", "pykeops",
+                                               "matplotlib", "beartype",
+                                               "jaxtyping"))
 # torch takes a long time to set up
 ```
 
