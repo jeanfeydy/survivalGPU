@@ -44,6 +44,7 @@ jobs:
 
       - name: survivalGPU virtual env
         run: |
+          apt-get install python3-venv
           R -e 'library(reticulate);virtualenv_create("survivalGPU");virtualenv_install("survivalGPU", packages = c("torch"));virtualenv_install("survivalGPU", packages = c("torch_scatter", "pykeops", "matplotlib", "beartype", "jaxtyping"))'
 
       - name: Build site
