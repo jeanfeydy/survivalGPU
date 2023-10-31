@@ -2,8 +2,8 @@ Package: survivalGPU
 Title: Fast and scalable implementations for survival models
 Version: 0.0.0.9000
 Authors@R: c(
-    person("Jean", "FEYDY", email = "jean.feydy@inria.fr",role = "aut"),
-    person("Alexis", "van STRAATEN", email = "alexis.vanstraaten@outlook.fr", role = c("aut","cre")),
+    person("Jean", "FEYDY", email = "jean.feydy@inria.fr", role = "aut"),
+    person("Alexis", "van STRAATEN", email = "alexis.vanstraaten@outlook.fr", role = c("aut", "cre")),
     person("Terry", "THERNEAU", role = "cph", comment = "Author of survival library"),
     person("Pierre", "SABATIER", role = "ctb"),
     person("Anne-Sophie", "JANNOT", role = "ctb"))
@@ -16,13 +16,13 @@ Imports:
     reticulate,
     stats,
     survival,
-    testthat (>= 3.0.0),
     utils
 Suggests: 
     dplyr,
     knitr,
     rmarkdown,
     survminer,
+    testthat (>= 3.0.0),
     WCE
 Config/testthat/edition: 3
 VignetteBuilder: knitr
