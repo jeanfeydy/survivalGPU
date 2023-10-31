@@ -36,6 +36,16 @@ jobs:
           needs: website
           working-directory: "R/"
 
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: 'pip' # caching pip dependencies
+
+      - name: survivalGPU virtual env
+        run: |
+          R -e 'library(reticulate);virtualenv_create("survivalGPU");virtualenv_install("survivalGPU", packages = c("torch"));virtualenv_install("survivalGPU", packages = c("torch_scatter", "pykeops", "matplotlib", "beartype", "jaxtyping"))'
+
       - name: Build site
         run: pkgdown::build_site_github_pages(pkg = "R/", new_process = FALSE, install = FALSE)
         shell: Rscript {0}
