@@ -49,12 +49,19 @@ def test_wce_shapes():
     """Tests the shapes of the WCESurvivalAnalysis attributes."""
 
     ds = load_drugs(n_drugs=1, n_patients=1, max_duration=1)
+
+    print(ds.dose)
+    print(ds.start)
+    print(ds.stop)
+    
     model = WCESurvivalAnalysis(cutoff=10, order=3, n_knots=1)
     model.fit(
-        covariates=ds.covariates, 
+        covariates=ds.covariates,
         stop=ds.stop,
         start=ds.start,
-        events=ds.events,
-        )
+        event=ds.event,
+        dose=ds.dose,
+        patient=ds.patient,
+    )
 
     assert model is not None

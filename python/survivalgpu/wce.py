@@ -187,24 +187,41 @@ class WCESurvivalAnalysis:
 
     # Computation of the WCE features ====================================================
 
-    def _wce_features(self, *, ids, doses, times):
+    @typecheck
+    def _wce_features(
+        self,
+        *,
+        patient: Int64Array["intervals"],
+        dose: Float64Array["intervals"],
+        time: Int64Array["intervals"],
+    ):
         """Computes the WCE B-Spline covariates on a batch of patients and drugs."""
+
+        patient = torch.from_numpy(patient).to(device)
+        dose = torch.from_numpy(dose).to(device)
+        time = torch.from_numpy(time).to(device)
+
         wce_features, knots = wce_features_batch(
-            ids=ids,
-            times=times,
-            doses=doses,
+            ids=patient,
+            times=time,
+            doses=dose,
             nknots=self.n_knots,
             cutoff=self.cutoff,
             order=self.order,
         )
+
+        wce_features = wce_features.cpu().numpy()
+        knots = knots.cpu().numpy()
+
         wce_features = self._constrain(wce_features)
-        assert wce_features.shape == (len(times), self.n_atoms)
+        assert wce_features.shape == (len(time), self.n_atoms)
         return wce_features, knots
 
+    @typecheck
     def fit(
         self,
         *,
-        doses: Float64Array["intervals"],
+        dose: Float64Array["intervals"],
         stop: Int64Array["intervals"],
         start: Int64Array["intervals"],
         event: Int64Array["intervals"],
@@ -217,13 +234,13 @@ class WCESurvivalAnalysis:
         batch_size: Optional[Int] = None,
         device: Optional[TorchDevice] = None,
     ):
-        if not torch.all(stop == start + 1):
+        if not np.all(stop == start + 1):
             raise NotImplementedError(
                 "Currently, we only support unit length intervals."
             )
 
         # Step 1: compute the time-dependent features (= exposures)
-        exposures, knots = self._wce_features(ids=patient, doses=doses, times=stop)
+        exposures, knots = self._wce_features(patient=patient, dose=dose, time=stop)
         assert exposures.shape == (len(stop), self.n_atoms)
 
         # Step 2: perform a CoxPH regression with the new covariates
@@ -234,7 +251,7 @@ class WCESurvivalAnalysis:
         else:
             # We observe other covariates such as the sex, etc.
             self.n_covariates = covariates.shape[-1]
-            covariates = torch.cat((covariates, exposures), dim=-1)
+            covariates = np.concatenate((covariates, exposures), axis=-1)
 
         self.survival_model.fit(
             covariates=covariates,
