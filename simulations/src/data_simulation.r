@@ -153,9 +153,9 @@ get_dataset <- function(Xmat, wce_mat) {
 }
 
 calcul_exposition <- function(scenario,normalization){
-    expo_list <- lapply((1:180)/365, scenario)/normalization
+    expo_list <- lapply((1:180)/365, scenario)
     expo <- do.call("rbind", expo_list)/365
-    return(expo)
+    return(expo/normalization)
 }
 
 # Function to simulate right constrained and unconstrained WCE with the same1
