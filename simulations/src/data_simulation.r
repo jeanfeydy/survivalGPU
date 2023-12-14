@@ -4,13 +4,13 @@ library(purrr)
 
 # Function to generate an individual time-dependent exposure history
 # e.g. generate prescriptions of different durations and doses.
-TDhist <- function(observation_time) {
+TDhist <- function(observation_time,doses) {
   # Duration : lognormal distribution(0.5,0.8)
   duration <- 7 + 7 * round(rlnorm(1, meanlog = 0.5, sdlog = 0.8), 0)
   # in weeks
 
   # Dose : random assignment of values 0.5, 1, 1.5, 2, 2.5 and 3
-  dose <- sample(seq(from = 0.5, to = 3, by = 0.5), size = 1)
+  dose <- sample(doses, size = 1)
 
   # Start with drug exposure
   vec <- rep(dose, duration)
@@ -19,21 +19,34 @@ TDhist <- function(observation_time) {
   while (length(vec) <= observation_time) {
       intermission <- 7 + 7 * round(rlnorm(1, meanlog = 0.5, sdlog = 0.8), 0) # in weeks
       duration <- 7 + 7 * round(rlnorm(1, meanlog = 0.5, sdlog = 0.8), 0) # in weeks
-      dose <- sample(c(0.5, 1, 1.5, 2, 2.5, 3), size = 1)
+      dose <- sample(doses, size = 1)
       vec <- append(vec, c(rep(0, intermission), rep(dose, duration)))
   }
 
   return(vec[1:observation_time])
 }
 
-
-generate_Xmat <- function(observation_time,n_patients){
+generate_Xmat <- function(observation_time,n_patients,doses){
   Xmat = matrix(ncol = 1,
                 nrow = n_patients * observation_time)
-  Xmat[, 1] <- do.call("c", lapply(1:n_patients, function(i) TDhist(observation_time)))
+  Xmat[, 1] <- do.call("c", lapply(1:n_patients, function(i) TDhist(observation_time,doses)))
   dim(Xmat) <- c(observation_time, n_patients)
   return(Xmat)
   }
+
+generate_Xmat_list<- function(observation_time,n_patients,n_bootstraps,doses){
+
+    print("start test")
+    Xmat_list = list()
+    for(i in 1:n_bootstraps){
+        print(i)
+        Xmat <- generate_Xmat(observation_time,n_patients,doses)
+        Xmat_list <- append(Xmat_list, list(Xmat))
+    }
+
+    return(Xmat_list)
+
+}
 
   # Function to obtain WCE vector
 wce_vector <- function(u, scenario, Xmat,normalization) {
@@ -198,7 +211,7 @@ Simulate_WCE<- function(scenario, Xmat,cutoff,normalization) {
                 results_unconstrained = results_unconstrained))
 }
 
-simulate_with_bootstraps <- function(n_bootstraps, number_patients, observation_time, scenario,cutoff,normalization){
+simulate_with_bootstraps <- function(n_bootstraps, number_patients, observation_time, scenario,cutoff,normalization, Xmat_list){
     print("################ Start simulation #################")
   
     start_time = Sys.time()
@@ -218,7 +231,8 @@ simulate_with_bootstraps <- function(n_bootstraps, number_patients, observation_
 
         print(paste("Simulation of bootstrap",i))
     
-        Xmat <- generate_Xmat(observation_time,number_patients)
+        #Xmat <- generate_Xmat(observation_time,number_patients)
+        Xmat <- Xmat_list[i]
         simulation <- Simulate_WCE(scenario,Xmat,cutoff,normalization)
         right_constrained <- append(right_constrained,list(simulation$results_right_constrained$WCEmat))
         right_constrained_BIC <- append(right_constrained_BIC,list(simulation$results_right_constrained$BIC))
