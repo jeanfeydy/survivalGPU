@@ -29,7 +29,6 @@ TDhist <- function(observation_time,doses) {
 }
 
 generate_Xmat <- function(observation_time,n_patients,doses){
-    print("for real")
   Xmat = matrix(ncol = 1,
                 nrow = n_patients * observation_time)
   Xmat[, 1] <- do.call("c", lapply(1:n_patients, function(i) TDhist(observation_time,doses)))
