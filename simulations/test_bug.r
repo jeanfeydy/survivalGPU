@@ -29,7 +29,7 @@ print(head(df_wce))
 
 print("#### Simulation package WCE ####")
 
-wce_right_constrained <- WCE(df_wce, "cox", 1, cutoff, constrained = "right",
+wce_right_constrained <- WCE(df_wce, "cox", 1, cutoff, constrained = "left",
                              id = "patient", event = "event", start = "start",
                              stop = "stop", expos = "dose")
 
@@ -38,7 +38,9 @@ print("OK")
 print("#### Simulation package wceGPU ####")
 
 
-wce_right_constrained <- wceGPU(df_wce, 1, cutoff, constrained = "right",
+wce_right_constrained <- wceGPU(df_wce, 1, cutoff, constrained = "left",
                              id = "patient", event = "event", start = "start",
                              stop = "stop", expos = "dose")
+
+
 
