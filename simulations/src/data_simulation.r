@@ -114,6 +114,14 @@ matching_algo <- function(wce_mat) {
             # If event, matching with different probabilities
           
             wce_matrix <- wce_mat_df %>% select(paste0("V", id)) %>% as.matrix()
+            if (4 * wce_matrix[time_event,] == 0){
+                print("source of the error !!!!!!!")
+                print(4 * wce_matrix[time_event,] == 0)
+                print(time_event)
+                print(wce_matrix[time_event,])
+
+
+            }
             proba <- (4 * wce_matrix[time_event,]) / sum(4 * wce_matrix[time_event,])
             sample_id <- sample(id, 1, prob = proba)
         }
