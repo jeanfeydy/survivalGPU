@@ -4,7 +4,8 @@ import sys
 
 
 sys.path.append("../../python")
-import survivalgpu
+from survivalgpu import use_cuda, device, float32, int32, int64
+from survivalgpu.utils import numpy
 from survivalgpu import wce_torch
 
 
@@ -25,11 +26,11 @@ with open("../WCEmat_data/bi_linear_weight.csv") as file:
 
 print(patient)
 
-patient = torch.tensor(patient,dtype=torch.int32)
-start = torch.tensor(start,dtype=torch.int32)
-stop = torch.tensor(stop,dtype=torch.int32)
-events = torch.tensor(events,dtype=torch.int32)
-doses = torch.tensor(doses,dtype=torch.int32)
+patient = torch.tensor(patient)
+start = torch.tensor(start)
+stop = torch.tensor(stop)
+events = torch.tensor(events)
+doses = torch.tensor(doses)
 
 
 result = wce_torch(ids = patient, doses = doses, events = events, times = start,
