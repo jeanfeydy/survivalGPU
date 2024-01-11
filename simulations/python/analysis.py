@@ -2,6 +2,9 @@ import csv
 import torch 
 import sys
 
+from pykeops.torch import LazyTensor
+
+
 
 sys.path.append("../../python")
 from survivalgpu import use_cuda, device, float32, int32, int64
@@ -27,11 +30,14 @@ with open("../WCEmat_data/bi_linear_weight.csv") as file:
         doses.append(float(row['dose']))
 
 print("OK 1")
-patient = torch.tensor(patient, dtype = int32)
-start = torch.tensor(start, dtype = int32)
-stop = torch.tensor(stop, dtype = int32)
-events = torch.tensor(events, dtype = int32)
-doses = torch.tensor(doses, dtype = float32)
+
+print(device)
+
+patient = torch.tensor(patient, device = device, dtype = int32)
+start = torch.tensor(start, device = device, dtype = int32)
+stop = torch.tensor(stop, device = device, dtype = int32)
+events = torch.tensor(events, device = device, dtype = int32)
+doses = torch.tensor(doses, device = device, dtype = float32)
 
 print("OK 2")
 
