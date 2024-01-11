@@ -24,18 +24,21 @@ with open("../WCEmat_data/bi_linear_weight.csv") as file:
         events.append(float(row['event']))
         doses.append(float(row['dose']))
 
-print(patient)
+print("OK 1")
+patient = torch.tensor(patient, dtype = int32)
+start = torch.tensor(start, dtype = int32)
+stop = torch.tensor(stop, dtype = int32)
+events = torch.tensor(events, dtype = int32)
+doses = torch.tensor(doses, dtype = float32)
 
-patient = torch.tensor(patient)
-start = torch.tensor(start)
-stop = torch.tensor(stop)
-events = torch.tensor(events)
-doses = torch.tensor(doses)
+print("OK 2")
+
 
 
 result = wce_torch(ids = patient, doses = doses, events = events, times = start,
                       cutoff = 180, nknots = 1,covariates = None)
 
+print("OK 3")
 
 
 print(result)
