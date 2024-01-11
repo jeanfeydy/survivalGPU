@@ -13,7 +13,6 @@ from survivalgpu import wce_torch
 from survivalgpu.wce_features import wce_features_batch
 
 
-
 patient = []
 start = []
 stop = []
@@ -29,25 +28,17 @@ with open("../WCEmat_data/bi_linear_weight.csv") as file:
         events.append(float(row['event']))
         doses.append(float(row['dose']))
 
-print("OK 1")
-
-print(device)
-
 patient = torch.tensor(patient, device = device, dtype = int32)
 start = torch.tensor(start, device = device, dtype = int32)
 stop = torch.tensor(stop, device = device, dtype = int32)
 events = torch.tensor(events, device = device, dtype = int32)
 doses = torch.tensor(doses, device = device, dtype = float32)
 
-print("OK 2")
-
-wce_features_batch( ids = patient, times = start, doses = doses, nknots = 1, cutoff = 180, 
-                   order=3, knots=None)
 
 result = wce_torch(ids = patient, doses = doses, events = events, times = start,
-                      cutoff = 180, nknots = 1,covariates = None)
+                      cutoff = 180, nknots = 1,covariates = None, batchsize = 50, bootstraps = 10
+                      )
 
-print("OK 3")
 
 
 print(result)
