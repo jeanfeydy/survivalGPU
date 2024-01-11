@@ -105,8 +105,10 @@ matching_algo <- function(wce_mat) {
     for (i in patient_order) {
         event <- df_event[j, "event"] %>% pull()
         time_event <- df_event[j, "FUP_Ti"] %>% pull()
+
+        first <- TRUE
         
-        
+   
         if(event == 0) {
             # If no event, all probabilities are the same
             sample_id <- sample(id, 1)
@@ -115,15 +117,12 @@ matching_algo <- function(wce_mat) {
           
             wce_matrix <- wce_mat_df %>% select(paste0("V", id)) %>% as.matrix()
             if (4 * wce_matrix[time_event,] == 0){
-                print("source of the error !!!!!!!")
-                print(4 * wce_matrix[time_event,] == 0)
-                print(time_event)
-                print(wce_matrix[time_event,])
+                sample_id <- sample(id, 1, prob = proba)
+            }else{
 
-
-            }
-            proba <- (4 * wce_matrix[time_event,]) / sum(4 * wce_matrix[time_event,])
-            sample_id <- sample(id, 1, prob = proba)
+                proba <- (4 * wce_matrix[time_event,]) / sum(4 * wce_matrix[time_event,])
+                sample_id <- sample(id, 1, prob = proba)
+            }            
         }
 
         matching_result <- rbind(matching_result,
