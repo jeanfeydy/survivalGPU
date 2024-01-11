@@ -7,6 +7,8 @@ sys.path.append("../../python")
 from survivalgpu import use_cuda, device, float32, int32, int64
 from survivalgpu.utils import numpy
 from survivalgpu import wce_torch
+from survivalgpu.wce_features import wce_features_batch
+
 
 
 patient = []
@@ -33,7 +35,8 @@ doses = torch.tensor(doses, dtype = float32)
 
 print("OK 2")
 
-
+wce_features_batch( ids = patient, times = start, doses = doses, nknots = 1, cutoff = 180, 
+                   order=3, knots=None)
 
 result = wce_torch(ids = patient, doses = doses, events = events, times = start,
                       cutoff = 180, nknots = 1,covariates = None)
