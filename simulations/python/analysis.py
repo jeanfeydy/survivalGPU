@@ -36,13 +36,13 @@ doses = torch.tensor(doses, device = device, dtype = float32)
 
 
 result = wce_torch(ids = patient, doses = doses, events = events, times = start,
-                      cutoff = 180, nknots = 1,covariates = None, batchsize = 1, bootstrap = 1000
+                      cutoff = 50, nknots = 1,covariates = None, batchsize = 1, bootstrap = 3,
+                      verbosity = 0
                       )
 
+PATH = "../Simulation_results/test_result"
 
-
-print(result)
-
+torch.save(result, PATH)
 
 
 
