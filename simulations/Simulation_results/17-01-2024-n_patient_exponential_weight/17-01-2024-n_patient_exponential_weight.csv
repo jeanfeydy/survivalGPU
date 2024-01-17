@@ -1,0 +1,13 @@
+path,n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/50_exponential_weight_1000bootsraps1knots_Right,50,exponential_weight,1000,1,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/50_exponential_weight_1000bootsraps2knots_Right,50,exponential_weight,1000,2,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/50_exponential_weight_1000bootsraps3knots_Right,50,exponential_weight,1000,3,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/100_exponential_weight_1000bootsraps1knots_Right,100,exponential_weight,1000,1,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/100_exponential_weight_1000bootsraps2knots_Right,100,exponential_weight,1000,2,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/100_exponential_weight_1000bootsraps3knots_Right,100,exponential_weight,1000,3,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/1000_exponential_weight_1000bootsraps1knots_Right,1000,exponential_weight,1000,1,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/1000_exponential_weight_1000bootsraps2knots_Right,1000,exponential_weight,1000,2,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/1000_exponential_weight_1000bootsraps3knots_Right,1000,exponential_weight,1000,3,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/5000_exponential_weight_1000bootsraps1knots_Right,5000,exponential_weight,1000,1,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/5000_exponential_weight_1000bootsraps2knots_Right,5000,exponential_weight,1000,2,180,Right
+../Simulation_results/17-01-2024-n_patient_exponential_weight/models/5000_exponential_weight_1000bootsraps3knots_Right,5000,exponential_weight,1000,3,180,Right

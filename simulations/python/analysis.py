@@ -3,6 +3,8 @@ import csv
 import torch 
 import sys
 import itertools
+import argparse
+
 
 
 from pykeops.torch import LazyTensor
@@ -22,6 +24,12 @@ from survivalgpu.wce_features import wce_features_batch
 
 
 print("Begining of the program")
+
+parser = argparse.ArgumentParser(description='Name the experiment')
+parser.add_argument('experiment_name', type=str, help='the name of the experiment')
+args = parser.parse_args()
+experiment_name = args.experiment_name
+print("###### Exeriment : ",experiment_name," #############")
 
 
 
@@ -68,7 +76,7 @@ def print_constrained(constraint):
 
 
 
-n_patients_list = [10,20,50,100,1000,5000]#,10000]
+n_patients_list = [50,100,1000,5000]#,10000]
 weight_function_list = ["exponential_weight"] #,"bi_linear_weight","constant_weight","early_peak_weight","inverted_u_weight","late_effect_weight"]
 n_bootstraps_list = [1000]#,1000]
 nknots_list = [1,2,3]
@@ -76,7 +84,6 @@ cutoff_list = [180]
 constraint = ["Right"]#[None, "Right"]
 # batchsizeS = [100] #not here
 
-experiment_name = "test_csv_header"
 result_folder_path = "../Simulation_results/" + experiment_name
 experiment_dict_list = []
 
