@@ -6,6 +6,8 @@ import numpy as np
 import os
 from statistics import mean
 from pykeops.torch import LazyTensor
+import pandas as pd
+import numpy as np
 
 
 
@@ -16,8 +18,8 @@ from survivalgpu import wce_torch
 from survivalgpu.wce_features import wce_features_batch
 
 
-simualtion = "16-01-2024"
-path =  "../Simulation_results/"+ simualtion + "/"
+simualtion = "17-01-2024-n_patient_exponential_weight"
+path =  "../Simulation_results/"+ simualtion + "/models/"
 # print(path)
 
 
@@ -27,12 +29,12 @@ list_dir = os.listdir(path)
 weight_function = "exponential_weight"
 
 
- 
+# experiements_df = pd.read_csv("../Simulation_results/"+ simualtion+"/"+simualtion +".csv")
 
-for i in range(1):
 
-    file_name = list_dir[0]
-    file_path =  "../Simulation_results/"+ simualtion + "/" + file_name
+
+
+def analyse_result(file_path):
 
     data = torch.load(file_path, map_location=torch.device('cpu'))
 
@@ -56,24 +58,61 @@ for i in range(1):
     mean_tensor = data["WCEmat"].mean(dim=0)
     std_tensor = data["WCEmat"].std(dim=0)
 
-    weights_diff = []
+    list_weights_diff = []
 
     list_air_diff = []
 
-    for i in range(int(data["WCEmat"].shape[0]/2)):
-        WV = abs(data["WCEmat"][i] - real_weights)
-        weights_diff.append(WV.mean().item())
+    for i in range(data["WCEmat"].shape[0]):
+        weights_diff = abs(data["WCEmat"][i] - real_weights)
+        list_weights_diff.append(weights_diff.mean().item())
 
         sum_air = data["WCEmat"][i].sum().item()
+        # print(data["WCEmat"][i].shape)
         sum_air_real = real_weights.sum().item()
         #print(sum_air_real)
         #print(sum_air) ### Ai ai ai sensé être à 1
         air_diff = abs(sum_air_real-sum_air)
         list_air_diff.append(air_diff)
-    print(air_diff)
-    print(mean(weights_diff))
 
 
+
+    return(np.array(list_weights_diff),np.array(list_air_diff))
+
+with open ("../Simulation_results/"+ simualtion+"/"+simualtion +".csv") as file:
+    experiment_list = []
+    csv_reader = csv.DictReader(file)
+    for experient in csv_reader:
+        (list_weights_diff, list_air_diff) =  analyse_result(experient['path'])
+
+        # lower_bar_WD = 
+        # print("weights_diff ",list_weights_diff.mean())
+
+        experient["weight_diff_mean"] = list_weights_diff.mean()
+        experient["weight_diff_95p"] = np.percentile(list_weights_diff,95)
+        experient["weight_diff_5p"] = np.percentile(list_weights_diff,5)
+
+        experient["air_diff_mean"] = list_air_diff.mean()
+        experient["air_diff_95p"] = np.percentile(list_air_diff,95)
+        experient["air_diff_5p"] = np.percentile(list_air_diff,5)
+
+        experiment_list.append(experient)
+
+
+result_path = "../Simulation_results/"+ simualtion+"/analyzed_"+simualtion + ".csv"
+
+
+with open(result_path,"w", newline ='') as file:
+    writer = csv.writer(file)
+    fields = list(experiment_list[0].keys())
+    print(fields)
+    writer.writerow(fields)
+
+    for experiment_dict in experiment_list:
+        line = []
+        for field in fields:
+            line.append(experiment_dict[field])
+        writer.writerow(line)
+        
 
 
 
