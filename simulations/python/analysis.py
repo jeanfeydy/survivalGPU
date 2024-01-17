@@ -58,37 +58,73 @@ def WCE_experiment(n_patients, weight_function,n_bootsraps,nknots,cutoff,constra
                           verbosity = 0
                           )
 
-    PATH = "../Simulation_results/16-01-2023/" + str(n_patients)+ "_" + weight_function + "_" + str(n_bootsraps) + "bootsraps" + str(nknots) +"knots" + "_" +print_constrained(constraint) +"_" + str(batchsize)  +"batchsize"
-
-    torch.save(result, PATH)
-
+    return result
 
 def print_constrained(constraint):
     if constraint == None:
         return("None")
     return(constraint)
-    
 
 
 
-n_patients_list = [500,1000,5000]#,10000]
+
+n_patients_list = [10,20,50,100,1000,5000]#,10000]
 weight_function_list = ["exponential_weight"] #,"bi_linear_weight","constant_weight","early_peak_weight","inverted_u_weight","late_effect_weight"]
-n_bootstraps_list = [10000]#,1000]
+n_bootstraps_list = [1000]#,1000]
 nknots_list = [1,2,3]
 cutoff_list = [180]
 constraint = ["Right"]#[None, "Right"]
-batchsizeS = [100] #not here
+# batchsizeS = [100] #not here
+
+experiment_name = "test_csv_header"
+result_folder_path = "../Simulation_results/" + experiment_name
+experiment_dict_list = []
 
 
-print("variables defined")
+for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint) in itertools.product(n_patients_list,weight_function_list, n_bootstraps_list,nknots_list,cutoff_list,constraint):
+    # print("##### start experiment : ")
 
-for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint, batchsize) in itertools.product(n_patients_list,weight_function_list, n_bootstraps_list,nknots_list,cutoff_list,constraint,batchsizeS):
-    print("##### start experiment : ")
+    path = result_folder_path + "/models/" + str(n_patients)+ "_" + weight_function + "_" + str(n_bootstraps) + "bootsraps" + str(nknots) +"knots" + "_" +print_constrained(constraint)
+    
+    experiment_dict = {
+        "path" : path,
+        "n_patients" : n_patients,
+        "weight_function": weight_function,
+        "n_bootstraps" : n_bootstraps,
+        "nknots" : nknots,
+        "cutoff" : cutoff,
+        "constraint" : constraint
+    }
+    # print("n_patients = ", str(n_patients)," - weight_function =" , weight_function ," - n_bootstraps = " , 
+    #       str(n_bootstraps), " - nknots =  ", str(nknots), " - cutoff = ", cutoff, "  - constraint = ",
+    #       print_constrained(constraint))
+    
+    # result = WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize = 100)
+    # torch.save(result, path)
+
+    experiment_dict_list.append(experiment_dict)
+
+# print(experiment_dict_list)
+
+result_path = result_folder_path + "/" + experiment_name + ".csv"
+
+with open(result_path,"w", newline ='') as file:
+    writer = csv.writer(file)
+    fields = list(experiment_dict_list[0].keys())
+    print(fields)
+    writer.writerow(fields)
+
+    for experiment_dict in experiment_dict_list:
+        line = []
+        for field in fields:
+            line.append(experiment_dict[field])
+        writer.writerow(line)
+        
+
+    
 
 
-    print("n_patients = ", str(n_patients)," - weight_function =" , weight_function ," - n_bootstraps = " , 
-          str(n_bootstraps), " - nknots =  ", str(nknots), " - cutoff = ", cutoff, "  - constraint = ",
-          print_constrained(constraint)," - batchsize = ",batchsize)
-    WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize)
     #print("right constrained")
     #WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff)
+
+
