@@ -95,12 +95,12 @@ for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint) in iter
         "cutoff" : cutoff,
         "constraint" : constraint
     }
-    # print("n_patients = ", str(n_patients)," - weight_function =" , weight_function ," - n_bootstraps = " , 
-    #       str(n_bootstraps), " - nknots =  ", str(nknots), " - cutoff = ", cutoff, "  - constraint = ",
-    #       print_constrained(constraint))
+    print("n_patients = ", str(n_patients)," - weight_function =" , weight_function ," - n_bootstraps = " , 
+          str(n_bootstraps), " - nknots =  ", str(nknots), " - cutoff = ", cutoff, "  - constraint = ",
+          print_constrained(constraint))
     
-    # result = WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize = 100)
-    # torch.save(result, path)
+    result = WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize = 100)
+    torch.save(result, path)
 
     experiment_dict_list.append(experiment_dict)
 
