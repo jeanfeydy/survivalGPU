@@ -117,8 +117,9 @@ matching_algo <- function(wce_mat) {
           
             wce_matrix <- wce_mat_df %>% select(paste0("V", id)) %>% as.matrix()
             if (4 * wce_matrix[time_event,] == 0){
-                sample_id <- sample(id, 1, prob = proba)
+                sample_id <- sample(id, 1)
             }else{
+
 
                 proba <- (4 * wce_matrix[time_event,]) / sum(4 * wce_matrix[time_event,])
                 sample_id <- sample(id, 1, prob = proba)
