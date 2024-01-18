@@ -76,7 +76,7 @@ def print_constrained(constraint):
 
 
 
-n_patients_list = [50,100,1000,5000]#,10000]
+n_patients_list = [50]#,1000,5000]#,10000]
 weight_function_list = ["exponential_weight"] #,"bi_linear_weight","constant_weight","early_peak_weight","inverted_u_weight","late_effect_weight"]
 n_bootstraps_list = [1000]#,1000]
 nknots_list = [1,2,3]

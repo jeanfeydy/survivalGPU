@@ -6,8 +6,8 @@ import numpy as np
 import os
 from statistics import mean
 from pykeops.torch import LazyTensor
-import pandas as pd
 import numpy as np
+import argparse
 
 
 
@@ -17,9 +17,12 @@ from survivalgpu.utils import numpy
 from survivalgpu import wce_torch
 from survivalgpu.wce_features import wce_features_batch
 
+parser = argparse.ArgumentParser(description='Name the experiment')
+parser.add_argument('experiment_name', type=str, help='the name of the experiment')
+args = parser.parse_args()
+experiment_name = args.experiment_name
 
-simualtion = "17-01-2024-n_patient_exponential_weight"
-path =  "../Simulation_results/"+ simualtion + "/models/"
+path =  "../Simulation_results/"+ experiment_name  + "/models/"
 # print(path)
 
 
@@ -29,7 +32,7 @@ list_dir = os.listdir(path)
 weight_function = "exponential_weight"
 
 
-# experiements_df = pd.read_csv("../Simulation_results/"+ simualtion+"/"+simualtion +".csv")
+# experiements_df = pd.read_csv("../Simulation_results/"+ experiment_name +"/"+experiment_name  +".csv")
 
 
 
@@ -78,7 +81,7 @@ def analyse_result(file_path):
 
     return(np.array(list_weights_diff),np.array(list_air_diff))
 
-with open ("../Simulation_results/"+ simualtion+"/"+simualtion +".csv") as file:
+with open ("../Simulation_results/"+ experiment_name +"/"+experiment_name  +".csv") as file:
     experiment_list = []
     csv_reader = csv.DictReader(file)
     for experient in csv_reader:
@@ -98,8 +101,8 @@ with open ("../Simulation_results/"+ simualtion+"/"+simualtion +".csv") as file:
         experiment_list.append(experient)
 
 
-result_path = "../Simulation_results/"+ simualtion+"/analyzed_"+simualtion + ".csv"
-
+result_path = "../Simulation_results/"+ experiment_name +"/analyzed_"+experiment_name  + ".csv"
+print(result_path)
 
 with open(result_path,"w", newline ='') as file:
     writer = csv.writer(file)
