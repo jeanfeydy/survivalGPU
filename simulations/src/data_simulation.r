@@ -1,6 +1,6 @@
 library(dplyr)
-library(WCE)
-library(purrr)
+# library(WCE)
+# library(purrr)
 
 # Function to generate an individual time-dependent exposure history
 # e.g. generate prescriptions of different durations and doses.
@@ -141,7 +141,7 @@ matching_algo <- function(wce_mat) {
                         df_event = df_event,
                         patient_order = patient_order))
         }
-    }
+    }   
 }
 
 # Function to render dataset after the matching algo
@@ -153,7 +153,9 @@ get_dataset <- function(Xmat, wce_mat) {
 
     for (i in matching_result$patient_order) {
         fu <- matching_result$df_event[matching_result$df_event$patient == i, "FUP_Ti"] %>% pull()
+
         event_patient <- matching_result$df_event[matching_result$df_event$patient == i, "event"] %>% pull()
+
 
         if(event_patient == 1) {
             event_vec <- c(rep(0, (fu-1)), 1)
