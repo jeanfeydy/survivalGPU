@@ -152,3 +152,6 @@ survivalGPU_*.tar.gz
 *anti_inflammatoires.R
 
 simulations/doc/*.pdf
+
+# testthat snapshots
+**/_snaps/

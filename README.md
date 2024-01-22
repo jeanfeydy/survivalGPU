@@ -24,4 +24,7 @@ For the R `survivalGPU` package, go to the `survivalGPU/R` folder. Then, launch 
 library(devtools)
 load_all()
 test()
+
+# To render the documentation as a static website:
+pkgdown::build_site()
 ```
