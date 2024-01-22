@@ -1,3 +1,5 @@
+library(jsonlite)
+
 # imports 
 
 source("src/data_simulation.r")
@@ -9,14 +11,14 @@ source("src/weight_functions.r")
 
 file_name <- "test_data"
 
-doses <- c(1,1.5,2,2.5,3)
-observation_time <- 365
-normalization <- 1
+args <- commandArgs(trailingOnly = TRUE)
+simulation_variables <- fromJSON(args[1])
+
+doses <- simulation_variables$doses
+observation_time <- simulation_variables$observation_time[1]
+normalization <- simulation_variables$normalization[1]
 
 
-
-
-# Simulation of Xmat
 
 
 
