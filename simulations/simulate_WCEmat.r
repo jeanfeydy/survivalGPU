@@ -47,6 +47,7 @@ for (n_patients in n_patients_list){
         wce_mat <- do.call("rbind", lapply(1:dim(Xmat)[1], wce_vector, scenario = scenario$weights, Xmat = Xmat,normalization = normalization))
         df_wce <- get_dataset(Xmat = Xmat, wce_mat = wce_mat)
         export_path <- paste0("WCEmat_data/", scenario$name,"_",n_patients,".csv")
+        print(export_path)
         write.csv(df_wce, export_path, row.names=FALSE)
         }
  }
