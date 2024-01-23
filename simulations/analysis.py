@@ -39,9 +39,6 @@ simulation_variables = json.loads(simulation_variables_str)
 # print(simulation_variables)
 
 
-parser = argparse.ArgumentParser(description='Name the experiment')
-parser.add_argument('experiment_name', type=str, help='the name of the experiment')
-# args = parser.parse_args()
 experiment_name = simulation_variables["experiment_name"]
 print("###### Exeriment : ",experiment_name," #############")
 
@@ -56,7 +53,7 @@ cutoff_list = simulation_variables["cutoff_list"]
 constraint = simulation_variables["constraint"]
 # batchsizeS = [100] #not here
 
-result_folder_path = "../Simulation_results/" + experiment_name
+result_folder_path = "Simulation_results/" + experiment_name
 experiment_dict_list = []
 
 
@@ -133,6 +130,7 @@ for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint) in iter
 # print(experiment_dict_list)
 
 result_path = result_folder_path + "/" + experiment_name + ".csv"
+print(result_path)
 
 with open(result_path,"w", newline ='') as file:
     writer = csv.writer(file)
