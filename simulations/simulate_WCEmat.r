@@ -18,7 +18,7 @@ doses <- simulation_variables$doses
 observation_time <- simulation_variables$observation_time[1]
 normalization <- simulation_variables$normalization[1]
 n_patients_list <- simulation_variables$n_patients
-scenario_list <- simulation_variables
+scenario_list <- simulation_variables$weight_function_list
 
 
 
@@ -47,19 +47,22 @@ scenario_translator <- function(scenario_name){
 }
 
 for (n_patients in n_patients_list){
+
+    path_experiement_result <- paste0("Simulation_results/",simulation_variables$experiment_name)
     
 
     Xmat <- generate_Xmat(observation_time,n_patients,doses)
-    write.csv(Xmat, paste0("Xmat_data/", n_patients,".csv  "))
+    write.csv(Xmat, paste0(path_experiement_result,"/Xmat/", n_patients,".csv  "))
+    
 
     for (scenario in scenario_list){
-        print(paste("#### Generating scenario : ",scenario$name))
+        print(paste("#### Generating scenario : ",scenario))
         print(paste("##n_patients = ",n_patients))
         wce_mat <- do.call("rbind", lapply(1:dim(Xmat)[1], wce_vector, scenario = scenario_translator(scenario), Xmat = Xmat,normalization = normalization))
         df_wce <- get_dataset(Xmat = Xmat, wce_mat = wce_mat)
-        export_path <- paste0("WCEmat_data/", scenario$name,"_",n_patients,".csv")
+        export_path <- paste0(path_experiement_result,"/WCEmat/", scenario,"_",n_patients,".csv")
         print(export_path)
-        write.csv(df_wce, export_path, row.names=FALSE)
+        write.csv(df_wce, export_path, row.names=FALSE) 
         }
  }
 

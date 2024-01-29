@@ -66,7 +66,7 @@ def WCE_experiment(n_patients, weight_function,n_bootsraps,nknots,cutoff,constra
     events = []
     doses = []
     
-    input_PATH = "WCEmat_data/" + weight_function + "_" + str(n_patients) +".csv"
+    input_PATH = result_folder_path + "/WCEmat/" + weight_function + "_" + str(n_patients) +".csv"
 
 
     with open(input_PATH) as file:
