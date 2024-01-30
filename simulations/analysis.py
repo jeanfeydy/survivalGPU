@@ -23,34 +23,32 @@ from survivalgpu.wce_features import wce_features_batch
 # data description  "{n_patient}_{weight_function}"
 
 
-print("Begining of the program")
-
 # Simulation of Xmat
 
 import json
 import sys
 
 # Read the JSON string from command line arguments
-simulation_variables_str = sys.argv[1]
-
+with open ("Simulation_results/simulation_parameters.json") as simulation_parameters_json:
+    simulation_parameters = json.load(simulation_parameters_json)
 # Convert JSON string back to a dictionary
-simulation_variables = json.loads(simulation_variables_str)
-
-# print(simulation_variables)
 
 
-experiment_name = simulation_variables["experiment_name"]
+# print(simulation_parameters)
+
+
+experiment_name = simulation_parameters["experiment_name"]
 print("###### Exeriment : ",experiment_name," #############")
 
 
 
 
-n_patients_list = simulation_variables["n_patients"]
-weight_function_list = simulation_variables["weight_function_list"]
-n_bootstraps_list = simulation_variables["n_bootstraps_list"]
-nknots_list = simulation_variables["nknots_list"]
-cutoff_list = simulation_variables["cutoff_list"]
-constraint = simulation_variables["constraint"]
+n_patients_list = simulation_parameters["n_patients"]
+weight_function_list = simulation_parameters["weight_function_list"]
+n_bootstraps_list = simulation_parameters["n_bootstraps_list"]
+nknots_list = simulation_parameters["nknots_list"]
+cutoff_list = simulation_parameters["cutoff_list"]
+constraint = simulation_parameters["constraint"]
 # batchsizeS = [100] #not here
 
 result_folder_path = "Simulation_results/" + experiment_name
