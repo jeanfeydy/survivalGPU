@@ -18,16 +18,16 @@ import os
 simulation_variables = {
 
     # The name of the expriment
-    "experiment_name"      : "test_of_the_process_4",
+    "experiment_name"      : "test_of_the_process_5",
 
     # Variables for the simualtion fo the Xmat
     "doses"                : [1, 1.5, 2, 2.5, 3],
     "observation_time"     : [365],
 
     # Variables for simualtion of the WCEmat
-    "n_patients"           : [50,100],
+    "n_patients"           : [50,100,1000],
     "normalization"        : [1],
-    "weight_function_list" : ["exponential_weight"], #,"bi_linear_weight","constant_weight","early_peak_weight","inverted_u_weight","late_effect_weight"]
+    "weight_function_list" : ["exponential_weight","bi_linear_weight"], #,"constant_weight","early_peak_weight","inverted_u_weight","late_effect_weight"]
 
     # Variables for the different experiment
     "n_bootstraps_list"    : [1000],#,1000],

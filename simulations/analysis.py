@@ -4,7 +4,7 @@ import torch
 import sys
 import itertools
 import argparse
-
+import time
 
 
 from pykeops.torch import LazyTensor
@@ -59,7 +59,7 @@ experiment_dict_list = []
 
 
 def WCE_experiment(n_patients, weight_function,n_bootsraps,nknots,cutoff,constraint,batchsize):
-
+    starting_time = time.time()
     patient = []
     start = []
     stop = []
@@ -90,8 +90,9 @@ def WCE_experiment(n_patients, weight_function,n_bootsraps,nknots,cutoff,constra
                           batchsize = batchsize, bootstrap = n_bootsraps, constrained = constraint,
                           verbosity = 0
                           )
+    computation_time =  time.time() - starting_time
 
-    return result
+    return (result, computation_time)
 
 def print_constrained(constraint):
     if constraint == None:
@@ -109,6 +110,14 @@ for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint) in iter
 
     path = result_folder_path + "/models/" + str(n_patients)+ "_" + weight_function + "_" + str(n_bootstraps) + "bootsraps" + str(nknots) +"knots" + "_" +print_constrained(constraint)
     
+
+    print("n_patients = ", str(n_patients)," - weight_function =" , weight_function ," - n_bootstraps = " , 
+          str(n_bootstraps), " - nknots =  ", str(nknots), " - cutoff = ", cutoff, "  - constraint = ",
+          print_constrained(constraint))
+    
+    result, computation_time = WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize = 100)
+    torch.save(result, path)
+
     experiment_dict = {
         "path" : path,
         "n_patients" : n_patients,
@@ -116,15 +125,9 @@ for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint) in iter
         "n_bootstraps" : n_bootstraps,
         "nknots" : nknots,
         "cutoff" : cutoff,
-        "constraint" : constraint
+        "constraint" : constraint,
+        "computation_time" : computation_time
     }
-    print("n_patients = ", str(n_patients)," - weight_function =" , weight_function ," - n_bootstraps = " , 
-          str(n_bootstraps), " - nknots =  ", str(nknots), " - cutoff = ", cutoff, "  - constraint = ",
-          print_constrained(constraint))
-    
-    result = WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize = 100)
-    torch.save(result, path)
-
     experiment_dict_list.append(experiment_dict)
 
 # print(experiment_dict_list)

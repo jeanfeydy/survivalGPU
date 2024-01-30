@@ -75,42 +75,42 @@ def analyse_result(file_path):
     mean_tensor = data["WCEmat"].mean(dim=0)
     std_tensor = data["WCEmat"].std(dim=0)
 
-    list_weights_diff = []
+    list_sum_weights_diff = []
 
-    list_air_diff = []
+    list_AUC_diff = []
 
     for i in range(data["WCEmat"].shape[0]):
-        weights_diff = abs(data["WCEmat"][i] - real_weights)
-        list_weights_diff.append(weights_diff.mean().item())
+        sum_weights_diff = abs(data["WCEmat"][i] - real_weights)
+        list_sum_weights_diff.append(sum_weights_diff.sum().item())
 
-        sum_air = data["WCEmat"][i].sum().item()
+        AUC = np.trapz(data["WCEmat"][i],list(range(data["WCEmat"][i].shape[0])))
         # print(data["WCEmat"][i].shape)
-        sum_air_real = real_weights.sum().item()
+        AUC_real = np.trapz(real_weights,list(range(real_weights.shape[0])))
         #print(sum_air_real)
         #print(sum_air) ### Ai ai ai sensé être à 1
-        air_diff = abs(sum_air_real-sum_air)
-        list_air_diff.append(air_diff)
+        AUC_diff = abs(AUC_real -AUC)
+        list_AUC_diff.append(AUC_diff)
 
 
 
-    return(np.array(list_weights_diff),np.array(list_air_diff))
+    return(np.array(list_sum_weights_diff),np.array(list_AUC_diff))
 
 with open ("Simulation_results/"+ experiment_name +"/"+experiment_name  +".csv") as file:
     experiment_list = []
     csv_reader = csv.DictReader(file)
     for experient in csv_reader:
-        (list_weights_diff, list_air_diff) =  analyse_result(experient['path'])
+        (list_sum_weights_diff, list_AUC_diff) =  analyse_result(experient['path'])
 
         # lower_bar_WD = 
-        # print("weights_diff ",list_weights_diff.mean())
+        # print("weights_diff ",list_sum_weights_diff.mean())
 
-        experient["weight_diff_mean"] = list_weights_diff.mean()
-        experient["weight_diff_95p"] = np.percentile(list_weights_diff,95)
-        experient["weight_diff_5p"] = np.percentile(list_weights_diff,5)
+        experient["sum_weight_diff_mean"] = list_sum_weights_diff.mean()
+        experient["sum_weight_diff_95p"] = np.percentile(list_sum_weights_diff,95)
+        experient["sum_weight_diff_5p"] = np.percentile(list_sum_weights_diff,5)
 
-        experient["air_diff_mean"] = list_air_diff.mean()
-        experient["air_diff_95p"] = np.percentile(list_air_diff,95)
-        experient["air_diff_5p"] = np.percentile(list_air_diff,5)
+        experient["AUC_diff_mean"] = list_AUC_diff.mean()
+        experient["AUC_diff_95p"] = np.percentile(list_AUC_diff,95)
+        experient["AUC_diff_5p"] = np.percentile(list_AUC_diff,5)
 
         experiment_list.append(experient)
 
