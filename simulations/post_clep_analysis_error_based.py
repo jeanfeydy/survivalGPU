@@ -20,38 +20,19 @@ from survivalgpu.utils import numpy
 from survivalgpu import wce_torch
 from survivalgpu.wce_features import wce_features_batch
 
-# parser = argparse.ArgumentParser(description='Name the experiment')
-# parser.add_argument('experiment_name', type=str, help='the name of the experiment')
-# args = parser.parse_args()
-# experiment_name = args.experiment_name
-
-# Read the JSON string from command line arguments
-simulation_variables_str = sys.argv[1]
-
-# Convert JSON string back to a dictionary
-simulation_variables = json.loads(simulation_variables_str)
-
-# print(simulation_variables)
 
 
-experiment_name = simulation_variables["experiment_name"]
+with open ("Simulation_results/simulation_parameters.json") as simulation_parameters_json:
+    simulation_parameters = json.load(simulation_parameters_json)
+
+experiment_name = simulation_parameters["experiment_name"]
+
 
 path =  "Simulation_results/"+ experiment_name  + "/models/"
-# print(path)
-
-
-list_dir = os.listdir(path)
-# print(list_dir)
-
-weight_function = "exponential_weight"
-
-
-# experiements_df = pd.read_csv("../Simulation_results/"+ experiment_name +"/"+experiment_name  +".csv")
 
 
 
-
-def analyse_result(file_path):
+def analyse_result(file_path,weight_function):
 
     data = torch.load(file_path, map_location=torch.device('cpu'))
 
@@ -98,21 +79,21 @@ def analyse_result(file_path):
 with open ("Simulation_results/"+ experiment_name +"/"+experiment_name  +".csv") as file:
     experiment_list = []
     csv_reader = csv.DictReader(file)
-    for experient in csv_reader:
-        (list_sum_weights_diff, list_AUC_diff) =  analyse_result(experient['path'])
+    for experiment in csv_reader:
+        (list_sum_weights_diff, list_AUC_diff) =  analyse_result(experiment['path'],experiment["weight_function"])
 
         # lower_bar_WD = 
         # print("weights_diff ",list_sum_weights_diff.mean())
 
-        experient["sum_weight_diff_mean"] = list_sum_weights_diff.mean()
-        experient["sum_weight_diff_95p"] = np.percentile(list_sum_weights_diff,95)
-        experient["sum_weight_diff_5p"] = np.percentile(list_sum_weights_diff,5)
+        experiment["sum_weight_diff_mean"] = list_sum_weights_diff.mean()
+        experiment["sum_weight_diff_95p"] = np.percentile(list_sum_weights_diff,95)
+        experiment["sum_weight_diff_5p"] = np.percentile(list_sum_weights_diff,5)
 
-        experient["AUC_diff_mean"] = list_AUC_diff.mean()
-        experient["AUC_diff_95p"] = np.percentile(list_AUC_diff,95)
-        experient["AUC_diff_5p"] = np.percentile(list_AUC_diff,5)
+        experiment["AUC_diff_mean"] = list_AUC_diff.mean()
+        experiment["AUC_diff_95p"] = np.percentile(list_AUC_diff,95)
+        experiment["AUC_diff_5p"] = np.percentile(list_AUC_diff,5)
 
-        experiment_list.append(experient)
+        experiment_list.append(experiment)
 
 
 result_path = "Simulation_results/"+ experiment_name +"/analyzed_"+experiment_name  + ".csv"

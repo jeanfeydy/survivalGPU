@@ -36,6 +36,8 @@ scenario_translator <- function(scenario_name){
 
 }
 
+simulation_times_list <- list()
+
 for (n_patients in n_patients_list){
 
     path_experiement_result <- paste0("Simulation_results/",simulation_parameters$experiment_name)
@@ -43,7 +45,7 @@ for (n_patients in n_patients_list){
 
     Xmat <- generate_Xmat(observation_time,n_patients,doses)
     write.csv(Xmat, paste0(path_experiement_result,"/Xmat/", n_patients,".csv  "))
-    simulation_time_list <- list()
+    
     
     scenario_time_list <- list()
     for (scenario in scenario_list){
@@ -56,19 +58,19 @@ for (n_patients in n_patients_list){
         write.csv(df_wce, export_path, row.names=FALSE) 
         end_time <- Sys.time()
         # print("#### scenario ####")
-        simulation_time <- end_time - start_time
-        scenario_time = as.numeric(simulation_time, units = "secs")
+        simulation_times <- end_time - start_time
+        scenario_time = as.numeric(simulation_times, units = "secs")
         # print(scenario_time)
         # print(scenario)
         # print("###list##")
-        # scenario_time_list[[scenario]] <-  scenario_time
+        scenario_time_list[[scenario]] <-  scenario_time
         # print(scenario_time_list)
         # print("#########")
         }
     print("######## n_patient")
     # print(scenario_time_list)
-    simulation_time_list[[as.character(n_patients)]] <- scenario_time_list
-    print(simulation_time_list)
+    simulation_times_list[[as.character(n_patients)]] <- scenario_time_list
+    print(simulation_times_list)
 
 
     print("##############")
@@ -76,11 +78,11 @@ for (n_patients in n_patients_list){
 
  }
 print("####final")
-print(simulation_time_list)
+print(simulation_times_list)
 
-json_file_name <-paste0(path_experiement_result,"/simulation_time.json")
-# print(simulation_time_list)
-write(toJSON(simulation_time_list), file = json_file_name)
+json_file_name <-paste0(path_experiement_result,"/simulation_times.json")
+# print(simulation_times_list)
+write(toJSON(simulation_times_list), file = json_file_name)
 
 
 

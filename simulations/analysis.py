@@ -33,11 +33,16 @@ with open ("Simulation_results/simulation_parameters.json") as simulation_parame
     simulation_parameters = json.load(simulation_parameters_json)
 # Convert JSON string back to a dictionary
 
-
 # print(simulation_parameters)
 
 
 experiment_name = simulation_parameters["experiment_name"]
+
+with open ("Simulation_results/" + experiment_name + "/simulation_times.json") as simulation_times_json:
+    simulation_times = json.load(simulation_times_json)
+
+
+
 print("###### Exeriment : ",experiment_name," #############")
 
 
@@ -116,6 +121,9 @@ for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint) in iter
     result, computation_time = WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize = 100)
     torch.save(result, path)
 
+
+    simulation_time = simulation_times[str(n_patients)][weight_function]
+
     experiment_dict = {
         "path" : path,
         "n_patients" : n_patients,
@@ -124,6 +132,7 @@ for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint) in iter
         "nknots" : nknots,
         "cutoff" : cutoff,
         "constraint" : constraint,
+        "simulation_time" : simulation_time,
         "computation_time" : computation_time
     }
     experiment_dict_list.append(experiment_dict)
