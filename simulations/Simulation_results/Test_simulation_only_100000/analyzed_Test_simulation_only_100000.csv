@@ -1,0 +1,2 @@
+path,n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,simulation_time,computation_time,sum_weight_diff_mean,sum_weight_diff_95p,sum_weight_diff_5p,AUC_diff_mean,AUC_diff_95p,AUC_diff_5p
+Simulation_results/Test_simulation_only_100000/models/100000_exponential_weight_1000bootsraps1knots_Right,100000,exponential_weight,1000,1,180,Right,60910.7143,1834.291969537735,0.08776304725557565,0.10100780278444291,0.07604563459753991,0.03361936439137469,0.053210470017188524,0.014243762562867347
