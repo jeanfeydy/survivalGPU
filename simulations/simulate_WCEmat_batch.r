@@ -6,13 +6,21 @@ source("src/data_simulation.r")
 source("src/weight_functions.r")
 
 
-simulation_parameters <- fromJSON("Simulation_results/simulation_parameters.json")
+# simulation_parameters <- fromJSON("Simulation_results/simulation_parameters.json")
 
-doses <- simulation_parameters$doses
-observation_time <- simulation_parameters$observation_time[1]
-normalization <- simulation_parameters$normalization[1]
-n_patients_list <- simulation_parameters$n_patients
-scenario_list <- simulation_parameters$weight_function_list
+# doses <- simulation_parameters$doses
+# observation_time <- simulation_parameters$observation_time[1]
+# normalization <- simulation_parameters$normalization[1]
+# n_patients_list <- simulation_parameters$n_patients
+# scenario_list <- simulation_parameters$weight_function_list
+
+### Simualtion parameters 
+
+doses <- c(1,1.5,2,2.5,3)
+observation_time <- c(365)
+n_patients_list <- c(100,500,1000,5000,10000,50000,100000)
+normalization = c(1)
+scenario_list = c("exponential_weight")
 
 
 scenario_translator <- function(scenario_name){
@@ -43,7 +51,7 @@ for (n_patients in n_patients_list){
      
 
     Xmat <- generate_Xmat(observation_time,n_patients,doses)
-    write.csv(Xmat, paste0(path_experiement_result,"/Xmat/", n_patients,".csv  "))
+    write.csv(Xmat, paste0("Xmat/", n_patients,".csv  "))
     
     
     scenario_time_list <- list()
@@ -55,7 +63,7 @@ for (n_patients in n_patients_list){
 
         print(n_patients)
 
-        wce_mat <- do.call("rbind", lapply(1:dim(Xmat)[1], wce_vector, scenario = scenario_translator(scenario), Xmat = Xmat,normalization = normalization))
+        wce_mat <- do.call("rbind", lapply(1:dim(Xmat)[1], wce_vector, scenario = scenario, Xmat = Xmat,normalization = normalization))
 
         
 
@@ -114,7 +122,7 @@ for (n_patients in n_patients_list){
 
         }
 
-        export_path <- paste0(path_experiement_result,"/WCEmat/", scenario,"_",n_patients,".csv")
+        export_path <- paste0("WCEmat/", scenario,"_",n_patients,".csv")
         print(export_path)
         write.csv(df_wce, export_path, row.names=FALSE) 
         end_time <- Sys.time()
