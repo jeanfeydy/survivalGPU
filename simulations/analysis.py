@@ -38,8 +38,8 @@ with open ("Simulation_results/simulation_parameters.json") as simulation_parame
 
 experiment_name = simulation_parameters["experiment_name"]
 
-with open ("Simulation_results/" + experiment_name + "/simulation_times.json") as simulation_times_json:
-    simulation_times = json.load(simulation_times_json)
+# with open ("Simulation_results/" + experiment_name + "/simulation_times.json") as simulation_times_json:
+#     simulation_times = json.load(simulation_times_json)
 
 
 
@@ -54,6 +54,7 @@ n_bootstraps_list = simulation_parameters["n_bootstraps_list"]
 nknots_list = simulation_parameters["nknots_list"]
 cutoff_list = simulation_parameters["cutoff_list"]
 constraint = simulation_parameters["constraint"]
+normalization = simulation_parameters["normalization"]
 # batchsizeS = [100] #not here
 
 result_folder_path = "Simulation_results/" + experiment_name
@@ -61,7 +62,7 @@ experiment_dict_list = []
 
 
 
-def WCE_experiment(n_patients, weight_function,n_bootsraps,nknots,cutoff,constraint,batchsize):
+def WCE_experiment(n_patients, weight_function,n_bootsraps,nknots,cutoff,constraint,batchsize,normalization):
     starting_time = time.time()
     patient = []
     start = []
@@ -69,7 +70,7 @@ def WCE_experiment(n_patients, weight_function,n_bootsraps,nknots,cutoff,constra
     events = []
     doses = []
     
-    input_PATH = result_folder_path + "/WCEmat/" + weight_function + "_" + str(n_patients) +".csv"
+    input_PATH = "WCEmat/" + weight_function + "_" + str(normalization) + "_" + str(n_patients) +".csv"
 
 
     with open(input_PATH) as file:
@@ -108,7 +109,7 @@ def print_constrained(constraint):
 
 
 
-for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint) in itertools.product(n_patients_list,weight_function_list, n_bootstraps_list,nknots_list,cutoff_list,constraint):
+for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint,normalization) in itertools.product(n_patients_list,weight_function_list, n_bootstraps_list,nknots_list,cutoff_list,constraint,normalization):
     # print("##### start experiment : ")
 
     path = result_folder_path + "/models/" + str(n_patients)+ "_" + weight_function + "_" + str(n_bootstraps) + "bootsraps" + str(nknots) +"knots" + "_" +print_constrained(constraint)
@@ -118,11 +119,11 @@ for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint) in iter
           str(n_bootstraps), " - nknots =  ", str(nknots), " - cutoff = ", cutoff, "  - constraint = ",
           print_constrained(constraint))
     
-    result, computation_time = WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize = 100)
+    result, computation_time = WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize = 100,normalization=normalization)
     torch.save(result, path)
 
 
-    simulation_time = simulation_times[str(n_patients)][weight_function]
+    # simulation_time = simulation_times[str(n_patients)][weight_function]
 
     experiment_dict = {
         "path" : path,
@@ -132,8 +133,9 @@ for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint) in iter
         "nknots" : nknots,
         "cutoff" : cutoff,
         "constraint" : constraint,
-        "simulation_time" : simulation_time,
-        "computation_time" : computation_time
+        # "simulation_time" : simulation_time[0],
+        "computation_time" : computation_time,
+        "normalization" : normalization
     }
     experiment_dict_list.append(experiment_dict)
 

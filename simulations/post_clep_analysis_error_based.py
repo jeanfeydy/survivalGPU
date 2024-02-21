@@ -28,16 +28,17 @@ with open ("Simulation_results/simulation_parameters.json") as simulation_parame
 experiment_name = simulation_parameters["experiment_name"]
 
 
+
 path =  "Simulation_results/"+ experiment_name  + "/models/"
 
 
 
-def analyse_result(file_path,weight_function):
+def analyse_result(file_path,weight_function,normalization):
 
     data = torch.load(file_path, map_location=torch.device('cpu'))
 
 
-    weight_function_path = "weight_functions_shapes/" + weight_function + ".csv"
+    weight_function_path = "weight_functions_shapes/" + weight_function + "_" + str(normalization) + ".csv"
 
 
 
@@ -61,7 +62,7 @@ def analyse_result(file_path,weight_function):
     list_AUC_diff = []
 
     for i in range(data["WCEmat"].shape[0]):
-        sum_weights_diff = abs(data["WCEmat"][i] - real_weights)
+        sum_weights_diff = abs(data["WCEmat"][i] - real_weights[0:len(data["WCEmat"][i])])
         list_sum_weights_diff.append(sum_weights_diff.sum().item())
 
         AUC = np.trapz(data["WCEmat"][i],list(range(data["WCEmat"][i].shape[0])))
@@ -80,7 +81,7 @@ with open ("Simulation_results/"+ experiment_name +"/"+experiment_name  +".csv")
     experiment_list = []
     csv_reader = csv.DictReader(file)
     for experiment in csv_reader:
-        (list_sum_weights_diff, list_AUC_diff) =  analyse_result(experiment['path'],experiment["weight_function"])
+        (list_sum_weights_diff, list_AUC_diff) =  analyse_result(experiment['path'],experiment["weight_function"],experiment["normalization"])
 
         # lower_bar_WD = 
         # print("weights_diff ",list_sum_weights_diff.mean())

@@ -18,22 +18,22 @@ import os
 simulation_parameters = {
 
     # The name of the expriment
-    "experiment_name"      : "test_of_the_process_6",
+    "experiment_name"      : "test_only_analysis",
 
     # Parameters for the simualtion fo the Xmat
     "doses"                : [1, 1.5, 2, 2.5, 3],
     "observation_time"     : [365],
 
     # Parameters for simualtion of the WCEmat
-    "n_patients"           : [50,100],
+    "n_patients"           : [100,500,1000,5000,10000,50000,100000], #,30000,40000,50000],
     "normalization"        : [1],
-    "weight_function_list" : ["exponential_weight","bi_linear_weight"],#], #,"constant_weight","early_peak_weight","inverted_u_weight","late_effect_weight"]
+    "weight_function_list" : ["exponential_weight"],#"bi_linear_weight"],#"constant_weight","early_peak_weight","inverted_u_weight","late_effect_weight"]
 
     # Parameters for the different experiment
-    "n_bootstraps_list"    : [100],#,1000],
+    "n_bootstraps_list"    : [1000],
     "nknots_list"          : [1,2,3],
     "cutoff_list"          : [180],
-    "constraint"           : ["Right"]#[None, "Right"]
+    "constraint"           : ["Right","None"]
 
 }
 
@@ -47,13 +47,13 @@ path_model_results = path_simulation_results + "/models"
 if not os.path.exists(path_model_results):
     os.mkdir(path_model_results)
     
-path_Xmat = path_simulation_results + "/Xmat"
-if not os.path.exists(path_Xmat):
-    os.mkdir(path_Xmat)
+# path_Xmat = path_simulation_results + "/Xmat"
+# if not os.path.exists(path_Xmat):
+#     os.mkdir(path_Xmat)
 
-path_WCEmat = path_simulation_results + "/WCEmat"
-if not os.path.exists(path_WCEmat):
-    os.mkdir(path_WCEmat)
+# path_WCEmat = path_simulation_results + "/WCEmat"
+# if not os.path.exists(path_WCEmat):
+#     os.mkdir(path_WCEmat)
 
 
 simulation_parameters_json = json.dumps(simulation_parameters)

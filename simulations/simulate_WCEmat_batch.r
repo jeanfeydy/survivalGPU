@@ -19,7 +19,7 @@ source("src/weight_functions.r")
 doses <- c(1,1.5,2,2.5,3)
 observation_time <- c(365)
 n_patients_list <- c(100,500,1000,5000,10000,50000,100000)
-normalization = c(1)
+normalization = 1
 scenario_list = c("exponential_weight")
 
 
@@ -43,11 +43,10 @@ scenario_translator <- function(scenario_name){
 
 }
 
-simulation_times_list <- list()
+# simulation_times_list <- list()
 
 for (n_patients in n_patients_list){
 
-    path_experiement_result <- paste0("Simulation_results/",simulation_parameters$experiment_name)
      
 
     Xmat <- generate_Xmat(observation_time,n_patients,doses)
@@ -122,7 +121,7 @@ for (n_patients in n_patients_list){
 
         }
 
-        export_path <- paste0("WCEmat/", scenario,"_",n_patients,".csv")
+        export_path <- paste0("WCEmat/", scenario,"_",normalization,"_",n_patients,".csv")
         print(export_path)
         write.csv(df_wce, export_path, row.names=FALSE) 
         end_time <- Sys.time()
@@ -134,8 +133,8 @@ for (n_patients in n_patients_list){
         }
     print("######## n_patient")
     # print(scenario_time_list)
-    simulation_times_list[[as.character(n_patients)]] <- scenario_time_list
-    print(simulation_times_list)
+    # simulation_times_list[[as.character(n_patients)]] <- scenario_time_list
+    # print(simulation_times_list)
 
 
     print("##############")
@@ -143,11 +142,11 @@ for (n_patients in n_patients_list){
 
  }
 print("####final")
-print(simulation_times_list)
-
-json_file_name <-paste0(path_experiement_result,"/simulation_times.json")
 # print(simulation_times_list)
-write(toJSON(simulation_times_list), file = json_file_name)
+
+# json_file_name <-paste0(Xmat,"/simulation_times.json")
+# # print(simulation_times_list)
+# write(toJSON(simulation_times_list), file = json_file_name)
 
 
 

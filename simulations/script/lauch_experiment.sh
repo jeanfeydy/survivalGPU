@@ -2,8 +2,6 @@
 
 cd /home/survivalGPU/simulations/
 
-mkdir 
-
 
 python simulation_and_experiment.py 
 
