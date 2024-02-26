@@ -15,7 +15,6 @@ n_patients_list <- simulation_parameters$n_patients
 scenario_list <- simulation_parameters$weight_function_list
 
 
-
 scenario_translator <- function(scenario_name){
 
     scenario_list <- list(

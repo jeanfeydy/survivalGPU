@@ -1,6 +1,10 @@
 library(WCE)
 library(boot)
 library(jsonlite)
+library(devtools)
+
+devtools::load_all("../../survivalGPU/R")
+
 
 # first test the bootstraps method
 # Do it with no bootstraps and 1000 bootsraps 
@@ -79,6 +83,21 @@ run_with_bootstraps <- function(data, n_bootstraps){
     return(result)
 }
 
+run_gpu <- function(data,n_bootstraps){
+    start_time = Sys.time()
+
+    model <- wceGPU(data, 1, cutoff, constrained = "right",
+                   id = "patient", event = "event", start = "start",
+                   stop = "stop", expos = "dose",nbootstraps = n_bootstraps)
+
+
+    end_time <- Sys.time()
+    time_difference <- end_time - start_time   
+    computation_time <- as.numeric(time_difference, units = "secs")
+
+    return(computation_time)
+
+}
 
 #############" MAIN"
 
@@ -87,7 +106,8 @@ cutoff = 180
 n_bootstraps = 1
 weight_function = "exponential_weight"
 
-computation_times_list <- list()
+gpu_computation_times_list <- list()
+cpu_computation_times_list <- list()
 
 n_patients_list = c(100,1000,10000) #,100000)
 
@@ -98,18 +118,30 @@ for (n_patients in n_patients_list){
     print(paste0("Start computation for : ",as.character(n_patients)," patients"))
     file_name <- paste0("WCEmat/", weight_function,"_",as.character(normalization), "_",as.character(n_patients),".csv")
     data = read.csv(file_name)
+
+
     result = run_with_bootstraps(data, n_bootstraps)
+    cpu_computation_time <- result$computation_time
+    cpu_computation_times_list[[as.character(n_patients)]] <- cpu_computation_time
+    
+    print(paste0("Computation for CPU took : ",as.character(cpu_computation_time),"s"))
+
+    
+    gpu_computation_time <- run_gpu(data,n_bootstraps)
+    gpu_computation_times_list[[as.character(n_patients)]] <- gpu_computation_time
+    
+    
+    print(paste0("Computation for GPU took : ",as.character(gpu_computation_time),"s"))
 
 
-    computation_time = result$computation_time
-    computation_times_list[[as.character(n_patients)]] <- computation_time
-    print(paste0("Computation took : ",as.character(computation_time),"s"))
-    write(toJSON(computation_times_list), file = "Simulation_results/computation_time_Rsurvival.json")
+    computation_time_output <- list("GPU_computaiton_time" = gpu_computation_times_list,
+                                    "CPU_computation_time" = cpu_computation_times_list)
+
+    write(toJSON(computation_time_output), file = "Simulation_results/computation_time_Rsurvival.json")
 
 
 }
 
-print(computation_times_list)
 
 
 
