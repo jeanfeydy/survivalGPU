@@ -21,9 +21,9 @@ options(scipen = 999)
 
 doses <- c(1,1.5,2,2.5,3)
 observation_time <- c(365)
-n_patients_list <- c(100,1000,10000)
+n_patients_list <- c(100000)#c(100,1000,10000)
 normalization = 1
-scenario_list = c("exponential_weight","bi_linear_weight","early_peak_weight","inverted_u_weight","null_weight")
+scenario_list =  c("exponential_weight","bi_linear_weight","early_peak_weight","inverted_u_weight","null_weight")
 
 
 

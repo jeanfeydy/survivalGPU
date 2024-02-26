@@ -25,7 +25,7 @@ simulation_parameters = {
     "observation_time"     : [365],
 
     # Parameters for simualtion of the WCEmat
-    "n_patients"           : [100,500,1000,5000,10000,50000,100000], #,30000,40000,50000],
+    "n_patients"           : [100,1000,10000], #,30000,40000,50000],
     "normalization"        : [1],
     "weight_function_list" : ["bi_linear_weight","early_peak_weight","early_peak_weight","inverted_u_weight","null_weight"], #"exponential_weight",#"constant_weight""inverted_u_weight","late_effect_weight"]
 
