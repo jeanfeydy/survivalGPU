@@ -1,3 +1,9 @@
+#Simualtion models
+simulations/Simulation_results/*/models/*
+simulations/output.json
+simulations/WCEmat/*
+simulations/Xmat/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

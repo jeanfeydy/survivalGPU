@@ -18,7 +18,7 @@ import os
 simulation_parameters = {
 
     # The name of the expriment
-    "experiment_name"      : "test_only_analysis",
+    "experiment_name"      : "other weights weights, 100-100000",
 
     # Parameters for the simualtion fo the Xmat
     "doses"                : [1, 1.5, 2, 2.5, 3],
@@ -27,7 +27,7 @@ simulation_parameters = {
     # Parameters for simualtion of the WCEmat
     "n_patients"           : [100,500,1000,5000,10000,50000,100000], #,30000,40000,50000],
     "normalization"        : [1],
-    "weight_function_list" : ["exponential_weight"],#"bi_linear_weight"],#"constant_weight","early_peak_weight","inverted_u_weight","late_effect_weight"]
+    "weight_function_list" : ["bi_linear_weight","early_peak_weight","early_peak_weight","inverted_u_weight","null_weight"], #"exponential_weight",#"constant_weight""inverted_u_weight","late_effect_weight"]
 
     # Parameters for the different experiment
     "n_bootstraps_list"    : [1000],

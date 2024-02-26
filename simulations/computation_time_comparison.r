@@ -90,20 +90,27 @@ weight_function = "exponential_weight"
 
 computation_times_list <- list()
 
-n_patients_list = c(100,1000)#,10000)
+n_patients_list = c(100,1000,10000,100000)
+
+
+
 
 for (n_patients in n_patients_list){
+    print(paste0("Start computation for : ",as.character(n_patients)," patients"))
     file_name <- paste0("WCEmat/", weight_function,"_",as.character(normalization), "_",as.character(n_patients),".csv")
     data = read.csv(file_name)
     result = run_with_bootstraps(data, n_bootstraps)
     computation_time = result$computation_time
     computation_times_list[[as.character(n_patients)]] <- computation_time
+    print(paste0("Computation took : ",as.character(computation_time),"s"))
+    write(toJSON(computation_times_list), file = "Simulation_results/computation_time_Rsurvival.json")
+
 
 }
 
 print(computation_times_list)
 
 
-write(toJSON(computation_times_list), file = "Simulation_results/computation_time_Rsurvival.json")
+
 
 

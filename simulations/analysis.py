@@ -118,8 +118,13 @@ for (n_patients,weight_function,n_bootstraps,nknots, cutoff, constraint,normaliz
     print("n_patients = ", str(n_patients)," - weight_function =" , weight_function ," - n_bootstraps = " , 
           str(n_bootstraps), " - nknots =  ", str(nknots), " - cutoff = ", cutoff, "  - constraint = ",
           print_constrained(constraint))
+
+    if n_patients < 10000:
+        batchsize = 100
+    else: 
+        batchsize = 10
     
-    result, computation_time = WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize = 100,normalization=normalization)
+    result, computation_time = WCE_experiment(n_patients,weight_function,n_bootstraps,nknots,cutoff,constraint,batchsize = batchsize,normalization=normalization)
     torch.save(result, path)
 
 

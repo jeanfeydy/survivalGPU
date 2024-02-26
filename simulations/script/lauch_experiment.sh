@@ -5,7 +5,7 @@ cd /home/survivalGPU/simulations/
 
 python simulation_and_experiment.py 
 
-Rscript simulate_WCEmat.r
+# Rscript simulate_WCEmat.r
 
 python analysis.py
 

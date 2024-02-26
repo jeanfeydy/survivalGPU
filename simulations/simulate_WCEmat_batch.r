@@ -5,6 +5,9 @@ library(jsonlite)
 source("src/data_simulation.r")
 source("src/weight_functions.r")
 
+options(scipen = 999)
+
+
 
 # simulation_parameters <- fromJSON("Simulation_results/simulation_parameters.json")
 
@@ -18,30 +21,11 @@ source("src/weight_functions.r")
 
 doses <- c(1,1.5,2,2.5,3)
 observation_time <- c(365)
-n_patients_list <- c(100,500,1000,5000,10000,50000,100000)
+n_patients_list <- c(100,1000,10000)
 normalization = 1
-scenario_list = c("exponential_weight")
+scenario_list = c("exponential_weight","bi_linear_weight","early_peak_weight","inverted_u_weight","null_weight")
 
 
-scenario_translator <- function(scenario_name){
-
-    scenario_list <- list(
-    list(name ="exponential_weight", weights = exponential_weight),
-    list(name ="bi_linear_weight", weights = bi_linear_weight),
-    list(name ="early_peak_weight", weights = early_peak_weight),
-    list(name ="inverted_u_weight", weights = inverted_u_weight),
-    list(name ="constant_weight", weights = constant_weight),
-    list(name ="late_effect_weight", weights = late_effect_weight)
-    
-    )
-
-    for(scenario in scenario_list) {
-        if(scenario$name == scenario_name) {
-            return(scenario$weights)
-        }
-    } 
-
-}
 
 # simulation_times_list <- list()
 
