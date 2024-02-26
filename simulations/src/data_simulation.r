@@ -1,4 +1,6 @@
 library(dplyr)
+source("src/weight_functions.r")
+
 # library(WCE)
 # library(purrr)
 
@@ -52,10 +54,22 @@ generate_Xmat_list<- function(observation_time,n_patients,n_bootstraps,doses){
 wce_vector <- function(u, scenario, Xmat,normalization) {
     t <- 1:u
 
-    scenario_function <- do.call(scenario, list((u - t) / 365))/normalization
+    # scenario_2 = exponential_weight
 
-    # Normalization (THIS SHOULD NOT BE HERE, we have to rethink the codebase and enter the scenario as a vector )
-    wce <- scenario_function * Xmat[t,]
+    # scenario_function <- do.call(scenario_2, list((u - t) / 365))/normalization
+
+    # print(scenario_function)
+
+
+    shape_path <- paste0("weight_functions_shapes/",scenario,"_",normalization,".csv")
+    scenario_shape <- read.csv(shape_path)$V1[t]
+    # print(scenario_shape)
+
+
+    # print(scenario_shape)
+
+ 
+    wce <- scenario_shape[1:u] * Xmat[t,]
 
     if (u == 1) {
         res <- wce
@@ -65,6 +79,11 @@ wce_vector <- function(u, scenario, Xmat,normalization) {
 
     return(res)
 }
+
+
+#### TEST
+# Xmat = 
+# wce_vector(180,"exponential_weight","Xmat",1,180)
 
 # Function to generate event times and censoring times
 event_censor_generation <- function(max_time,n_patients) {
@@ -178,8 +197,15 @@ get_dataset <- function(Xmat, wce_mat) {
 calcul_exposition <- function(scenario,normalization){
     expo_list <- lapply((1:180)/365, scenario)
     expo <- do.call("rbind", expo_list)/365
-    return(expo/normalization)
+
+    integral <- integrate(scenario, lower = 1/365, upper = cutoff/365)
+    normalization_factor =  normalization_goal/integral$value
+
+
+    return(expo*normalization_factor)
 }
+
+
 
 # Function to simulate right constrained and unconstrained WCE with the same1
 # dataset according to a specif@installed R Toolsic scenario
