@@ -1,0 +1,1 @@
+{"GPU_no_bootstraps_computaiton_time":{"100":[0.4944],"1000":[0.8236],"10000":[2.7774]},"GPU_with_bootstraps_computation_time":{"100":[7.5245],"1000":[15.7582],"10000":[94.3655]}}
