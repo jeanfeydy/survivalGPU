@@ -18,7 +18,7 @@ import os
 simulation_parameters = {
 
     # The name of the expriment
-    "experiment_name"      : "other weights weights, 100-100000",
+    "experiment_name"      : "multiple weights : 100 - 10000",
 
     # Parameters for the simualtion fo the Xmat
     "doses"                : [1, 1.5, 2, 2.5, 3],

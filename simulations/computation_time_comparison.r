@@ -34,7 +34,7 @@ devtools::load_all("../../survivalGPU/R")
 options(scipen = 999)
 
 
-run_with_bootstraps <- function(data, n_bootstraps){
+run_cpu <- function(data, n_bootstraps){
 
 
     start_time = Sys.time()
@@ -80,7 +80,7 @@ run_with_bootstraps <- function(data, n_bootstraps){
     computation_time <- as.numeric(time_difference, units = "secs")
 
     result = list(model = boot, computation_time = computation_time)
-    return(result)
+    return(computation_time)
 }
 
 run_gpu <- function(data,n_bootstraps){
@@ -88,28 +88,77 @@ run_gpu <- function(data,n_bootstraps){
 
     model <- wceGPU(data, 1, cutoff, constrained = "right",
                    id = "patient", event = "event", start = "start",
-                   stop = "stop", expos = "dose",nbootstraps = n_bootstraps)
+                   stop = "stop", expos = "dose",nbootstraps = n_bootstraps,batchsize = 100)
 
 
     end_time <- Sys.time()
     time_difference <- end_time - start_time   
+    print("######### DEBUG")
+    print(time_difference)
+    print("######### DEBUG")
+
     computation_time <- as.numeric(time_difference, units = "secs")
 
     return(computation_time)
 
 }
 
+run_gpu_no_bootstraps <- function(data){
+    start_time = Sys.time()
+
+    model <- wceGPU(data, 1, cutoff, constrained = "right",
+                   id = "patient", event = "event", start = "start",
+                   stop = "stop", expos = "dose")
+
+
+    end_time <- Sys.time()
+    time_difference <- end_time - start_time   
+    print("######### DEBUG")
+    print(time_difference)
+    print("######### DEBUG")
+
+    computation_time <- as.numeric(time_difference, units = "secs")
+
+    return(computation_time)
+
+}
+
+run_cpu_no_bootstraps <- function(data){
+    start_time = Sys.time()
+
+    model <- WCE(data, "Cox", 1, cutoff, constrained = "right",
+                   id = "patient", event = "event", start = "start",
+                   stop = "stop", expos = "dose")
+
+    end_time <- Sys.time()
+    time_difference <- end_time - start_time   
+    print("######### DEBUG")
+    print(time_difference)
+    print("######### DEBUG")
+
+    computation_time <- as.numeric(time_difference, units = "secs")
+
+    return(computation_time)
+
+}
+
+
 #############" MAIN"
 
 normalization <- 1
 cutoff = 180
-n_bootstraps = 1
+n_bootstraps = 1000
 weight_function = "exponential_weight"
 
 gpu_computation_times_list <- list()
 cpu_computation_times_list <- list()
 
-n_patients_list = c(100,1000,10000) #,100000)
+# n_patients_list = c(100,1000,10000,100000)
+n_patients_list = c(100,1000,10000)#,10000)#,10000,100000)
+
+
+
+experiment_name <- "100-1000 with bootstraps"
 
 
 
@@ -120,14 +169,18 @@ for (n_patients in n_patients_list){
     data = read.csv(file_name)
 
 
-    result = run_with_bootstraps(data, n_bootstraps)
-    cpu_computation_time <- result$computation_time
+    cpu_computation_time = run_cpu(data,n_bootstraps)
+    # cpu_computation_time = run_cpu_no_bootstraps(data)
+
+
     cpu_computation_times_list[[as.character(n_patients)]] <- cpu_computation_time
     
     print(paste0("Computation for CPU took : ",as.character(cpu_computation_time),"s"))
 
     
     gpu_computation_time <- run_gpu(data,n_bootstraps)
+    # gpu_computation_time <- run_gpu_no_bootstraps(data)
+
     gpu_computation_times_list[[as.character(n_patients)]] <- gpu_computation_time
     
     
@@ -137,7 +190,7 @@ for (n_patients in n_patients_list){
     computation_time_output <- list("GPU_computaiton_time" = gpu_computation_times_list,
                                     "CPU_computation_time" = cpu_computation_times_list)
 
-    write(toJSON(computation_time_output), file = "Simulation_results/computation_time_Rsurvival.json")
+    write(toJSON(computation_time_output), file = paste0("Simulation_results/Computation_time_comprison/",experiment_name,".json"))
 
 
 }
