@@ -21,10 +21,10 @@ options(scipen = 999)
 
 doses <- c(1,1.5,2,2.5,3)
 observation_time <- c(365)
-n_patients_list <- c(100000)#c(100,1000,10000)
-normalization = 1
-scenario_list =  c("exponential_weight","bi_linear_weight","early_peak_weight","inverted_u_weight","null_weight")
-
+n_patients_list <- c(100,1000)#c(100,1000,10000)
+scenario_list =  c("exponential_weight")#,bi_linear_weight,early_peak_weight,inverted_u_weight,null_weight)
+cutoff = 180
+HR_target = 1.5
 
 
 # simulation_times_list <- list()
@@ -35,10 +35,14 @@ for (n_patients in n_patients_list){
 
     Xmat <- generate_Xmat(observation_time,n_patients,doses)
     write.csv(Xmat, paste0("Xmat/", n_patients,".csv  "))
+
     
-    
+     
     scenario_time_list <- list()
+   
     for (scenario in scenario_list){
+
+        scenario_function <- scenario_translator(scenario)
 
         batchsize <- 10000
 
@@ -46,9 +50,9 @@ for (n_patients in n_patients_list){
 
         print(n_patients)
 
-        wce_mat <- do.call("rbind", lapply(1:dim(Xmat)[1], wce_vector, scenario = scenario, Xmat = Xmat,normalization = normalization))
+        normalization_factor <- calculate_normalization_factor(scenario_function,cutoff,HR_target)
 
-        
+        wce_mat <- do.call("rbind", lapply(1:dim(Xmat)[1], wce_vector, scenario = scenario_function, Xmat = Xmat,normalization_factor = normalization_factor))       
 
 
         if (n_patients > batchsize){
@@ -105,7 +109,20 @@ for (n_patients in n_patients_list){
 
         }
 
-        export_path <- paste0("WCEmat/", scenario,"_",normalization,"_",n_patients,".csv")
+        file_name = paste0(scenario,"_",as.character(n_patients),".csv")
+        
+        HR_folder_name = paste0("HR-",as.character(HR_target))
+
+
+        folder_path <- file.path("WCEmat",HR_folder_name)
+
+        if (!dir.exists(folder_path)){
+        dir.create(folder_path)
+        } 
+
+        export_path <- file.path(folder_path,file_name)
+
+
         print(export_path)
         write.csv(df_wce, export_path, row.names=FALSE) 
         end_time <- Sys.time()
@@ -115,22 +132,24 @@ for (n_patients in n_patients_list){
         scenario_time_list[[scenario]] <-  scenario_time
 
         }
-    print("######## n_patient")
-    # print(scenario_time_list)
-    # simulation_times_list[[as.character(n_patients)]] <- scenario_time_list
-    # print(simulation_times_list)
 
 
-    print("##############")
+    # print("######## n_patient")
+    # # print(scenario_time_list)
+    # # simulation_times_list[[as.character(n_patients)]] <- scenario_time_list
+    # # print(simulation_times_list)
+
+
+    # print("##############")
 
 
  }
-print("####final")
-# print(simulation_times_list)
-
-# json_file_name <-paste0(Xmat,"/simulation_times.json")
+# print("####final")
 # # print(simulation_times_list)
-# write(toJSON(simulation_times_list), file = json_file_name)
+
+# # json_file_name <-paste0(Xmat,"/simulation_times.json")
+# # # print(simulation_times_list)
+# # write(toJSON(simulation_times_list), file = json_file_name)
 
 
 

@@ -1,7 +1,5 @@
 library(pracma)
 
-
-
 # Scenario 1 - Exponential
 exponential_weight <- function(u_t) {
   return(7 * exp(-7 * u_t))
@@ -42,4 +40,32 @@ late_effect_weight <- function(u_t) {
 ## Scenario 7 - Constant
 null_weight <- function(u_t) {
   return(0.00000000000000000000000000000)
+}
+
+
+scenario_translator <- function(scenario){
+  if(scenario == "exponential_weight"){
+    return(exponential_weight)
+  }
+  if(scenario == "bi_linear_weight"){
+    return(bi_linear_weight)
+  }
+  if(scenario == "exponential_weight"){
+    return(exponential_weight)
+  }
+  if(scenario == "early_peak_weight"){
+    return(early_peak_weight)
+  }
+  if(scenario == "inverted_u_weight"){
+    return(inverted_u_weight)
+  }
+  if(scenario == "constant_weight"){
+    return(constant_weight)
+  }  
+  if(scenario == "late_effect_weight"){
+    return(late_effect_weight)
+  }
+  if(scenario == "null_weight"){
+    return(null_weight)
+  }
 }

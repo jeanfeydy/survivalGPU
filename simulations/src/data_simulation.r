@@ -51,25 +51,15 @@ generate_Xmat_list<- function(observation_time,n_patients,n_bootstraps,doses){
 }
 
   # Function to obtain WCE vector
-wce_vector <- function(u, scenario, Xmat,normalization) {
+wce_vector <- function(u, scenario, Xmat,normalization_factor) {
     t <- 1:u
 
     # scenario_2 = exponential_weight
 
-    # scenario_function <- do.call(scenario_2, list((u - t) / 365))/normalization
-
-    # print(scenario_function)
-
-
-    shape_path <- paste0("weight_functions_shapes/",scenario,"_",normalization,".csv")
-    scenario_shape <- read.csv(shape_path)$V1[t]
-    # print(scenario_shape)
-
-
-    # print(scenario_shape)
+    scenario_function <- do.call(scenario, list((u - t) / 365))*normalization_factor
 
  
-    wce <- scenario_shape[1:u] * Xmat[t,]
+    wce <- scenario_function[1:u] * Xmat[t,]
 
     if (u == 1) {
         res <- wce
@@ -78,6 +68,24 @@ wce_vector <- function(u, scenario, Xmat,normalization) {
     }
 
     return(res)
+}
+
+calculate_normalization_factor <- function(scenario, HR_target,cutoff){
+    t<- 1:cutoff
+
+    normalization_target <- log(HR_target)
+
+    scenario_function <- do.call(scenario, list((cutoff - t) / 365))
+    sum <- sum(scenario_function)/365 
+
+    
+
+    if (sum ==0 ){
+        normalization_factor <- 1
+    }else{
+        normalization_factor <- normalization_target/sum
+    }
+    return(normalization_factor)
 }
 
 
@@ -194,108 +202,113 @@ get_dataset <- function(Xmat, wce_mat) {
     return(df_wce)
 }
 
-calcul_exposition <- function(scenario,normalization){
-    expo_list <- lapply((1:180)/365, scenario)
+calcul_exposition <- function(scenario,HR_target,cutoff){s
+
+    expo_list <- lapply((1:cutoff)/365, scenario)
     expo <- do.call("rbind", expo_list)/365
 
-    integral <- integrate(scenario, lower = 1/365, upper = cutoff/365)
-    normalization_factor =  normalization_goal/integral$value
+    normalization_factor <- calculate_normalization_factor(scenario,HR_target,cutoff)
 
 
     return(expo*normalization_factor)
 }
+#calculate_normalization_factor <- function(scenario, HR_target,cutoff){
 
 
 
-# Function to simulate right constrained and unconstrained WCE with the same1
-# dataset according to a specif@installed R Toolsic scenario
-Simulate_WCE<- function(scenario, Xmat,cutoff,normalization) {
 
-    wce_mat <- do.call("rbind", lapply(1:dim(Xmat)[1], wce_vector, scenario = scenario, Xmat = Xmat,normalization = normalization))
-    df_wce <- get_dataset(Xmat = Xmat, wce_mat = wce_mat)
+
+
+
+# # Function to simulate right constrained and unconstrained WCE with the same1
+# # dataset according to a specif@installed R Toolsic scenario
+# Simulate_WCE<- function(scenario, Xmat,cutoff,normalization) {
+
+#     wce_mat <- do.call("rbind", lapply(1:dim(Xmat)[1], wce_vector, scenario = scenario, Xmat = Xmat,normalization = normalization))
+#     df_wce <- get_dataset(Xmat = Xmat, wce_mat = wce_mat)
     
 
-    # cutoff at 180 - right constrained and unconstrained with the same dataset
-    wce_right_constrained <- WCE(df_wce, "Cox", 1:3, cutoff, constrained = "right",
-                                 id = "patient", event = "event", start = "start",
-                                 stop = "stop", expos = "dose")
+#     # cutoff at 180 - right constrained and unconstrained with the same dataset
+#     wce_right_constrained <- WCE(df_wce, "Cox", 1:3, cutoff, constrained = "right",
+#                                  id = "patient", event = "event", start = "start",
+#                                  stop = "stop", expos = "dose")
 
-    wce_unconstrained <- WCE(df_wce, "Cox", 1:3, cutoff, constrained = FALSE,
-                             id = "patient", event = "event", start = "start",
-                             stop = "stop", expos = "dose")
+#     wce_unconstrained <- WCE(df_wce, "Cox", 1:3, cutoff, constrained = FALSE,
+#                              id = "patient", event = "event", start = "start",
+#                              stop = "stop", expos = "dose")
 
-    WCEmat_right_constrained <- wce_right_constrained$WCEmat[which.min(wce_right_constrained$info.criterion),1:180]
+#     WCEmat_right_constrained <- wce_right_constrained$WCEmat[which.min(wce_right_constrained$info.criterion),1:180]
 
-    MSE_right_constrained <-  mean((calcul_exposition(scenario,normalization) - WCEmat_right_constrained )^2)
+#     MSE_right_constrained <-  mean((calcul_exposition(scenario,normalization) - WCEmat_right_constrained )^2)
 
 
 
-    WCEmat_unconstrained <- wce_unconstrained$WCEmat[which.min(wce_unconstrained$info.criterion),1:180]
+#     WCEmat_unconstrained <- wce_unconstrained$WCEmat[which.min(wce_unconstrained$info.criterion),1:180]
 
-    MSE_unconstrained <-  mean((calcul_exposition(scenario,normalization) - WCEmat_unconstrained )^2)
+#     MSE_unconstrained <-  mean((calcul_exposition(scenario,normalization) - WCEmat_unconstrained )^2)
     
-    results_right_constrained = list(WCEmat = WCEmat_right_constrained,
-                                     BIC = min(wce_right_constrained$info.criterion),
-                                     MSE = MSE_right_constrained)
+#     results_right_constrained = list(WCEmat = WCEmat_right_constrained,
+#                                      BIC = min(wce_right_constrained$info.criterion),
+#                                      MSE = MSE_right_constrained)
     
-    results_unconstrained = list(WCEmat = WCEmat_unconstrained,
-                                 BIC = min(wce_unconstrained$info.criterion),
-                                 MSE = MSE_unconstrained)
+#     results_unconstrained = list(WCEmat = WCEmat_unconstrained,
+#                                  BIC = min(wce_unconstrained$info.criterion),
+#                                  MSE = MSE_unconstrained)
         
-    # Best result according to BIC
-    return(list(results_right_constrained = results_right_constrained,
-                results_unconstrained = results_unconstrained))
-}
+#     # Best result according to BIC
+#     return(list(results_right_constrained = results_right_constrained,
+#                 results_unconstrained = results_unconstrained))
+# }
 
-simulate_with_bootstraps <- function(n_bootstraps, number_patients, observation_time, scenario,cutoff,normalization, Xmat_list){
-    print("################ Start simulation #################")
+# simulate_with_bootstraps <- function(n_bootstraps, number_patients, observation_time, scenario,cutoff,normalization, Xmat_list){
+#     print("################ Start simulation #################")
   
-    start_time = Sys.time()
+#     start_time = Sys.time()
     
-    print(paste("simulation of ",n_bootstraps,"bootstraps"))
+#     print(paste("simulation of ",n_bootstraps,"bootstraps"))
     
     
-    right_constrained <- list()
-    right_constrained_BIC <- list()
-    right_constrained_MSE <- list()
-    unconstrained <- list()
-    unconstrained_BIC <-  list()
-    unconstrained_MSE <-  list()
+#     right_constrained <- list()
+#     right_constrained_BIC <- list()
+#     right_constrained_MSE <- list()
+#     unconstrained <- list()
+#     unconstrained_BIC <-  list()
+#     unconstrained_MSE <-  list()
 
 
-    for (i in 1:n_bootstraps){
+#     for (i in 1:n_bootstraps){
 
-        print(paste("Simulation of bootstrap",i))
+#         print(paste("Simulation of bootstrap",i))
     
-        #Xmat <- generate_Xmat(observation_time,number_patients)
-        Xmat <- Xmat_list[i]
-        simulation <- Simulate_WCE(scenario,Xmat,cutoff,normalization)
-        right_constrained <- append(right_constrained,list(simulation$results_right_constrained$WCEmat))
-        right_constrained_BIC <- append(right_constrained_BIC,list(simulation$results_right_constrained$BIC))
-        right_constrained_MSE <- append(right_constrained_MSE,list(simulation$results_right_constrained$MSE))
-        unconstrained <- append(unconstrained,list(simulation$results_unconstrained$WCEmat))
-        unconstrained_BIC <- append(unconstrained_BIC,list(simulation$results_unconstrained$BIC))   
-        unconstrained_MSE <- append(unconstrained_MSE,list(simulation$results_unconstrained$MSE))
+#         #Xmat <- generate_Xmat(observation_time,number_patients)
+#         Xmat <- Xmat_list[i]
+#         simulation <- Simulate_WCE(scenario,Xmat,cutoff,normalization)
+#         right_constrained <- append(right_constrained,list(simulation$results_right_constrained$WCEmat))
+#         right_constrained_BIC <- append(right_constrained_BIC,list(simulation$results_right_constrained$BIC))
+#         right_constrained_MSE <- append(right_constrained_MSE,list(simulation$results_right_constrained$MSE))
+#         unconstrained <- append(unconstrained,list(simulation$results_unconstrained$WCEmat))
+#         unconstrained_BIC <- append(unconstrained_BIC,list(simulation$results_unconstrained$BIC))   
+#         unconstrained_MSE <- append(unconstrained_MSE,list(simulation$results_unconstrained$MSE))
 
     
 
-    }    
+#     }    
 
 
-    list_simulations <- list(right_constrained=right_constrained,
-                             right_constrained_BIC = right_constrained_BIC,
-                             right_constrained_MSE = right_constrained_MSE,
-                             unconstrained = unconstrained,
-                             unconstrained_BIC = unconstrained_BIC,
-                             unconstrained_MSE = unconstrained_MSE)
-    end_time = Sys.time()
-    time = difftime(end_time, start_time, units = "sec")
-    print(paste("This simulation took : ", round(time), " seconds"))
+#     list_simulations <- list(right_constrained=right_constrained,
+#                              right_constrained_BIC = right_constrained_BIC,
+#                              right_constrained_MSE = right_constrained_MSE,
+#                              unconstrained = unconstrained,
+#                              unconstrained_BIC = unconstrained_BIC,
+#                              unconstrained_MSE = unconstrained_MSE)
+#     end_time = Sys.time()
+#     time = difftime(end_time, start_time, units = "sec")
+#     print(paste("This simulation took : ", round(time), " seconds"))
 
-    return(list_simulations)
-}
+#     return(list_simulations)
+# }
 
-normalize_function <- function(scenario, sum, upper_time){
-  integration <- integrate(scenario, lower = 0, upper = upper_time)$value
-  return(integration)
-}
+# normalize_function <- function(scenario, sum, upper_time){
+#   integration <- integrate(scenario, lower = 0, upper = upper_time)$value
+#   return(integration)
+# }
