@@ -12,13 +12,13 @@ devtools::load_all("../../../survivalGPU/R")
 expriment_name = "HR : 100 - 100 000"
 
 # static parameters 
-n_bootstraps = 1000
+n_bootstraps = 100
 cutoff = 180
 
 # variable paramters 
-HR_target_list = c(1.5)
+HR_target_list = c(2)
 weight_functions_list = c("exponential_weight")
-n_patients_list = c(100,1000,10000)
+n_patients_list = c(100,1000)#,10000)
 n_knots_list = c(1)
 
 

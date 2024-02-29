@@ -24,7 +24,7 @@ observation_time <- c(365)
 n_patients_list <- c(100,1000)#c(100,1000,10000)
 scenario_list =  c("exponential_weight")#,bi_linear_weight,early_peak_weight,inverted_u_weight,null_weight)
 cutoff = 180
-HR_target = 1.5
+HR_target = 2
 
 
 # simulation_times_list <- list()
@@ -50,7 +50,9 @@ for (n_patients in n_patients_list){
 
         print(n_patients)
 
-        normalization_factor <- calculate_normalization_factor(scenario_function,cutoff,HR_target)
+        normalization_factor <- calculate_normalization_factor(scenario_function,HR_target,cutoff)
+
+        print(paste0("normalization_factor: ",normalization_factor))
 
         wce_mat <- do.call("rbind", lapply(1:dim(Xmat)[1], wce_vector, scenario = scenario_function, Xmat = Xmat,normalization_factor = normalization_factor))       
 
