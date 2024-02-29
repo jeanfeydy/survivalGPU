@@ -14,20 +14,22 @@ n_bootstraps = 10
 cutoff = 180
 
 # variable paramters 
-HR_cible = c(2.8)
-weight_function = c("exponential_weight")
+HR_cible_list = c(2.8)
+weight_functions_list = c("exponential_weight")
 n_patients_list = c(100,1000)
+n_knots_list = c(1,2)
+
 
 
 ###########################################################
 
 
 
-analyze_data <- function(file_path, cutoff, n_bootstraps) {
+analyze_data <- function(file_path, cutoff, n_bootstraps,nknots) {
 
     data = read.csv(file_path)
 
-    model <- wceGPU(data, 1, cutoff, constrained = "right",
+    model <- wceGPU(data, nknots, cutoff, constrained = "right",
                id = "patient", event = "event", start = "start",
                stop = "stop", expos = "dose",nbootstraps = n_bootstraps,batchsize = 10, verbosity=0)
 
@@ -62,10 +64,20 @@ HR_calculated_results = c()
 HR_calculated_2_5_results = c()
 HR_calculated_97_5_results = c()
 
-for (n_patients in n_patients_list){
+combinaisons_parameters <- expand.grid(HR = HR_cible_list,weight_function = weight_functions_list, n_patients = n_patients_list,n_knots= n_knots_list)
+print(combinaisons_parameters)
+
+for (i in 1:nrow(combinaisons_parameters)){
+
+    HR_cible <- combinaisons_parameters$HR[i]
+    weight_function <- combinaisons_parameters$weight_function[i]
+    n_patients <- combinaisons_parameters$n_patients[i]
+    nknots <- combinaisons_parameters$n_knots[i]
+
+
     file_path = file_name_translator(n_patients,HR_cible,weight_function)
     print(file_path)
-    HR_result = analyze_data(file_path, cutoff,n_bootstraps)
+    HR_result = analyze_data(file_path, cutoff,n_bootstraps,nknots)
     print(HR_result)
 
     ### here logic is false, see https://datatofish.com/export-dataframe-to-csv-in-r/ for better
@@ -88,16 +100,22 @@ result_dict = list("weight_function"= weight_function_results,
                    "HR_cible"= HR_cible_results,
                    "HR_calculated"= HR_calculated_results,
                    "HR_calculated_2_5"= HR_calculated_2_5_results,
-                   "HR_calculated_97_5"= HR_calculated_97_5_results 
-    
-)
-
-print(weight_function_results)
-write.csv(result_dict, "test_2.csv")
+                   "HR_calculated_97_5"= HR_calculated_97_5_results
+                   )
 
 }
 
+result_dict_path = file.path("../Simulation_results",expriment_name)
 
+
+if (!dir.exists(result_dict_path)){
+dir.create(result_dict_path)
+} 
+
+file_result_name = paste0("analyzed_",expriment_name,".csv")
+file_result_path = file.path(result_dict_path,file_result_name)
+
+write.csv(result_dict, file_result_path)
 
 
 
