@@ -5,6 +5,12 @@ exponential_weight <- function(u_t) {
   return(7 * exp(-7 * u_t))
 }
 
+
+# Scenario 1 - Exponential
+exponential_weight_2 <- function(u_t) {
+  return((7 * exp(-7 * u_t))*0.5)
+}
+
 # Scenario 2 - Bi-Linear 
 bi_linear_weight <- function(u_t) {
   ifelse((u_t) <= (50 / 365),
@@ -64,6 +70,9 @@ scenario_translator <- function(scenario){
   }  
   if(scenario == "late_effect_weight"){
     return(late_effect_weight)
+  }
+  if(scenario == "exponential_weight_2"){
+    return(exponential_weight_2)
   }
   if(scenario == "null_weight"){
     return(null_weight)

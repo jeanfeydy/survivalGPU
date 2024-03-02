@@ -1,5 +1,5 @@
 library(dplyr)
-source("src/weight_functions.r")
+# source("src/weight_functions.r")
 
 # library(WCE)
 # library(purrr)
@@ -54,18 +54,30 @@ generate_Xmat_list<- function(observation_time,n_patients,n_bootstraps,doses){
 wce_vector <- function(u, scenario, Xmat,normalization_factor) {
     t <- 1:u
 
+
     # scenario_2 = exponential_weight
+    # print(u)
+    scenario_shape <- do.call(scenario, list((u - t) / 365))/365*normalization_factor
 
-    scenario_function <- do.call(scenario, list((u - t) / 365))*normalization_factor
 
- 
-    wce <- scenario_function[1:u] * Xmat[t,]
+    if(u ==180){
+        print("Here motherfuckers")
+        print(sum(scenario_shape))
+        print(exp(sum(scenario_shape)))
+
+    }
+
+    
+    # print(sum(scenario_shape))
+
+    wce <- scenario_shape[1:u] * Xmat[t,]
 
     if (u == 1) {
         res <- wce
     } else {
         res <- apply(wce, 2, sum)
     }
+
 
     return(res)
 }
@@ -76,16 +88,29 @@ calculate_normalization_factor <- function(scenario, HR_target,cutoff){
     normalization_target <- log(HR_target)
 
     scenario_function <- do.call(scenario, list((cutoff - t) / 365))
-    sum <- sum(scenario_function)/365 
-
+    scenario_sum <- sum(scenario_function)/365 
     
 
-    if (sum ==0 ){
+    if (scenario_sum ==0 ){
         normalization_factor <- 1
     }else{
-        normalization_factor <- normalization_target/sum
+        normalization_factor <- normalization_target/scenario_sum
     }
+
+ 
+
     return(normalization_factor)
+}
+
+calcul_exposition <- function(scenario,HR_target,cutoff){
+
+    expo_list <- lapply((1:cutoff)/365, scenario)
+    expo <- do.call("rbind", expo_list)/365
+
+    normalization_factor <- calculate_normalization_factor(scenario,HR_target,cutoff)
+
+
+    return(expo*normalization_factor)
 }
 
 
@@ -147,9 +172,46 @@ matching_algo <- function(wce_mat) {
                 sample_id <- sample(id, 1)
             }else{
 
+            # print("HR test : ")
 
-                proba <- (4 * wce_matrix[time_event,]) / sum(4 * wce_matrix[time_event,])
-                sample_id <- sample(id, 1, prob = proba)
+            # HR_target = 2
+            # print("proba for HR 2 : ")
+
+            # proba2 <- (exp(log(HR_target))* wce_matrix[time_event,]) / sum(exp(log(HR_target)) * wce_matrix[time_event,])
+            # # print(proba2)
+            # sample_id <- sample(id, 1, prob = proba2)
+            # # print(sample_id)
+
+
+            # HR_target = 4
+
+            # print("proba for HR 4 : ")
+            # proba4 <- (exp(log(HR_target))* wce_matrix[time_event,]) / sum(exp(log(HR_target)) * wce_matrix[time_event,])
+            # # print(proba4)
+            # sample_id <- sample(id, 1, prob = proba4)
+
+            # print(proba2 == proba4)
+            # print(sample_id)
+
+            # proba <- (4 * wce_matrix[time_event,]) / sum(4 * wce_matrix[time_event,])
+            # proba <- exp((wce_matrix[time_event,]) / sum(exp(
+
+            # HR_target = 1.5
+            
+            
+            # proba <- (4 * wce_matrix[time_event,]) / sum(4 * wce_matrix[time_event,])
+
+            # proba <- (exp(log(HR_target)* wce_matrix[time_event,])) / sum(exp(log(HR_target) * wce_matrix[time_event,]))
+                
+            proba <- (exp(wce_matrix[time_event,])) / sum(exp(wce_matrix[time_event,]))
+            # proba <- (wce_matrix[time_event,]) / sum(wce_matrix[time_event,])
+
+            sample_id <- sample(id, 1, prob = proba)
+
+            
+            # wce_matrix[time_event,])))
+
+
             }            
         }
 
@@ -202,16 +264,7 @@ get_dataset <- function(Xmat, wce_mat) {
     return(df_wce)
 }
 
-calcul_exposition <- function(scenario,HR_target,cutoff){s
 
-    expo_list <- lapply((1:cutoff)/365, scenario)
-    expo <- do.call("rbind", expo_list)/365
-
-    normalization_factor <- calculate_normalization_factor(scenario,HR_target,cutoff)
-
-
-    return(expo*normalization_factor)
-}
 #calculate_normalization_factor <- function(scenario, HR_target,cutoff){
 
 
