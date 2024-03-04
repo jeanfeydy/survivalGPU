@@ -14,17 +14,18 @@ source("../src/weight_functions.r")
 
 ########################################## EXPERIMENTS DATA ##########################################
 
-expriment_name = "test_images"
+expriment_name = "HR : sauf 2.8 10000"
 
 # static parameters 
-n_bootstraps = 100
+n_bootstraps = 1000
 cutoff = 180
 
 # variable paramters 
-HR_target_list = c(3)
+HR_target_list = c(1.25,1.5,2,2.8,3.5)
 weight_functions_list = c("exponential_weight") #c("exponential_weight")
-n_patients_list = c(100)#,10000)
+n_patients_list = c(100000)#,10000)
 n_knots_list = c(1)
+
 
 
 ######################################################################################################
@@ -49,6 +50,11 @@ HR_GPU_bootstraps_2_5_results = c()
 HR_GPU_bootstraps_97_5_results = c()
 HR_GPU_results = c()
 HR_CPU_resutls = c()
+
+print(HR_target_list)
+print(weight_functions_list)
+print(n_patients_list)
+print(n_knots_list)
 
 combinaisons_parameters <- expand.grid(HR_target = HR_target_list,weight_function = weight_functions_list, n_patients = n_patients_list,n_knots= n_knots_list)
 print(combinaisons_parameters)
@@ -231,7 +237,7 @@ result_dict = list("weight_function"= weight_function_results,
                    "HR_target"= HR_target_results,
                    "HR_calculated_GPU_bootstraps"= HR_GPU_bootstraps_results,
                    "HR_calculated_GPU_bootstraps_2_5"= HR_GPU_bootstraps_2_5_results,
-                   "HR_calculated_GPU_bootstraps_97_5"= HR_GPU_bootstraps_97_5_results,
+                   "HR_calculated_GPU_bootstraps_97_5"= HR_GPU_bootstraps_97_5_results
                 #    "HR_GPU" = HR_GPU_results,
                 #    "HR_CPU" = HR_CPU_resutls
                    )
