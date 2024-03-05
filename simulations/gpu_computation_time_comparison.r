@@ -85,16 +85,20 @@ run_cpu <- function(data, n_bootstraps){
 
 run_gpu <- function(data,n_bootstraps,n_patients){
     start_time = Sys.time()
-
-    batchsize = 100
-
-    if (n_patients > 9999){
+    
+    if(n_patients < 10000){
+        batchsize = 100
+    }  
+    else{
         batchsize = 10
-    }
+    } 
+    print("#############BATCHSIZE")
+    
+    print(batchsize)
 
     model <- wceGPU(data, 1, cutoff, constrained = "right",
                    id = "patient", event = "event", start = "start",
-                   stop = "stop", expos = "dose",nbootstraps = n_bootstraps,batchsize = batchsize)
+                   stop = "stop", expos = "dose",nbootstraps = n_bootstraps,batchsize=batchsize)
 
 
     end_time <- Sys.time()
@@ -156,17 +160,25 @@ cutoff = 180
 n_bootstraps = 1000
 weight_function = "exponential_weight"
 
-gpu_computation_times_list <- list()
-cpu_computation_times_list <- list()
+gpu_no_bootstraps_computation_times_list <- list()
+gpu_with_bootstraps_computation_times_list <- list()
 
 # n_patients_list = c(100,1000,10000,100000)
 n_patients_list = c(100,1000,10000,100000)#,10000)#,10000,100000)
 
 
 
-experiment_name <- "100-1000 with bootstraps"
+experiment_name <- "GPU with and without bootstraps : 100 - 100 000"
 
 
+#launch first to test theory first survivalGPU
+
+n_patients = 100
+file_name <- paste0("WCEmat/", weight_function,"_",as.character(normalization), "_",as.character(n_patients),".csv")
+data = read.csv(file_name)
+print("dummy first one")
+gpu_no_bootstraps_computation_time = run_gpu_no_bootstraps(data)
+print(paste0("Computation for CPU took : ",as.character(gpu_no_bootstraps_computation_time),"s"))
 
 
 for (n_patients in n_patients_list){
@@ -175,26 +187,26 @@ for (n_patients in n_patients_list){
     data = read.csv(file_name)
 
 
-    cpu_computation_time = run_cpu(data,n_bootstraps)
-    # cpu_computation_time = run_cpu_no_bootstraps(data)
+    gpu_no_bootstraps_computation_time = run_gpu_no_bootstraps(data)
+    # gpu_no_bootstraps_computation_time = run_cpu_no_bootstraps(data)
 
 
-    cpu_computation_times_list[[as.character(n_patients)]] <- cpu_computation_time
+    gpu_no_bootstraps_computation_times_list[[as.character(n_patients)]] <- gpu_no_bootstraps_computation_time
     
-    print(paste0("Computation for CPU took : ",as.character(cpu_computation_time),"s"))
+    print(paste0("Computation for GPU no bootstraps took : ",as.character(gpu_no_bootstraps_computation_time),"s"))
 
     
-    gpu_computation_time <- run_gpu(data,n_bootstraps,n_patients)
-    # gpu_computation_time <- run_gpu_no_bootstraps(data)
+    gpu_with_bootstraps_computation_time <- run_gpu(data,n_bootstraps,n_patients)
+    # gpu_with_bootstraps_computation_time <- run_gpu_no_bootstraps(data)
 
-    gpu_computation_times_list[[as.character(n_patients)]] <- gpu_computation_time
+    gpu_with_bootstraps_computation_times_list[[as.character(n_patients)]] <- gpu_with_bootstraps_computation_time
     
     
-    print(paste0("Computation for GPU took : ",as.character(gpu_computation_time),"s"))
+    print(paste0("Computation for GPU with bootstraps took : ",as.character(gpu_with_bootstraps_computation_time),"s"))
 
 
-    computation_time_output <- list("GPU_computaiton_time" = gpu_computation_times_list,
-                                    "CPU_computation_time" = cpu_computation_times_list)
+    computation_time_output <- list("GPU_no_bootstraps_computaiton_time" = gpu_no_bootstraps_computation_times_list,
+                                    "GPU_with_bootstraps_computation_time" = gpu_with_bootstraps_computation_times_list)
 
     write(toJSON(computation_time_output), file = paste0("Simulation_results/Computation_time_comprison/",experiment_name,".json"))
 

@@ -61,6 +61,8 @@ def analyse_result(file_path,weight_function,normalization):
 
     list_AUC_diff = []
 
+    list_AUC = []
+
     for i in range(data["WCEmat"].shape[0]):
         sum_weights_diff = abs(data["WCEmat"][i] - real_weights[0:len(data["WCEmat"][i])])
         list_sum_weights_diff.append(sum_weights_diff.sum().item())
@@ -72,6 +74,9 @@ def analyse_result(file_path,weight_function,normalization):
         #print(sum_air) ### Ai ai ai sensé être à 1
         AUC_diff = abs(AUC_real -AUC)
         list_AUC_diff.append(AUC_diff)
+
+        list_AUC.append(AUC)
+
 
 
 
@@ -93,6 +98,10 @@ with open ("Simulation_results/"+ experiment_name +"/"+experiment_name  +".csv")
         experiment["AUC_diff_mean"] = list_AUC_diff.mean()
         experiment["AUC_diff_95p"] = np.percentile(list_AUC_diff,95)
         experiment["AUC_diff_5p"] = np.percentile(list_AUC_diff,5)
+
+        experiment["AUC"] = list_AUC_diff.mean()
+        experiment["AUC_95p"] = np.percentile(list_AUC_diff,95)
+        experiment["AUC_5p"] = np.percentile(list_AUC_diff,5)
 
         experiment_list.append(experiment)
 
