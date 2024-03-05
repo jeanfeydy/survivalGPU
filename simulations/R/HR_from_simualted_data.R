@@ -17,13 +17,13 @@ source("../src/weight_functions.r")
 expriment_name = "HR : sauf 2.8 10000"
 
 # static parameters 
-n_bootstraps = 1000
+n_bootstraps = 100
 cutoff = 180
 
 # variable paramters 
-HR_target_list = c(1.25,1.5,2,2.8,3.5)
-weight_functions_list = c("exponential_weight") #c("exponential_weight")
-n_patients_list = c(100000)#,10000)
+HR_target_list = c(2.8)
+weight_functions_list = c("exponential_weight","bi_linear_weight") #c("exponential_weight")
+n_patients_list = c(100)#,10000)
 n_knots_list = c(1)
 
 
@@ -217,7 +217,7 @@ for (i in 1:nrow(combinaisons_parameters)){
 
 
 
-    weight_function_results = c(weight_function_results,weight_function)  
+    weight_function_results = append(weight_function_results,weight_function) #c(weight_function_results,weight_function)  
     n_patients_results = c(n_patients_results,n_patients)  
     n_bootstraps_results = c(n_bootstraps_results,n_bootstraps)  
     cutoff_results = c(cutoff_results,cutoff)  
@@ -228,7 +228,7 @@ for (i in 1:nrow(combinaisons_parameters)){
     # HR_GPU_results = c(HR_GPU_results,HR_result_GPU)
     # HR_CPU_resutls = c(HR_CPU_resutls,HR_result_CPU)
 
-
+print("############ Debug Weight function resutls")
 
 result_dict = list("weight_function"= weight_function_results,
                    "n_patients"= n_patients_results,
