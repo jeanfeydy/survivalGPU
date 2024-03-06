@@ -21,15 +21,24 @@ options(scipen = 999)
 
 doses <- c(1,1.5,2,2.5,3)
 observation_time <- c(365)
-n_patients_list <- c(100,1000,10000,1000000)#c(100,1000,10000)
-scenario_list =  c("exponential_weight","bi_linear_weight","early_peak_weight","inverted_u_weight")
+n_patients_list <- c(100)#c(100,1000,10000)
+scenario_list =  c("null_weight")
 cutoff = 180
-HR_target = 1.25
+HR_target = 1
+
+
+if(HR_target == 1){
+    
+    print("HR target = 1, only scenario is null_weight")
+    scenario_list = c("null_weight")
+}
+
 
 
 # simulation_times_list <- list()
 
 for (n_patients in n_patients_list){
+
 
      
 
@@ -39,8 +48,11 @@ for (n_patients in n_patients_list){
     
      
     scenario_time_list <- list()
+
+
    
     for (scenario in scenario_list){
+
 
         scenario_function <- scenario_translator(scenario)
 
@@ -56,6 +68,11 @@ for (n_patients in n_patients_list){
 
         wce_mat <- do.call("rbind", lapply(1:cutoff, wce_vector, scenario = scenario_function, Xmat = Xmat,normalization_factor = normalization_factor)) 
 
+        if(HR_target == 1){
+            is_null_weight <- TRUE
+        }else{
+            is_null_weight <- FALSE
+        }
 
 
 
@@ -70,7 +87,8 @@ for (n_patients in n_patients_list){
 
             current_n <- current_n + batchsize
 
-            df_wce_batch <- get_dataset(Xmat = Xmat_batch, wce_mat = wce_mat_batch)
+
+            df_wce_batch <- get_dataset(Xmat = Xmat_batch, wce_mat = wce_mat_batch,is_null_weight)
             df_wce_batch <- df_wce_batch[order(df_wce_batch$patient),]
 
             df_wce <- df_wce_batch
@@ -84,7 +102,7 @@ for (n_patients in n_patients_list){
 
                 
 
-                df_wce_batch <- get_dataset(Xmat = Xmat_batch, wce_mat = wce_mat_batch)
+                df_wce_batch <- get_dataset(Xmat = Xmat_batch, wce_mat = wce_mat_batch,is_null_weight)
                 df_wce_batch <- df_wce_batch[order(df_wce_batch$patient),]
 
                 df_wce_batch["patient"] <- df_wce_batch["patient"] + current_n -1
@@ -99,7 +117,7 @@ for (n_patients in n_patients_list){
         }
         else{
             
-            df_wce <- get_dataset(Xmat = Xmat, wce_mat = wce_mat)
+            df_wce <- get_dataset(Xmat = Xmat, wce_mat = wce_mat,is_null_weight)
 
             
             # print("#### scenario ####")

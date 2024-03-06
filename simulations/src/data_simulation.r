@@ -233,12 +233,69 @@ matching_algo <- function(wce_mat) {
     }   
 }
 
+# Function for 'the final step of the permutational algorithm'
+matching_algo_null <- function(wce_mat) {
+    print("using null matching algo")
+    n_patient <- ncol(wce_mat)
+    events_generation <- event_censor_generation(dim(wce_mat)[1],dim(wce_mat)[2])
+    
+    df_event <- data.frame(patient = 1:n_patient,
+                           eventRandom = events_generation$eventRandom,
+                           censorRandom = events_generation$censorRandom)
+    df_event <- df_event %>%
+        group_by(patient) %>%
+        mutate(FUP_Ti = min(eventRandom, censorRandom)) %>%
+        mutate(event = ifelse(FUP_Ti == eventRandom, 1, 0)) %>%
+        ungroup() %>%
+        arrange(FUP_Ti)
+
+    # init
+    patient_order <- df_event$patient
+    j = 1
+    id <- 1:n_patient
+    wce_mat_df <- wce_mat %>% as.data.frame()
+    matching_result <- data.frame()
+
+    # Iterative matching, start with the lowest FUP
+    for (i in patient_order) {
+        event <- df_event[j, "event"] %>% pull()
+        time_event <- df_event[j, "FUP_Ti"] %>% pull()
+
+        first <- TRUE
+        
+
+        sample_id <- sample(id, 1)
+
+
+        matching_result <- rbind(matching_result,
+                                 data.frame(id_patient = i,
+                                            id_dose_wce = sample_id))
+        id <- id[!id %in% sample_id]
+        j = j + 1
+
+        # Stop when last id of iterative algo
+        if(length(id) == 1) {
+            matching_result <- rbind(matching_result,
+                                     data.frame(id_patient = patient_order[n_patient],
+                                                id_dose_wce = id))
+            return(list(matching_result = matching_result,
+                        df_event = df_event,
+                        patient_order = patient_order))
+        }
+    }   
+}
+
 # Function to render dataset after the matching algo
-get_dataset <- function(Xmat, wce_mat) {
+get_dataset <- function(Xmat, wce_mat,is_null_weight) {
     df_wce <- data.frame()
     Xmat_df <- Xmat %>%
         as.data.frame()
-    matching_result <- matching_algo(wce_mat)
+    
+    if(is_null_weight == TRUE){
+        matching_result <- matching_algo_null(wce_mat)
+    }else{
+        matching_result <- matching_algo(wce_mat)
+    }
 
     for (i in matching_result$patient_order) {
         fu <- matching_result$df_event[matching_result$df_event$patient == i, "FUP_Ti"] %>% pull()
