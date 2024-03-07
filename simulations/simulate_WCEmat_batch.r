@@ -21,7 +21,7 @@ options(scipen = 999)
 
 doses <- c(1,1.5,2,2.5,3)
 observation_time <- c(365)
-n_patients_list <- c(200,500,2000,5000,20000,50000,100000)#c(100,1000,10000)
+n_patients_list <- c(100,200)#c(100,1000,10000)
 scenario_list =  c("bi_linear_weight")
 cutoff = 180
 HR_target = 2.8
@@ -73,8 +73,6 @@ for (n_patients in n_patients_list){
         }else{
             is_null_weight <- FALSE
         }
-
-
 
         if (n_patients > batchsize){
 

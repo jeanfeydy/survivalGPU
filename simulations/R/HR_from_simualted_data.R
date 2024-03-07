@@ -14,16 +14,16 @@ source("../src/weight_functions.r")
 
 ########################################## EXPERIMENTS DATA ##########################################
 
-expriment_name = "06-03-2024 : all functions, 100-10000"
+expriment_name = "test_BIC"
 
 # static parameters 
-n_bootstraps = 100
+n_bootstraps = 1000
 cutoff = 180
 
 # variable paramters 
-HR_target_list = c(1.25,1.5,2,2.8)
-weight_functions_list = c("bi_linear_weight") #c("exponential_weight")
-n_patients_list = c()#,10000)
+HR_target_list = c(2.8)
+weight_functions_list = c("exponential_weight") #c("exponential_weight")
+n_patients_list = c(100)#,10000)
 n_knots_list = c(1,2,3)
 
 
@@ -50,6 +50,7 @@ HR_GPU_bootstraps_2_5_results = c()
 HR_GPU_bootstraps_97_5_results = c()
 HR_GPU_results = c()
 HR_CPU_resutls = c()
+BIC_results = c()
 
 print(HR_target_list)
 print(weight_functions_list)
@@ -107,7 +108,7 @@ for (i in 1:nrow(combinaisons_parameters)){
                id = "patient", event = "event", start = "start",
                stop = "stop", expos = "dose",nbootstraps = n_bootstraps,batchsize = batchsize, verbosity=0)
 
-
+     BIC = mean(wce_model_GPU_bootstraps$info.criterion)
 
     exposed   <- rep(1, cutoff)
     non_exposed   <- rep(0, cutoff)
@@ -117,6 +118,8 @@ for (i in 1:nrow(combinaisons_parameters)){
     # HR_result_GPU = HR(wce_model_GPU,vecnum = exposed, vecdenom= non_exposed)
 
     HR_result_GPU_bootstraps = HR(wce_model_GPU_bootstraps,vecnum = exposed, vecdenom= non_exposed)
+
+   
 
     # print(paste0("HR CPU :",HR_result_CPU))
     # print(paste0("HR GPU :",HR_result_GPU))
@@ -218,17 +221,17 @@ for (i in 1:nrow(combinaisons_parameters)){
 
 
     weight_function_results = append(weight_function_results,weight_function) #c(weight_function_results,weight_function)  
-    n_patients_results = c(n_patients_results,n_patients)  
-    n_bootstraps_results = c(n_bootstraps_results,n_bootstraps)  
-    cutoff_results = c(cutoff_results,cutoff)  
-    HR_target_results = c(HR_target_results,HR_target)       
-    HR_GPU_bootstraps_results = c(HR_GPU_bootstraps_results,HR_result_GPU_bootstraps[1])  
-    HR_GPU_bootstraps_2_5_results = c(HR_GPU_bootstraps_2_5_results,HR_result_GPU_bootstraps[2]) 
-    HR_GPU_bootstraps_97_5_results = c(HR_GPU_bootstraps_97_5_results,HR_result_GPU_bootstraps[3])  
+    n_patients_results = append(n_patients_results,n_patients)  
+    n_bootstraps_results = append(n_bootstraps_results,n_bootstraps)  
+    cutoff_results = append(cutoff_results,cutoff)  
+    HR_target_results = append(HR_target_results,HR_target)       
+    HR_GPU_bootstraps_results = append(HR_GPU_bootstraps_results,HR_result_GPU_bootstraps[1])  
+    HR_GPU_bootstraps_2_5_results = append(HR_GPU_bootstraps_2_5_results,HR_result_GPU_bootstraps[2]) 
+    HR_GPU_bootstraps_97_5_results = append(HR_GPU_bootstraps_97_5_results,HR_result_GPU_bootstraps[3])  
+    BIC_results = append(BIC_results,BIC)
     # HR_GPU_results = c(HR_GPU_results,HR_result_GPU)
     # HR_CPU_resutls = c(HR_CPU_resutls,HR_result_CPU)
 
-print("############ Debug Weight function resutls")
 
 result_dict = list("weight_function"= weight_function_results,
                    "n_patients"= n_patients_results,
@@ -237,7 +240,8 @@ result_dict = list("weight_function"= weight_function_results,
                    "HR_target"= HR_target_results,
                    "HR_calculated_GPU_bootstraps"= HR_GPU_bootstraps_results,
                    "HR_calculated_GPU_bootstraps_2_5"= HR_GPU_bootstraps_2_5_results,
-                   "HR_calculated_GPU_bootstraps_97_5"= HR_GPU_bootstraps_97_5_results
+                   "HR_calculated_GPU_bootstraps_97_5"= HR_GPU_bootstraps_97_5_results,
+                   "BIC_results" = BIC_results
                 #    "HR_GPU" = HR_GPU_results,
                 #    "HR_CPU" = HR_CPU_resutls
                    )

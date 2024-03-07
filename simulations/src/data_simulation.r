@@ -59,14 +59,6 @@ wce_vector <- function(u, scenario, Xmat,normalization_factor) {
     # print(u)
     scenario_shape <- do.call(scenario, list((u - t) / 365))/365*normalization_factor
 
-
-    if(u ==180){
-        print("Here motherfuckers")
-        print(sum(scenario_shape))
-        print(exp(sum(scenario_shape)))
-
-    }
-
     
     # print(sum(scenario_shape))
 
