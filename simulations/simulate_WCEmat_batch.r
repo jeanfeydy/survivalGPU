@@ -21,10 +21,10 @@ options(scipen = 999)
 
 doses <- c(1,1.5,2,2.5,3)
 observation_time <- c(365)
-n_patients_list <- c(100)#c(100,1000,10000)
-scenario_list =  c("null_weight")
+n_patients_list <- c(200,500,2000,5000,20000,50000,100000)#c(100,1000,10000)
+scenario_list =  c("bi_linear_weight")
 cutoff = 180
-HR_target = 1
+HR_target = 2.8
 
 
 if(HR_target == 1){

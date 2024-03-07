@@ -14,17 +14,17 @@ source("../src/weight_functions.r")
 
 ########################################## EXPERIMENTS DATA ##########################################
 
-expriment_name = "HR : sauf 2.8 10000"
+expriment_name = "06-03-2024 : all functions, 100-10000"
 
 # static parameters 
 n_bootstraps = 100
 cutoff = 180
 
 # variable paramters 
-HR_target_list = c(2.8)
-weight_functions_list = c("exponential_weight","bi_linear_weight") #c("exponential_weight")
-n_patients_list = c(100)#,10000)
-n_knots_list = c(1)
+HR_target_list = c(1.25,1.5,2,2.8)
+weight_functions_list = c("bi_linear_weight") #c("exponential_weight")
+n_patients_list = c()#,10000)
+n_knots_list = c(1,2,3)
 
 
 
