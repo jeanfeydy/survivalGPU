@@ -14,16 +14,16 @@ source("../src/weight_functions.r")
 
 ########################################## EXPERIMENTS DATA ##########################################
 
-expriment_name = "test_BIC"
+expriment_name = "Other weights, small experiemnt"
 
 # static parameters 
 n_bootstraps = 1000
 cutoff = 180
 
 # variable paramters 
-HR_target_list = c(2.8)
-weight_functions_list = c("exponential_weight") #c("exponential_weight")
-n_patients_list = c(100)#,10000)
+HR_target_list = c(1.25,1.5,2,2.8)#c(1)#c(2.8)
+weight_functions_list = c("bi_linear_weight, early_peak_weight, inverted_u_weight") #c("exponential_weight")
+n_patients_list = c(100,1000,10000,100000)#c(100,200,500,1000,2000,5000,10000,20000,50000,100000)#,10000)
 n_knots_list = c(1,2,3)
 
 
@@ -51,6 +51,7 @@ HR_GPU_bootstraps_97_5_results = c()
 HR_GPU_results = c()
 HR_CPU_resutls = c()
 BIC_results = c()
+n_knots_results = c()
 
 print(HR_target_list)
 print(weight_functions_list)
@@ -229,6 +230,7 @@ for (i in 1:nrow(combinaisons_parameters)){
     HR_GPU_bootstraps_2_5_results = append(HR_GPU_bootstraps_2_5_results,HR_result_GPU_bootstraps[2]) 
     HR_GPU_bootstraps_97_5_results = append(HR_GPU_bootstraps_97_5_results,HR_result_GPU_bootstraps[3])  
     BIC_results = append(BIC_results,BIC)
+    n_knots_results = append(n_knots_results,n_knots)
     # HR_GPU_results = c(HR_GPU_results,HR_result_GPU)
     # HR_CPU_resutls = c(HR_CPU_resutls,HR_result_CPU)
 
@@ -241,12 +243,11 @@ result_dict = list("weight_function"= weight_function_results,
                    "HR_calculated_GPU_bootstraps"= HR_GPU_bootstraps_results,
                    "HR_calculated_GPU_bootstraps_2_5"= HR_GPU_bootstraps_2_5_results,
                    "HR_calculated_GPU_bootstraps_97_5"= HR_GPU_bootstraps_97_5_results,
-                   "BIC_results" = BIC_results
+                   "BIC_results" = BIC_results,
+                   "nknots" = n_knots_results
                 #    "HR_GPU" = HR_GPU_results,
                 #    "HR_CPU" = HR_CPU_resutls
                    )
-
-}
 
 result_dict_path = file.path("../Simulation_results",expriment_name)
 
@@ -254,6 +255,10 @@ file_result_name = paste0("analyzed_",expriment_name,".csv")
 file_result_path = file.path(result_dict_path,file_result_name)
 
 write.csv(result_dict, file_result_path)
+
+
+}
+
 
 
 
