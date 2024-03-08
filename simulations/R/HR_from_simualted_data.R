@@ -11,31 +11,22 @@ devtools::load_all("../../../survivalGPU/R")
 
 source("../src/data_simulation.r")
 source("../src/weight_functions.r")
+source("experiment_parameters.R")
 
 ########################################## EXPERIMENTS DATA ##########################################
 
-expriment_name = "Other weights, small experiemnt"
 
-# static parameters 
-n_bootstraps = 1000
-cutoff = 180
+experiment_parameters = generate_parameters()
 
-# variable paramters 
-HR_target_list = c(1.25,1.5,2,2.8)#c(1)#c(2.8)
-weight_functions_list = c("bi_linear_weight, early_peak_weight, inverted_u_weight") #c("exponential_weight")
-n_patients_list = c(100,1000,10000,100000)#c(100,200,500,1000,2000,5000,10000,20000,50000,100000)#,10000)
-n_knots_list = c(1,2,3)
+experiment_name = experiment_parameters$experiment_name
+n_bootstraps= experiment_parameters$n_bootstraps
+cutoff= experiment_parameters$cutoff
+HR_target_list= experiment_parameters$HR_target_list
+weight_functions_list= experiment_parameters$weight_functions_list
+n_patients_list= experiment_parameters$n_patients_list
+n_knots_list= experiment_parameters$n_knots_list
 
-
-
-######################################################################################################
-
-
-
-
-
-
-
+print(experiment_name)
 
 ######## Script
 
@@ -61,12 +52,14 @@ print(n_knots_list)
 combinaisons_parameters <- expand.grid(HR_target = HR_target_list,weight_function = weight_functions_list, n_patients = n_patients_list,n_knots= n_knots_list)
 print(combinaisons_parameters)
 
-result_dict_path = file.path("../Simulation_results",expriment_name)
+result_dict_path = file.path("../Simulation_results",experiment_name)
 
-if (!dir.exists(result_dict_path)){
-dir.create(result_dict_path)
-} 
-
+if (dir.exists(result_dict_path)){
+    print("this experiment already exist")
+    quit()
+}else{
+    dir.create(result_dict_path)
+}
 
 for (i in 1:nrow(combinaisons_parameters)){
 
@@ -200,7 +193,7 @@ for (i in 1:nrow(combinaisons_parameters)){
 
     file_name = paste0(weight_function," patients : ",n_patients," HR : ",HR_target," nknots : ",n_knots,".png")
 
-    file_path = file.path("../Simulation_results",expriment_name,file_name)
+    file_path = file.path("../Simulation_results",experiment_name,file_name)
 
     png(file_path, width = 800, height = 600)
 
@@ -249,9 +242,9 @@ result_dict = list("weight_function"= weight_function_results,
                 #    "HR_CPU" = HR_CPU_resutls
                    )
 
-result_dict_path = file.path("../Simulation_results",expriment_name)
+result_dict_path = file.path("../Simulation_results",experiment_name)
 
-file_result_name = paste0("analyzed_",expriment_name,".csv")
+file_result_name = paste0("analyzed_",experiment_name,".csv")
 file_result_path = file.path(result_dict_path,file_result_name)
 
 write.csv(result_dict, file_result_path)
