@@ -2,9 +2,9 @@ library(jsonlite)
 
 # imports 
 
-source("../src/data_simulation.r")
-source("../src/weight_functions.r")
+source("weight_functions.R")
 source("simulation_parameters.R")
+source("functions_data_simulation.R")
 
 options(scipen = 999)
 
