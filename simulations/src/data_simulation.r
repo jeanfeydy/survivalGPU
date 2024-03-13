@@ -313,6 +313,18 @@ get_dataset <- function(Xmat, wce_mat,is_null_weight) {
     return(df_wce)
 }
 
+binarization_dose_function <- function(doses){
+    binary_doses = c()
+    for(dose in doses){
+        binary_dose <- dose
+        if (dose > 1){
+            binary_dose = 1
+        }
+        binary_doses <- append(binary_doses,binary_dose)
+    }
+    return(binary_doses)
+}
+
 
 #calculate_normalization_factor <- function(scenario, HR_target,cutoff){
 

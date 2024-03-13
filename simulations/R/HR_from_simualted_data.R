@@ -25,8 +25,11 @@ HR_target_list= experiment_parameters$HR_target_list
 weight_functions_list= experiment_parameters$weight_functions_list
 n_patients_list= experiment_parameters$n_patients_list
 n_knots_list= experiment_parameters$n_knots_list
+binarization_dose_list = experiment_parameters$binarization_dose_list
 
 print(experiment_name)
+
+print(binarization_dose_list)
 
 ######## Script
 
@@ -43,20 +46,20 @@ HR_GPU_results = c()
 HR_CPU_resutls = c()
 BIC_results = c()
 n_knots_results = c()
+binarization_dose_results =c()
 
-print(HR_target_list)
-print(weight_functions_list)
-print(n_patients_list)
-print(n_knots_list)
+# print(HR_target_list)
+# print(weight_functions_list)
+# print(n_patients_list)
+# print(n_knots_list)
 
-combinaisons_parameters <- expand.grid(HR_target = HR_target_list,weight_function = weight_functions_list, n_patients = n_patients_list,n_knots= n_knots_list)
+combinaisons_parameters <- expand.grid(HR_target = HR_target_list,weight_function = weight_functions_list, n_patients = n_patients_list,binarization_dose_list = binarization_dose_list,n_knots= n_knots_list)
 print(combinaisons_parameters)
 
 result_dict_path = file.path("../Simulation_results",experiment_name)
 
 if (dir.exists(result_dict_path)){
-    print("this experiment already exist")
-    quit()
+    stop("this experiment already exist")
 }else{
     dir.create(result_dict_path)
 }
@@ -67,6 +70,7 @@ for (i in 1:nrow(combinaisons_parameters)){
     weight_function <- combinaisons_parameters$weight_function[i]
     n_patients <- combinaisons_parameters$n_patients[i]
     n_knots <- combinaisons_parameters$n_knots[i]
+    binarization_dose <- combinaisons_parameters$binarization_dose_list[i]
 
     print(paste0("Starting computation for :" ,as.character(n_patients),"patients - HR_target = ",HR_target," - weight function = ",weight_function,"- ",as.character(n_knots)," knots"))
 
@@ -86,6 +90,11 @@ for (i in 1:nrow(combinaisons_parameters)){
 
 
     data = read.csv(file_path)
+
+    if(binarization_dose == TRUE){
+        print("effective binarization dose")
+        data["dose"] <- lapply(data["dose"], binarization_dose_function)
+    }
 
 
             
