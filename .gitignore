@@ -159,6 +159,7 @@ simulations/Simulation_results/*/models/*
 simulations/output.json
 simulations/Xmat/*
 simulations/WCEmat/*
+simulations/simulated_datasets/*
 simulations/Simulation_results/*/*.png
 
 simulations/survivalGPU.code-workspace

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-cd /home/survivalGPU/simulations/
+cd /home/survivalGPU/simulations/R
 
 
 # python simulation_and_experiment.py 
 
-Rscript simulate_WCEmat_batch.r
+Rscript simulate_WCEmat_batch.R
 
 # python analysis.py
 
