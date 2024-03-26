@@ -2,6 +2,9 @@ import numpy as np
 import random
 import pandas as pd
 import taichi as ti
+import taichi.math as tm
+
+import time
 
 import scenarios
 
@@ -57,13 +60,13 @@ def generate_wce_vector(u, scenario_shape, Xmat):
 
 
 
-def generate_wce_mat(scenario_name, Xmat, cutoff):
+def generate_wce_mat(scenario_name, Xmat, cutoff, max_time):
     """
     This function generate the wce mattrix that keep the WCE wieght of all the patient at
     all the times intill the cutoff
     """
-    scenario_shape = scenarios.get_scenario(scenario_name,cutoff)
-    wce_mat = np.vstack([generate_wce_vector(u, scenario_shape, Xmat) for u in range(1,cutoff+1)])
+    scenario_shape = np.concatenate((scenarios.get_scenario(scenario_name,cutoff),np.zeros(max_time-cutoff)))
+    wce_mat = np.vstack([generate_wce_vector(u, scenario_shape, Xmat) for u in range(1,max_time+1)])
     return wce_mat
 
 
@@ -107,24 +110,26 @@ def event_censor_generation(max_time, n_patients, censoring_ratio):
 
     # Censoring times : Uniform[1;730] for all scenarios
 
-@ti.kernel
-def gpu_matching(wce_mat_current:ti.types.ndarray() ,time_event: int ):
 
-    proba =  0
 
-    return proba
 
+
+
+   
+
+    
 def cpu_matching(wce_mat_current,time_event, HR_target ):
 
-    print(wce_mat_current)
-    print()
-    print(np.exp(wce_mat_current[time_event,]))
-    print(time_event)
+    # print(wce_mat_current)
+    # print()
+    # print(np.exp(wce_mat_current[time_event,]))
+    # print(time_event)
 
-    print(wce_mat_current)
+    # print(wce_mat_current)
+
+   
 
     probas = np.array(np.exp(HR_target * wce_mat_current[time_event,])/np.sum(np.exp(HR_target * wce_mat_current[time_event,])))
-
     return probas
 
 
@@ -163,12 +168,52 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
             # print(wce_mat)
             # print(ids)
             wce_mat_current = wce_mat[:,ids]
-            print(wce_mat_current.shape)
-            print(f"current wce_mat shape  : {wce_mat_current.shape}")
-            print(wce_mat_current.shape)
-            probas = cpu_matching(wce_mat_current, time_event,HR_target)
 
-            print(probas)
+            
+            # print(a)
+            # print(wce_mat_current.shape)
+            # print(f"current wce_mat shape  : {wce_mat_current.shape}")
+            # print(wce_mat_current.shape)
+            # probas = cpu_matching(wce_mat_current, time_event,HR_target)
+            wce_mat_current = wce_mat_current.astype(np.float32, copy=False)
+            wce_mat_current_field = ti.field(float, wce_mat_current.shape)
+            wce_mat_current_field.from_numpy(wce_mat_current)
+            probas_gpu = ti.field(float,(wce_mat_current_field.shape[1]))
+
+        
+            
+            @ti.kernel
+            def gpu_matching(time_event: int, HR_target:float ) -> float:
+
+                # sum_proba: ti.float64
+                sum_proba = 0.0
+                for i in range(wce_mat_current_field.shape[1]):
+                    # print(tm.exp(HR_target * wce_mat_current_field[time_event,i]))
+                    sum_proba += tm.exp(HR_target * wce_mat_current_field[time_event,i])       
+                # print(sum_proba)   
+                # print(1)     
+
+                for i in range(wce_mat_current_field.shape[1]):
+                    probas_gpu[i] = tm.exp(HR_target * wce_mat_current_field[time_event,i])/sum_proba
+                return sum_proba
+            
+            
+
+            sum_proba = gpu_matching(time_event,HR_target)
+            probas = probas_gpu.to_numpy()
+            # print(f"GPU_sum : {sum_proba}")
+            # probas = probas.reshape(len(ids))
+        
+
+            # print(probas)
+            # print(probas.shape)
+            # print(ids.shape)
+       
+
+
+            id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
+            # print("OK")
+            ids = np.delete(ids,id_index) 
             # id_index = np.random.randint(0,len(ids))
             # ids = np.delete(ids,id_index) 
 
@@ -237,7 +282,7 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
 # print("\n")
      
-n_patients = 10
+n_patients = 10000
 max_time = 365
 cutoff = 180
 
@@ -246,7 +291,8 @@ Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
 
 scenario= "exponential_scenario"
 
-wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff)
+wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff, max_time= max_time)
+
 
 # print(wce_mat)
 # print(wce_mat.shape)
@@ -266,9 +312,20 @@ print(type(wce_mat))
 
 
 
+ti.init(arch=ti.gpu)
 
 # ti.init(arch=ti.gpu)
 
 print(f"initial wce_mat shape : {wce_mat.shape}")
 
+start_time = time.perf_counter()
+
 matching_algo(wce_mat, max_time,n_patients, HR_target=1.5) # wce_mat
+
+end_time = time.perf_counter()
+
+elapsed_time = end_time - start_time
+print("Elapsed time: ", elapsed_time)
+
+# 5000 patients : 158 GPU
+
