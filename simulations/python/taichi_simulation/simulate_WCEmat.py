@@ -184,235 +184,7 @@ def cpu_matching(wce_mat_current,time_event, HR_target ):
 
 
 
-def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target ):
-#wce_mat:np.matrix,
-    
-    gpu_time = 0
-    
-    events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
-    
-    # print(events)
-    # print(FUP_tis)
-
-    ids = np.arange(0,n_patients, dtype = int)
-    
-    
-    for i in range(n_patients):
-        iteration_start = time.perf_counter()
-        elapsed_gpu_time = 0
-        # print(i)
-        # print(ids)
-        # print(f"len ids : {len(ids)}")
-        # print(f"len(events): {len(events)}")
-        # print(f"i: {i}")
-        iteration_start = time.perf_counter()
-
-        event = events[i]
-        time_event = FUP_tis[i]
-        # print(event)
-
-        #if event == 0:
-        if event ==0:
-            
-            id_index = np.random.randint(0,len(ids))
-            ids = np.delete(ids,id_index) 
-            # wce_mat_current = np.array(wce_mat)[ids]
-            # print(wce_mat_current.shape)
-        else:
-            # gpu_matching(wce_mat, time_event)
-            # print(wce_mat)
-            # print(ids)
-            wce_mat_current = wce_mat[:,ids]
-
-            
-            # print(a)
-            # print(wce_mat_current.shape)
-            # print(f"current wce_mat shape  : {wce_mat_current.shape}")
-            # print(wce_mat_current.shape)
-            # probas = cpu_matching(wce_mat_current, time_event,HR_target)
-
-            data_modif_start = time.perf_counter()
-            wce_mat_current = wce_mat_current.astype(np.float32, copy=False)
-            wce_mat_current_field = ti.field(float, wce_mat_current.shape)
-            wce_mat_current_field.from_numpy(wce_mat_current)
-            probas_gpu = ti.field(float,(wce_mat_current_field.shape[1]))
-
-            data_modif_end = time.perf_counter()
-            elapsed_data_modif_time = data_modif_end - data_modif_start
-            print(f"data_modif time= {elapsed_data_modif_time}")
-           
-            @ti.kernel
-            def gpu_matching(time_event: int, HR_target:float ) -> float:
-
-                # sum_proba: ti.float64
-                sum_proba = 0.0
-                for i in range(wce_mat_current_field.shape[1]):
-                    # print(tm.exp(HR_target * wce_mat_current_field[time_event,i]))
-                    sum_proba += tm.exp(HR_target * wce_mat_current_field[time_event,i])       
-                # print(sum_proba)   
-                # print(1)     
-
-                for i in range(wce_mat_current_field.shape[1]):
-                    probas_gpu[i] = tm.exp(HR_target * wce_mat_current_field[time_event,i])/sum_proba
-                return sum_proba
-            
-            gpu_start = time.perf_counter()
-            sum_proba = gpu_matching(time_event,HR_target)
-            gpu_end = time.perf_counter()
-
-            elapsed_gpu_time = gpu_end - gpu_start
-            # print(elapsed_gpu_time)
-            print(elapsed_gpu_time)
-            
-            gpu_time += elapsed_gpu_time
-            
-
-           
-            probas = probas_gpu.to_numpy()
-            # print(f"GPU_sum : {sum_proba}")
-            # probas = probas.reshape(len(ids))
-        
-
-            # print(probas)
-            # print(probas.shape)
-            # print(ids.shape)
-       
-
-
-            id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
-            # print("OK")
-            ids = np.delete(ids,id_index) 
-            # id_index = np.random.randint(0,len(ids))
-            # ids = np.delete(ids,id_index) 
-
-        iteration_end = time.perf_counter()
-        elapsed_iteration = iteration_end - iteration_start 
-        print(f"unparallelized iteration = {elapsed_iteration - elapsed_gpu_time}")
-    print(f"Time in gpu :{gpu_time}")
-
-
-    return gpu_time
-
-def parallelized_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target ):
-    
-    gpu_time = 0
-    
-    times_event_0, times_event_1 = parallilized_event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
-
-
-
-    
-    # print(events)
-    # print(FUP_tis)
-
-    
-
-    ids = np.arange(0,n_patients, dtype = int)
-
-
-    # time_event_0 = [i if events[i] ==0 else 0: for i in range(len(events))]
-    # print(time_event_0)
-
-    
-    
-    for i in range(n_patients):
-        iteration_start = time.perf_counter()
-        elapsed_gpu_time = 0
-        # print(i)
-        # print(ids)
-        # print(f"len ids : {len(ids)}")
-        # print(f"len(events): {len(events)}")
-        # print(f"i: {i}")
-        iteration_start = time.perf_counter()
-
-        event = events[i]
-        time_event = FUP_tis[i]
-        # print(event)
-
-        #if event == 0:
-        if event ==0:
-            
-            id_index = np.random.randint(0,len(ids))
-            ids = np.delete(ids,id_index) 
-            # wce_mat_current = np.array(wce_mat)[ids]
-            # print(wce_mat_current.shape)
-        else:
-            # gpu_matching(wce_mat, time_event)
-            # print(wce_mat)
-            # print(ids)
-            wce_mat_current = wce_mat[:,ids]
-
-            
-            # print(a)
-            # print(wce_mat_current.shape)
-            # print(f"current wce_mat shape  : {wce_mat_current.shape}")
-            # print(wce_mat_current.shape)
-            # probas = cpu_matching(wce_mat_current, time_event,HR_target)
-
-            data_modif_start = time.perf_counter()
-            wce_mat_current = wce_mat_current.astype(np.float32, copy=False)
-            wce_mat_current_field = ti.field(float, wce_mat_current.shape)
-            wce_mat_current_field.from_numpy(wce_mat_current)
-            probas_gpu = ti.field(float,(wce_mat_current_field.shape[1]))
-
-            data_modif_end = time.perf_counter()
-            elapsed_data_modif_time = data_modif_end - data_modif_start
-            print(f"data_modif time= {elapsed_data_modif_time}")
-           
-            @ti.kernel
-            def gpu_matching(time_event: int, HR_target:float ) -> float:
-
-                # sum_proba: ti.float64
-                sum_proba = 0.0
-                for i in range(wce_mat_current_field.shape[1]):
-                    # print(tm.exp(HR_target * wce_mat_current_field[time_event,i]))
-                    sum_proba += tm.exp(HR_target * wce_mat_current_field[time_event,i])       
-                # print(sum_proba)   
-                # print(1)     
-
-                for i in range(wce_mat_current_field.shape[1]):
-                    probas_gpu[i] = tm.exp(HR_target * wce_mat_current_field[time_event,i])/sum_proba
-                return sum_proba
-            
-            gpu_start = time.perf_counter()
-            sum_proba = gpu_matching(time_event,HR_target)
-            gpu_end = time.perf_counter()
-
-            elapsed_gpu_time = gpu_end - gpu_start
-            # print(elapsed_gpu_time)
-            print(elapsed_gpu_time)
-            
-            gpu_time += elapsed_gpu_time
-            
-
-           
-            probas = probas_gpu.to_numpy()
-            # print(f"GPU_sum : {sum_proba}")
-            # probas = probas.reshape(len(ids))
-        
-
-            # print(probas)
-            # print(probas.shape)
-            # print(ids.shape)
-       
-
-
-            id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
-            # print("OK")
-            ids = np.delete(ids,id_index) 
-            # id_index = np.random.randint(0,len(ids))
-            # ids = np.delete(ids,id_index) 
-
-        iteration_end = time.perf_counter()
-        elapsed_iteration = iteration_end - iteration_start 
-        print(f"unparallelized iteration = {elapsed_iteration - elapsed_gpu_time}")
-    print(f"Time in gpu :{gpu_time}")
-
-
-    return gpu_time
-
 def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
-#wce_mat:np.matrix,
     
     cpu_time = 0
     
@@ -420,52 +192,31 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
     event_censor_end = time.perf_counter()
     elapsed_event_censor = event_censor_end - event_censor_start
-    # print(f"event_censor time : {elapsed_event_censor}")
 
     wce_id_indexes = []
     
-    # print(events)
-    # print(FUP_tis)
 
     ids = np.arange(0,n_patients, dtype = int)
     
     
     for i in range(n_patients):
         iteration_start = time.perf_counter()
-        # if i%int(n_patients/20)== 0:
-        #     print(i)
-        # print(i)
-        # print(ids)
-        # print(f"len ids : {len(ids)}")
-        # print(f"len(events): {len(events)}")
-        # print(f"i: {i}")
-
         event = events[i]
         time_event = FUP_tis[i]
-        # print(event)
 
-        #if event == 0:
         if event ==0:
             
             id_index = np.random.randint(0,len(ids))
+            wce_id = ids[id_index]
             ids = np.delete(ids,id_index) 
 
-            elapsed_cpu_time = 0
-            # wce_mat_current = np.array(wce_mat)[ids]
-            # print(wce_mat_current.shape)
-        else:
-            # gpu_matching(wce_mat, time_event)
-            # print(wce_mat)
-            # print(ids)
-            wce_mat_current = wce_mat[:,ids]
-
             
-            # print(a)
-            # print(wce_mat_current.shape)
-            # print(f"current wce_mat shape  : {wce_mat_current.shape}")
-            # print(wce_mat_current.shape)
-            # probas = cpu_matching(wce_mat_current, time_event,HR_target)
 
+            elapsed_cpu_time = 0
+
+        else:
+
+            wce_mat_current = wce_mat[:,ids]
 
             
             cpu_start = time.perf_counter()
@@ -473,36 +224,25 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
             cpu_end = time.perf_counter()
 
             elapsed_cpu_time = cpu_end - cpu_start
-            # print(elapsed_cpu_time)
             
             cpu_time += elapsed_cpu_time
-            # print(f"Time in cpu :{elapsed_cpu_time}")
-            
 
-           
-            # print(f"GPU_sum : {sum_proba}")
-            # probas = probas.reshape(len(ids))
-        
-
-            # print(probas)
-            # print(probas.shape)
-            # print(ids.shape)
        
 
 
             id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
-            # print("OK")
+            wce_id = ids[id_index]
             ids = np.delete(ids,id_index) 
-            # id_index = np.random.randint(0,len(ids))
-            # ids = np.delete(ids,id_index) 
-        wce_id_indexes.append(id_index)
+
+        wce_id_indexes.append(wce_id)
 
             
 
         
         iteration_end = time.perf_counter()
         elapsed_iteration = iteration_end - iteration_start 
-        # print(f"unparallelized iteration = {elapsed_iteration - elapsed_cpu_time}")
+
+    wce_id_indexes = np.array(wce_id_indexes)
 
     
 
@@ -537,16 +277,41 @@ def get_dataset(Xmat, wce_mat, HR_target):
 
     start_dataset_time = time.perf_counter()
 
-    start = True
+    
 
+    #### intialization matrix
+
+    patient_index = 0
+
+
+
+    fu_patient = df_event[df_event ["patient_id"] == patient_index]["FUP_ti"].item()
+    event_patient = df_event[df_event ["patient_id"] == patient_index]["event"].item()
+
+    if event_patient == 0:
+        event_vec = np.append(np.zeros(fu_patient-1),1)
+    else:
+        event_vec = np.zeros(fu_patient)
+    # print(event_vec)
+        
+    id_dose = wce_id_indexes[patient_index]
+
+    data = Xmat[:fu_patient,id_dose].flatten()
+    data_vector = np.array([data[:,i].item() for i in range(data.shape[1])])
     
+    data_frame_matrix = np.vstack([np.repeat(patient_index,fu_patient),
+                                  np.arange(fu_patient),
+                                  np.arange(1,fu_patient+1),
+                                  event_vec,
+                                  data_vector]).transpose()
+        
     
-    for patient_index in range(len(wce_id_indexes)):
+    for patient_index in range(1,len(wce_id_indexes)):
         fu_patient = df_event[df_event ["patient_id"] == patient_index]["FUP_ti"].item()
         event_patient = df_event[df_event ["patient_id"] == patient_index]["event"].item()
 
         if event_patient == 0:
-            event_vec = np.append(np.zeros(fu_patient-1),1)
+            event_vec = np.append(np.zeros(fu_patient-1, dtype = int),1)
         else:
             event_vec = np.zeros(fu_patient)
         # print(event_vec)
@@ -574,11 +339,8 @@ def get_dataset(Xmat, wce_mat, HR_target):
                                       data_vector]
                                       ).transpose()
         
-        if start == True: 
-            data_frame_matrix = new_data_frame_matrix
-            start = False
-        else: 
-            data_frame_matrix = np.vstack([data_frame_matrix,new_data_frame_matrix])
+
+        data_frame_matrix = np.vstack([data_frame_matrix,new_data_frame_matrix])
         
 
  
@@ -590,6 +352,8 @@ def get_dataset(Xmat, wce_mat, HR_target):
     df_wce= pd.DataFrame(data_frame_matrix,
                             columns = ["patient","start","stop","event","dose"]
                             )
+    
+    print(df_wce)
     
         
         
@@ -611,8 +375,138 @@ def get_dataset(Xmat, wce_mat, HR_target):
     # for patient_index in range(len(wce_id_indexes)):
     #     event_patient = 
 
+def get_dataset_gpu(Xmat, wce_mat, HR_target):
+
+    max_time,n_patients = wce_mat.shape[0], wce_mat.shape[1]
+    print(max_time)
+    print(n_patients)
+    wce_id_indexes, events, FUP_tis = cpu_matching_algo(wce_mat, max_time,n_patients, HR_target=1.5) # wce_mat
+    
+    df_wce = pd.DataFrame()
+    df_Xmat = pd.DataFrame(Xmat)
+
+    # print(events)
+    print(wce_id_indexes)
+    ordered_events = np.array(events)[wce_id_indexes]
+    ordered_FUP_tis = np.array(FUP_tis)[wce_id_indexes]
+    # print(ordered_events)
 
 
+    data_event = np.vstack([np.arange(n_patients),
+                             events,
+                             FUP_tis]).transpose()
+    
+    print(data_event)
+    print("total_time : ", FUP_tis.sum())
+
+    df_event = pd.DataFrame(data_event,
+                             columns = ["patient_id","event","FUP_ti"])
+    
+
+    start_dataset_time = time.perf_counter()
+
+    
+    ti.init(arch = "gpu")
+
+    data_field = ti.field(dtype=ti.i64, shape=(FUP_tis.sum(),5))
+    print(data_field)
+
+    Xmat_transposed = Xmat.transpose()
+
+    # print(Xmat_transposed)
+
+
+
+    times= np.arange(1,max_time+1)
+    print(times)
+
+
+
+    # @ti.func
+
+    # id_and_times = ti.Vector(np.[list(range(n_patients)), list(range(max_time))])
+
+
+    patient_time_field= ti.field(dtype=int, shape=(n_patients, max_time))
+
+    print("###################")
+    print(FUP_tis)
+    print(wce_id_indexes)
+    print("###################")
+
+    print(wce_id_indexes.dtype)
+
+    print(Xmat)
+    print(Xmat[1,2])
+
+
+
+
+
+
+
+    print(FUP_tis)
+    # ["patient","start","stop","event","dose"]
+
+
+    @ti.kernel
+    def iteration_dataset(ordered_events:ti.types.ndarray() ,ordered_FUP_tis:ti.types.ndarray(), 
+                          wce_id_indexes:ti.types.ndarray(), Xmat_transposed:ti.types.ndarray()
+                          ):#, Xmat_transposed:ti.types.ndarray()):
+        print("GPU KERNEL")
+
+        line = 0 
+
+        for patient_id, time in patient_time_field:
+            # print(patient_index, time)
+            # print(patient_id)
+            # print(time)
+
+            event = ordered_events[patient_id]
+            b= ordered_FUP_tis[patient_id]
+            
+
+
+            if time < ordered_FUP_tis[patient_id]:
+
+                patient = patient_id
+                event = 0
+                dose = Xmat_transposed[patient_id,time]
+                time_start = time
+                time_stop = time +1 
+
+                data_field[line,0] = patient_id
+                data_field[line,1] = 0
+                data_field[line,2] = Xmat_transposed[patient_id,time]
+                data_field[line,3] = time
+                data_field[line,4] = time +1 
+            
+                line += 1 
+
+
+
+
+            elif time == ordered_FUP_tis[patient_id]:
+                patient = patient_id
+                event = ordered_events[patient_id]
+                dose = Xmat_transposed[patient_id,time]
+                time_start = time
+                time_stop = time +1 
+
+                data_field[line,0] = patient_id
+                data_field[line,1] = 0
+                data_field[line,2] = Xmat_transposed[patient_id,time]
+                data_field[line,3] = time
+                data_field[line,4] = time +1 
+            
+                line += 1 
+
+    iteration_dataset(ordered_events,ordered_FUP_tis,wce_id_indexes,Xmat_transposed)
+
+
+
+    
+    return data_field.to_numpy()
             
 ########################################################""
      
@@ -661,7 +555,7 @@ def get_dataset(Xmat, wce_mat, HR_target):
 
 ############## Real ones 
 
-n_patients = 10000
+n_patients = 1000
 max_time = 365
 cutoff = 180
 
@@ -693,7 +587,7 @@ start_cpu_time = time.perf_counter()
 
 # wce_id_indexes, events, FUP_tis = cpu_matching_algo(wce_mat, max_time,n_patients, HR_target=1.5) # wce_mat
 
-df_wce = get_dataset(Xmat, wce_mat, 1.5)
+numpy_wce = get_dataset_gpu(Xmat, wce_mat, 1.5)
 
 end_cpu_time = time.perf_counter()
 
@@ -701,6 +595,13 @@ elapsed_cpu_total_time = end_cpu_time - start_cpu_time
 
 # print(f"time in rest program : {elapsed_cpu_total_time - cpu_time}")
 print(f"total time cpu matching algo : {elapsed_cpu_total_time}")
+
+df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
+
+print(df_wce)
+
+
+
 
 df_wce.to_csv("test_df")
 
