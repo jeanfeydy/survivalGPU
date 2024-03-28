@@ -255,7 +255,8 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     wce_id_indexes = []
     
 
-    ids = np.arange(0,n_patients, dtype = int)
+    ids = torch.arange(0,n_patients, dtype = int)
+    print(ids)
 
 
     gpu_time = 0
@@ -302,9 +303,9 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
             torch_time_start = time.perf_counter()
             wce_mat_current_torch = wce_mat_torch[:,ids]
-            wce_mat_current_torch.to("cpu")
-            wce_mat_current = wce_mat_current_torch.numpy()
             torch_time_stop = time.perf_counter()
+            wce_mat_current_torch = wce_mat_current_torch.to("cpu")
+            wce_mat_current = wce_mat_current_torch.numpy()
             elapsed_torch_time = torch_time_stop - torch_time_start
 
             torch_time += elapsed_torch_time            
@@ -679,7 +680,7 @@ def torch_get_dataset_gpu(Xmat, wce_mat, HR_target):
     
     return filtered_data, elapsed_matching_time, elapsed_dataset_time   
 
-n_patients = 1000
+n_patients = 10000
 max_time = 365
 cutoff = 180
 HR_target = 1.5
