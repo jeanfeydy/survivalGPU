@@ -99,7 +99,7 @@ def event_censor_generation(max_time, n_patients, censoring_ratio):
     # TODO patients that are not censored
     censorRandom = np.round(np.random.uniform(low = 1, high = max_time* int(1/censoring_ratio), size = n_patients)).astype(int)
 
-    event = [1 if eventRandom[i]< censorRandom[i] else 0 for i in range(len(eventRandom))]
+    event = np.array([1 if eventRandom[i]< censorRandom[i] else 0 for i in range(len(eventRandom))])
     FUP_Ti = np.minimum(eventRandom,censorRandom)
 
 
@@ -120,14 +120,14 @@ def cpu_matching(wce_mat_current,time_event, HR_target ):
    
 
     probas = np.array(np.exp(HR_target * wce_mat_current[time_event -1,])/np.sum(np.exp(HR_target * wce_mat_current[time_event -1,])))
-
-    return probas.reshape(probas.shape[1])
+    return probas
 
 
 
 def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     
     cpu_time = 0
+    total_checking_choice = 0
     
     event_censor_start = time.perf_counter()
     events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
@@ -138,9 +138,14 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     
 
     ids = np.arange(0,n_patients, dtype = int)
+
+
     
     
     for i in range(n_patients):
+        if i % (n_patients/20) == 0:
+            print(i)
+        
         iteration_start = time.perf_counter()
         event = events[i]
         time_event = FUP_tis[i]
@@ -157,7 +162,39 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
         else:
 
-            wce_mat_current = wce_mat[:,ids]
+            # print(type(wce_mat))
+            
+            checking_start = time.perf_counter()
+
+    
+
+            wce_mat_current_field = ti.field(dtype=ti.f64, shape =(max_time, ids.shape[0]))
+
+            # print(wce_mat_current_field.shape)
+
+            @ti.kernel
+            def generate_current_mat(ids:ti.types.ndarray(), wce_mat:ti.types.ndarray()):
+                for i, j in wce_mat_current_field:
+                    wce_mat_current_field[i,j] = wce_mat[i,ids[j]]
+
+            generate_current_mat(ids, wce_mat)
+
+            wce_mat_current = wce_mat_current_field.to_numpy()
+   
+            # wce_mat_current = wce_mat_current_old
+
+            # wce_mat_current = wce_mat
+
+            # print()
+            # print(wce_mat.transpose())
+            # print()
+            # print(wce_mat_current)
+
+            # @ti.kernel
+
+            checking_end = time.perf_counter()
+
+            
 
             
             cpu_start = time.perf_counter()
@@ -167,13 +204,24 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
             elapsed_cpu_time = cpu_end - cpu_start
             
             cpu_time += elapsed_cpu_time
+            
 
        
-
+            
 
             id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
+
+            
+
+
+            
+
             wce_id = ids[id_index]
             ids = np.delete(ids,id_index) 
+
+            elapsed_checking_time = checking_end - checking_start
+            total_checking_choice += elapsed_checking_time
+
 
         wce_id_indexes.append(wce_id)
 
@@ -185,8 +233,8 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
     wce_id_indexes = np.array(wce_id_indexes)
 
-    
-
+    print("cpu_time :",cpu_time)
+    print("checking: ",total_checking_choice )
 
     
 
@@ -402,9 +450,10 @@ def get_dataset_gpu(Xmat, wce_mat, HR_target):
     return filtered_data, elapsed_matching_time, elapsed_dataset_time         
 
 
-n_patients = 10000
+n_patients = 1000
 max_time = 365
-cutoff = 180
+cutoff = 1
+HR_target = 1.5
 
 Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
 
@@ -413,6 +462,14 @@ scenario= "exponential_scenario"
 
 wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff, max_time= max_time)
 
+# start_matching_time = time.perf_counter()
+
+# wce_id_indexes, events, FUP_tis = cpu_matching_algo(wce_mat, max_time, n_patients, HR_target)
+
+# end_matching_time = time.perf_counter()
+# elapsed_matching_time = end_matching_time - start_matching_time 
+
+# print(f"total mathing_time  : {elapsed_matching_time}")
 
 
 
@@ -442,7 +499,7 @@ if cpu_benchmark == True:
 
 print("GPU BENCHMARK")
 
-ti.init(arch=ti.cpu)
+ti.init(arch=ti.gpu)
 
 start_cpu_time = time.perf_counter()
 
