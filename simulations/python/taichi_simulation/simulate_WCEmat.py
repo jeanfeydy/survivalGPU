@@ -123,12 +123,6 @@ def cpu_matching(wce_mat_current,time_event, HR_target ):
     probas = np.array(np.exp(HR_target * wce_mat_current[time_event -1,])/np.sum(np.exp(HR_target * wce_mat_current[time_event -1,])))
     return probas.reshape(probas.shape[1])
 
-def torch_matching(wce_mat_current,time_event, HR_target ):
-
-   
-
-    probas = np.array(np.exp(HR_target * wce_mat_current[time_event -1,])/np.sum(np.exp(HR_target * wce_mat_current[time_event -1,])))
-    return probas #.reshape(probas.shape[1])
 
 
 def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
@@ -238,6 +232,12 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     return wce_id_indexes, events, FUP_tis
 
 
+def torch_matching(wce_mat_current,time_event, HR_target ):
+
+   
+
+    
+    return probas #.reshape(probas.shape[1])
 
 
 def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
@@ -255,7 +255,7 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     wce_id_indexes = []
     
 
-    ids = torch.arange(0,n_patients, dtype = int)
+    ids = torch.arange(0,n_patients, dtype = int).to(device)
     print(ids)
 
 
@@ -304,8 +304,6 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
             torch_time_start = time.perf_counter()
             wce_mat_current_torch = wce_mat_torch[:,ids]
             torch_time_stop = time.perf_counter()
-            wce_mat_current_torch = wce_mat_current_torch.to("cpu")
-            wce_mat_current = wce_mat_current_torch.numpy()
             elapsed_torch_time = torch_time_stop - torch_time_start
 
             torch_time += elapsed_torch_time            
@@ -314,9 +312,19 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
             
 
+
             
             cpu_start = time.perf_counter()
-            probas = torch_matching(wce_mat_current,time_event,HR_target)
+    
+            # Calculate the exponent part
+            exp_vals = torch.exp(HR_target * wce_mat_current_torch[time_event - 1,])
+
+            # Calculate the sum of the exponentials for normalization
+            exp_sum = torch.sum(exp_vals)
+            proba_torch = exp_vals/exp_sum
+
+            # print(proba_torch)
+            # quit()
             cpu_end = time.perf_counter()
 
             elapsed_cpu_time = cpu_end - cpu_start
@@ -327,15 +335,18 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
        
             
 
-            id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
+ 
+            id_index_torch = torch.multinomial(proba_torch,1).item()
+
+
 
             
 
 
             
 
-            wce_id = ids[id_index]
-            ids = np.delete(ids,id_index) 
+            wce_id = ids[id_index_torch]
+            ids = np.delete(ids,id_index_torch) 
 
             elapsed_checking_time = checking_end - checking_start
             total_checking_choice += elapsed_checking_time
