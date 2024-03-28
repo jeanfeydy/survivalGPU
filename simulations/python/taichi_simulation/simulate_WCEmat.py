@@ -120,8 +120,7 @@ def cpu_matching(wce_mat_current,time_event, HR_target ):
    
 
     probas = np.array(np.exp(HR_target * wce_mat_current[time_event -1,])/np.sum(np.exp(HR_target * wce_mat_current[time_event -1,])))
-    return probas
-
+    return probas.reshape(probas.shape[1])
 
 
 def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
@@ -138,6 +137,10 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     
 
     ids = np.arange(0,n_patients, dtype = int)
+
+
+    gpu_time = 0
+    numpy_time = 0
 
 
     
@@ -162,35 +165,17 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
         else:
 
-            # print(type(wce_mat))
             
             checking_start = time.perf_counter()
 
-    
 
-            wce_mat_current_field = ti.field(dtype=ti.f64, shape =(max_time, ids.shape[0]))
 
-            # print(wce_mat_current_field.shape)
+            numpy_time_start = time.perf_counter()
+            wce_mat_current = wce_mat[:,ids]
+            numpy_time_stop = time.perf_counter()
+            elapsed_numpy_time = numpy_time_stop - numpy_time_start
 
-            @ti.kernel
-            def generate_current_mat(ids:ti.types.ndarray(), wce_mat:ti.types.ndarray()):
-                for i, j in wce_mat_current_field:
-                    wce_mat_current_field[i,j] = wce_mat[i,ids[j]]
-
-            generate_current_mat(ids, wce_mat)
-
-            wce_mat_current = wce_mat_current_field.to_numpy()
-   
-            # wce_mat_current = wce_mat_current_old
-
-            # wce_mat_current = wce_mat
-
-            # print()
-            # print(wce_mat.transpose())
-            # print()
-            # print(wce_mat_current)
-
-            # @ti.kernel
+            numpy_time += elapsed_numpy_time
 
             checking_end = time.perf_counter()
 
@@ -233,7 +218,8 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
     wce_id_indexes = np.array(wce_id_indexes)
 
-    print("cpu_time :",cpu_time)
+    print("gpu_time :",gpu_time)
+    print("numpy_time: ",numpy_time )
     print("checking: ",total_checking_choice )
 
     
@@ -450,9 +436,9 @@ def get_dataset_gpu(Xmat, wce_mat, HR_target):
     return filtered_data, elapsed_matching_time, elapsed_dataset_time         
 
 
-n_patients = 1000
+n_patients = 10000
 max_time = 365
-cutoff = 1
+cutoff = 180
 HR_target = 1.5
 
 Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
