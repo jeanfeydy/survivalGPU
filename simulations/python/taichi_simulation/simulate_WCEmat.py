@@ -123,6 +123,13 @@ def cpu_matching(wce_mat_current,time_event, HR_target ):
     probas = np.array(np.exp(HR_target * wce_mat_current[time_event -1,])/np.sum(np.exp(HR_target * wce_mat_current[time_event -1,])))
     return probas.reshape(probas.shape[1])
 
+def torch_matching(wce_mat_current,time_event, HR_target ):
+
+   
+
+    probas = np.array(np.exp(HR_target * wce_mat_current[time_event -1,])/np.sum(np.exp(HR_target * wce_mat_current[time_event -1,])))
+    return probas #.reshape(probas.shape[1])
+
 
 def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     
@@ -231,6 +238,8 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     return wce_id_indexes, events, FUP_tis
 
 
+
+
 def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -283,16 +292,18 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
 
 
-            numpy_time_start = time.perf_counter()
-            wce_mat_current = wce_mat[:,ids]
-            numpy_time_stop = time.perf_counter()
-            elapsed_numpy_time = numpy_time_stop - numpy_time_start
+            # numpy_time_start = time.perf_counter()
+            # wce_mat_current_cpu = wce_mat[:,ids]
+            # numpy_time_stop = time.perf_counter()
+            # elapsed_numpy_time = numpy_time_stop - numpy_time_start
 
-            numpy_time += elapsed_numpy_time
+            # numpy_time += elapsed_numpy_time
 
 
             torch_time_start = time.perf_counter()
             wce_mat_current_torch = wce_mat_torch[:,ids]
+            wce_mat_current_torch.to("cpu")
+            wce_mat_current = wce_mat_current_torch.numpy()
             torch_time_stop = time.perf_counter()
             elapsed_torch_time = torch_time_stop - torch_time_start
 
@@ -304,7 +315,7 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
             
             cpu_start = time.perf_counter()
-            probas = cpu_matching(wce_mat_current,time_event,HR_target)
+            probas = torch_matching(wce_mat_current,time_event,HR_target)
             cpu_end = time.perf_counter()
 
             elapsed_cpu_time = cpu_end - cpu_start
@@ -664,7 +675,6 @@ def torch_get_dataset_gpu(Xmat, wce_mat, HR_target):
     data_numpy = data_field.to_numpy()
 
     filtered_data = data_numpy[~np.all(data_numpy == 0, axis=1)]
-    filtered_data = data_numpy
 
     
     return filtered_data, elapsed_matching_time, elapsed_dataset_time   
@@ -703,7 +713,7 @@ if cpu_benchmark == True:
 
     # wce_id_indexes, events, FUP_tis = cpu_matching_algo(wce_mat, max_time,n_patients, HR_target=1.5) # wce_mat
 
-    numpy_wce, elapsed_matching_time, elapsed_dataset_time = get_dataset(Xmat, wce_mat, 1.5)
+    numpy_wce, elapsed_matching_time, elapsed_dataset_time = get_dataset_gpu(Xmat, wce_mat, 1.5)
 
     end_cpu_time = time.perf_counter()
 
