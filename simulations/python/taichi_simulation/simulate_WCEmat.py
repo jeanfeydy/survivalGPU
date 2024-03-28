@@ -232,12 +232,6 @@ def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     return wce_id_indexes, events, FUP_tis
 
 
-def torch_matching(wce_mat_current,time_event, HR_target ):
-
-   
-
-    
-    return probas #.reshape(probas.shape[1])
 
 
 def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
@@ -255,7 +249,7 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     wce_id_indexes = []
     
 
-    ids = torch.arange(0,n_patients, dtype = int).to(device)
+    ids = np.arange(0,n_patients, dtype = int)
     print(ids)
 
 
@@ -323,6 +317,8 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
             exp_sum = torch.sum(exp_vals)
             proba_torch = exp_vals/exp_sum
 
+            probas = np.array(proba_torch.cpu())
+
             # print(proba_torch)
             # quit()
             cpu_end = time.perf_counter()
@@ -336,17 +332,17 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
             
 
  
-            id_index_torch = torch.multinomial(proba_torch,1).item()
+            # id_index_torch = torch.multinomial(proba_torch,1).item()
 
 
 
             
 
 
-            
+            id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
 
-            wce_id = ids[id_index_torch]
-            ids = np.delete(ids,id_index_torch) 
+            wce_id = ids[id_index]
+            ids = np.delete(ids,id_index) 
 
             elapsed_checking_time = checking_end - checking_start
             total_checking_choice += elapsed_checking_time
@@ -691,7 +687,7 @@ def torch_get_dataset_gpu(Xmat, wce_mat, HR_target):
     
     return filtered_data, elapsed_matching_time, elapsed_dataset_time   
 
-n_patients = 10000
+n_patients = 100000
 max_time = 365
 cutoff = 180
 HR_target = 1.5
