@@ -232,11 +232,12 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     event_censor_end = time.perf_counter()
     elapsed_event_censor = event_censor_end - event_censor_start
 
-    wce_id_indexes = []
     
 
-    ids = np.arange(0,n_patients, dtype = int)
-    print(ids)
+    # ids = np.arange(0,n_patients, dtype = int)
+    ids_torch = torch.arange(0,n_patients, dtype = int).to(device)
+    wce_id_indexes = torch.zeros(len(ids_torch),dtype = int).to(device)
+
 
 
     gpu_time = 0
@@ -256,11 +257,13 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
         event = events[i]
         time_event = FUP_tis[i]
 
-        if event ==0:
+        if event == 0:
             
-            id_index = np.random.randint(0,len(ids))
-            wce_id = ids[id_index]
-            ids = np.delete(ids,id_index) 
+            # id_index = np.random.randint(0,len(ids))
+            id_index = torch.randint(0,len(ids_torch),(1,))
+            wce_id = ids_torch[id_index]
+            ids_torch = ids_torch[ids_torch != wce_id]
+            # ids = np.delete(ids,id_index) 
 
             
 
@@ -283,7 +286,7 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
             torch_time_start = time.perf_counter()
             # ids =  torch.from_numpy(ids).to(device)
-            wce_mat_current_torch = wce_mat_torch[:,ids]
+            wce_mat_current_torch = wce_mat_torch[:,ids_torch]
             torch_time_stop = time.perf_counter()
             elapsed_torch_time = torch_time_stop - torch_time_start
 
@@ -304,7 +307,7 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
             exp_sum = torch.sum(exp_vals)
             proba_torch = exp_vals/exp_sum
 
-            probas = np.array(proba_torch.cpu())
+            # probas = np.array(proba_torch.cpu())
 
             # print(proba_torch)
             # quit()
@@ -326,16 +329,20 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
             
 
 
-            id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
+            # id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
 
-            wce_id = ids[id_index]
-            ids = np.delete(ids,id_index) 
+
+            id_index = torch.multinomial(input = proba_torch, num_samples= 1)
+
+            wce_id = ids_torch[id_index]
+            # ids = np.delete(ids,id_index) 
+            ids_torch = ids_torch[ids_torch != wce_id]
 
             elapsed_checking_time = checking_end - checking_start
             total_checking_choice += elapsed_checking_time
 
 
-        wce_id_indexes.append(wce_id)
+        wce_id_indexes[i] = wce_id
 
             
 
@@ -343,7 +350,8 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
         iteration_end = time.perf_counter()
         elapsed_iteration = iteration_end - iteration_start 
 
-    wce_id_indexes = np.array(wce_id_indexes)
+    wce_id_indexes = np.array(wce_id_indexes.to("cpu"))
+    print()
 
     print("gpu_time :",gpu_time)
     print("numpy_time: ",numpy_time )
@@ -373,6 +381,9 @@ def torch_get_dataset_gpu(Xmat, wce_mat, HR_target):
     elapsed_matching_time = end_matching_time - start_matching_time
 
     start_dataset_time = time.perf_counter()
+
+
+    print(wce_id_indexes)
 
 
     # print(events)
