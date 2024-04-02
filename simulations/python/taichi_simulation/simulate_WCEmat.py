@@ -4,6 +4,9 @@ import pandas as pd
 import taichi as ti
 import taichi.math as tm
 import torch
+import torchvision.models as models
+from torch.profiler import profile, record_function, ProfilerActivity
+
 
 import time
 
@@ -279,7 +282,7 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
 
             torch_time_start = time.perf_counter()
-            ids =  torch.from_numpy(ids).to(device)
+            # ids =  torch.from_numpy(ids).to(device)
             wce_mat_current_torch = wce_mat_torch[:,ids]
             torch_time_stop = time.perf_counter()
             elapsed_torch_time = torch_time_stop - torch_time_start
@@ -465,7 +468,7 @@ def torch_get_dataset_gpu(Xmat, wce_mat, HR_target):
     
     return filtered_data, elapsed_matching_time, elapsed_dataset_time   
 
-n_patients = 1000
+n_patients = 10
 max_time = 365
 cutoff = 180
 HR_target = 1.5
@@ -520,7 +523,10 @@ start_cpu_time = time.perf_counter()
 
 # wce_id_indexes, events, FUP_tis = cpu_matching_algo(wce_mat, max_time,n_patients, HR_target=1.5) # wce_mat
 
-numpy_wce, elapsed_matching_time, elapsed_dataset_time = torch_get_dataset_gpu(Xmat, wce_mat, 1.5)
+with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+    numpy_wce, elapsed_matching_time, elapsed_dataset_time = torch_get_dataset_gpu(Xmat, wce_mat, 1.5)
+
+prof.export_chrome_trace("trace.json")
 
 end_cpu_time = time.perf_counter()
 
