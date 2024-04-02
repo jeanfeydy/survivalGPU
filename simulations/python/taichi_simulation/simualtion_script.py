@@ -14,7 +14,7 @@ import simulate_WCEmat
 
 ti.init(arch=ti.cpu)
 
-n_patients_list = [100,200,500,1000,2000,5000,10000,20000,50000,100000]
+n_patients_list = [100,200,500,1000] #[100,200,500,1000,2000,5000,10000,20000,50000,100000]
 max_time = 365
 cutoff = 180
 HR_target = 1.5
@@ -49,10 +49,18 @@ for n_patients in n_patients_list:
 
     print(f"The simulation for {n_patients} patients took: {computation_times}s")
 
-df_computation_times = pd.DataFrame([n_patients,computation_times], columns = ["n_patients", "computation_times"])
+# print(np.array[np.array(n_patients),np.array(computation_times))
+    
 
 
+data = np.array([n_patients_list,computation_times]).transpose()
+print(data.shape)
 
+
+print(data)
+
+df_computation_times = pd.DataFrame(data, columns = ["n_patients", "computation_times"])
+df_computation_times.to_csv("computation_times_results")
 
 
 
