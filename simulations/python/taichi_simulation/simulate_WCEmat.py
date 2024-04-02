@@ -74,17 +74,6 @@ def generate_wce_mat(scenario_name, Xmat, cutoff, max_time):
     return wce_mat
 
 
-def matching(wce_mat: np.matrix):
-    """
-    This is the matr
-    """
-    n_patients = wce_mat.shape[1]
-
-
-
-
-    return np.array(times_event_0), np.array(times_event_1)
-
 def event_censor_generation(max_time, n_patients, censoring_ratio):
     """
     This function generate random event and censoring times 
@@ -110,139 +99,20 @@ def event_censor_generation(max_time, n_patients, censoring_ratio):
     return event, FUP_Ti
 
 
-
-  
-
-    
-def cpu_matching(wce_mat_current,time_event, HR_target ):
-    
-    event_censor_start = time.perf_counter()
-    events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
-    event_censor_end = time.perf_counter()
-    elapsed_event_censor = event_censor_end - event_censor_start
-
-    wce_id_indexes = []
-    
-
-    ids = np.arange(0,n_patients, dtype = int)
-
-
-    gpu_time = 0
-    numpy_time = 0
-
-
-    
-    
-    for i in range(n_patients):
-        if i % (n_patients/20) == 0:
-            print(i)
-        
-        iteration_start = time.perf_counter()
-        event = events[i]
-        time_event = FUP_tis[i]
-
-        if event ==0:
-            
-            id_index = np.random.randint(0,len(ids))
-            wce_id = ids[id_index]
-            ids = np.delete(ids,id_index) 
-
-            
-
-            elapsed_cpu_time = 0
-
-        else:
-
-            
-            checking_start = time.perf_counter()
-
-
-
-            numpy_time_start = time.perf_counter()
-            wce_mat_current = wce_mat[:,ids]
-            numpy_time_stop = time.perf_counter()
-            elapsed_numpy_time = numpy_time_stop - numpy_time_start
-
-            numpy_time += elapsed_numpy_time
-
-            checking_end = time.perf_counter()
-
-            
-
-            
-            cpu_start = time.perf_counter()
-            probas = cpu_matching(wce_mat_current,time_event,HR_target)
-            cpu_end = time.perf_counter()
-
-            elapsed_cpu_time = cpu_end - cpu_start
-            
-            cpu_time += elapsed_cpu_time
-            
-
-       
-            
-
-            id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
-
-            
-
-
-            
-
-            wce_id = ids[id_index]
-            ids = np.delete(ids,id_index) 
-
-            elapsed_checking_time = checking_end - checking_start
-            total_checking_choice += elapsed_checking_time
-
-
-        wce_id_indexes.append(wce_id)
-
-            
-
-        
-        iteration_end = time.perf_counter()
-        elapsed_iteration = iteration_end - iteration_start 
-
-    wce_id_indexes = np.array(wce_id_indexes)
-
-    print("gpu_time :",gpu_time)
-    print("numpy_time: ",numpy_time )
-    print("checking: ",total_checking_choice )
-
-    
-
-    
-
-
-    return wce_id_indexes, events, FUP_tis
-
-
-
-
-def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
+def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    cpu_time = 0
     total_checking_choice = 0
     
-    event_censor_start = time.perf_counter()
     events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
-    event_censor_end = time.perf_counter()
-    elapsed_event_censor = event_censor_end - event_censor_start
 
-    
 
-    # ids = np.arange(0,n_patients, dtype = int)
     ids_torch = torch.arange(0,n_patients, dtype = int).to(device)
     wce_id_indexes = torch.zeros(len(ids_torch),dtype = int).to(device)
 
 
 
-    gpu_time = 0
-    numpy_time = 0
-    torch_time = 0
 
 
     wce_mat_torch = torch.from_numpy(wce_mat).to(device)
@@ -253,114 +123,33 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
         if i % (n_patients/20) == 0:
             print(i)
         
-        iteration_start = time.perf_counter()
+     
         event = events[i]
         time_event = FUP_tis[i]
 
         if event == 0:
             
-            # id_index = np.random.randint(0,len(ids))
             id_index = torch.randint(0,len(ids_torch),(1,))
             wce_id = ids_torch[id_index]
             ids_torch = ids_torch[ids_torch != wce_id]
-            # ids = np.delete(ids,id_index) 
 
-            
-
-            elapsed_cpu_time = 0
 
         else:
 
-            
-            checking_start = time.perf_counter()
-
-
-
-            # numpy_time_start = time.perf_counter()
-            # wce_mat_current_cpu = wce_mat[:,ids]
-            # numpy_time_stop = time.perf_counter()
-            # elapsed_numpy_time = numpy_time_stop - numpy_time_start
-
-            # numpy_time += elapsed_numpy_time
-
-
-            torch_time_start = time.perf_counter()
-            # ids =  torch.from_numpy(ids).to(device)
             wce_mat_current_torch = wce_mat_torch[:,ids_torch]
-            torch_time_stop = time.perf_counter()
-            elapsed_torch_time = torch_time_stop - torch_time_start
-
-            torch_time += elapsed_torch_time            
-
-            checking_end = time.perf_counter()
-
-            
-
-
-            
-            cpu_start = time.perf_counter()
-    
-            # Calculate the exponent part
             exp_vals = torch.exp(HR_target * wce_mat_current_torch[time_event - 1,])
-
-            # Calculate the sum of the exponentials for normalization
             exp_sum = torch.sum(exp_vals)
             proba_torch = exp_vals/exp_sum
-
-            # probas = np.array(proba_torch.cpu())
-
-            # print(proba_torch)
-            # quit()
-            cpu_end = time.perf_counter()
-
-            elapsed_cpu_time = cpu_end - cpu_start
-            
-            cpu_time += elapsed_cpu_time
-            
-
-       
-            
-
- 
-            # id_index_torch = torch.multinomial(proba_torch,1).item()
-
-
-
-            
-
-
-            # id_index = np.random.choice(np.arange(0,len(ids)), p = probas)
-
-
             id_index = torch.multinomial(input = proba_torch, num_samples= 1)
-
             wce_id = ids_torch[id_index]
-            # ids = np.delete(ids,id_index) 
             ids_torch = ids_torch[ids_torch != wce_id]
-
-            elapsed_checking_time = checking_end - checking_start
-            total_checking_choice += elapsed_checking_time
 
 
         wce_id_indexes[i] = wce_id
 
             
 
-        
-        iteration_end = time.perf_counter()
-        elapsed_iteration = iteration_end - iteration_start 
-
     wce_id_indexes = np.array(wce_id_indexes.to("cpu"))
-    print()
-
-    print("gpu_time :",gpu_time)
-    print("numpy_time: ",numpy_time )
-    print("torch_time: ",torch_time )
-
-    print("checking: ",total_checking_choice )
-
-    
-
     
 
 
@@ -368,29 +157,15 @@ def torch_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
 
 
-def torch_get_dataset_gpu(Xmat, wce_mat, HR_target):
+def get_dataset(Xmat, wce_mat, HR_target):
 
     max_time,n_patients = wce_mat.shape[0], wce_mat.shape[1]
-    print(max_time)
-    print(n_patients)
-
-    start_matching_time = time.perf_counter()
-    wce_id_indexes, events, FUP_tis = torch_matching_algo(wce_mat, max_time,n_patients, HR_target) # wce_mat
-    
-    end_matching_time = time.perf_counter()
-    elapsed_matching_time = end_matching_time - start_matching_time
-
-    start_dataset_time = time.perf_counter()
+    wce_id_indexes, events, FUP_tis = matching_algo(wce_mat, max_time,n_patients, HR_target) # wce_mat
 
 
-    print(wce_id_indexes)
 
-
-    # print(events)
     ordered_events = np.array(events)[wce_id_indexes]
     ordered_FUP_tis = np.array(FUP_tis)[wce_id_indexes]
-    # print(ordered_events)
-
     
 
     data_field = ti.field(dtype=ti.i64, shape=(n_patients*max_time,5))
@@ -410,7 +185,6 @@ def torch_get_dataset_gpu(Xmat, wce_mat, HR_target):
                           wce_id_indexes:ti.types.ndarray(), Xmat_transposed:ti.types.ndarray(),
                           max_time:int
                           ):
-        print("GPU KERNEL")
 
         line = 0 
 
@@ -458,7 +232,6 @@ def torch_get_dataset_gpu(Xmat, wce_mat, HR_target):
                 data_field[line,3] = event
                 data_field[line,4] = Xmat_transposed[patient_id,time]
             
-        print(line)
 
 
         
@@ -467,17 +240,12 @@ def torch_get_dataset_gpu(Xmat, wce_mat, HR_target):
 
 
 
-    end_dataset_time = time.perf_counter()
-
-    elapsed_dataset_time = end_dataset_time - start_dataset_time
-
-
     data_numpy = data_field.to_numpy()
 
     filtered_data = data_numpy[~np.all(data_numpy == 0, axis=1)]
 
     
-    return filtered_data, elapsed_matching_time, elapsed_dataset_time   
+    return filtered_data
 
 n_patients = 10
 max_time = 365
@@ -491,68 +259,29 @@ scenario= "exponential_scenario"
 
 wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff, max_time= max_time)
 
-# start_matching_time = time.perf_counter()
-
-# wce_id_indexes, events, FUP_tis = cpu_matching_algo(wce_mat, max_time, n_patients, HR_target)
-
-# end_matching_time = time.perf_counter()
-# elapsed_matching_time = end_matching_time - start_matching_time 
-
-# print(f"total mathing_time  : {elapsed_matching_time}")
 
 
 
 #############################################""
-cpu_benchmark = False
-
-if cpu_benchmark == True:
-    print("CPU BENCHMARK")
 
 
-    start_cpu_time = time.perf_counter()
+ti.init(arch=ti.gpu)
 
-    # wce_id_indexes, events, FUP_tis = cpu_matching_algo(wce_mat, max_time,n_patients, HR_target=1.5) # wce_mat
-
-    numpy_wce, elapsed_matching_time, elapsed_dataset_time = get_dataset_gpu(Xmat, wce_mat, 1.5)
-
-    end_cpu_time = time.perf_counter()
-
-    elapsed_cpu_total_time = end_cpu_time - start_cpu_time 
-
-    # print(f"time in rest program : {elapsed_cpu_total_time - cpu_time}")
-    print(f"total time  : {elapsed_cpu_total_time}")
-    print(f"matching time  : {elapsed_matching_time}")
-    print(f"dataset time  : {elapsed_dataset_time}")
-
-
-
-print("GPU BENCHMARK")
-
-ti.init(arch=ti.cpu)
-
-start_cpu_time = time.perf_counter()
+start_simulation_time = time.perf_counter()
 
 # wce_id_indexes, events, FUP_tis = cpu_matching_algo(wce_mat, max_time,n_patients, HR_target=1.5) # wce_mat
 
-with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
-    numpy_wce, elapsed_matching_time, elapsed_dataset_time = torch_get_dataset_gpu(Xmat, wce_mat, 1.5)
 
-prof.export_chrome_trace("trace.json")
+numpy_wce = get_dataset(Xmat, wce_mat, 1.5)
 
-end_cpu_time = time.perf_counter()
+end_simulation_time = time.perf_counter()
 
-elapsed_cpu_total_time = end_cpu_time - start_cpu_time 
+elapsed_simulation_time = end_simulation_time - start_simulation_time 
 
-# print(f"time in rest program : {elapsed_cpu_total_time - cpu_time}")
-print(f"total time  : {elapsed_cpu_total_time}")
-print(f"matching time  : {elapsed_matching_time}")
-print(f"dataset time  : {elapsed_dataset_time}")
+print(f"Simulation_time : {elapsed_simulation_time}")
 
 
 df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
-
-
-
 
 
 df_wce.to_csv("test_df")
