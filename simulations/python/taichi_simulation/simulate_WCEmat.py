@@ -117,18 +117,6 @@ def event_censor_generation(max_time, n_patients, censoring_ratio):
 
     
 def cpu_matching(wce_mat_current,time_event, HR_target ):
-
-   
-
-    probas = np.array(np.exp(HR_target * wce_mat_current[time_event -1,])/np.sum(np.exp(HR_target * wce_mat_current[time_event -1,])))
-    return probas.reshape(probas.shape[1])
-
-
-
-def cpu_matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
-    
-    cpu_time = 0
-    total_checking_choice = 0
     
     event_censor_start = time.perf_counter()
     events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
@@ -687,7 +675,7 @@ def torch_get_dataset_gpu(Xmat, wce_mat, HR_target):
     
     return filtered_data, elapsed_matching_time, elapsed_dataset_time   
 
-n_patients = 100000
+n_patients = 1000
 max_time = 365
 cutoff = 180
 HR_target = 1.5
@@ -736,7 +724,7 @@ if cpu_benchmark == True:
 
 print("GPU BENCHMARK")
 
-ti.init(arch=ti.gpu)
+ti.init(arch=ti.cpu)
 
 start_cpu_time = time.perf_counter()
 
