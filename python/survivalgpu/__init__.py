@@ -8,6 +8,7 @@ torch.backends.cuda.matmul.allow_tf32 = False
 
 from .coxph import coxph_torch, coxph_numpy, coxph_R
 from .wce import wce_torch, wce_numpy, wce_R
+from .simulation import simulate_dataset
 from . import utils, optimizers
 from .utils import use_cuda, device, float32, int32, int64
 
@@ -19,6 +20,7 @@ __all__ = sorted(
         "wce_torch",
         "wce_numpy",
         "wce_R",
+        "simulate_dataset"
     ]
 )
 
