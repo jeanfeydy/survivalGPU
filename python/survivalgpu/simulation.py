@@ -264,7 +264,6 @@ def get_dataset(Xmat, wce_mat, HR_target):
 
 
     number_lines = ordered_FUP_tis.sum()
-    print(number_lines)
 
     patient_id_array = np.zeros(number_lines, dtype = int)
     event_array = np.zeros(number_lines, dtype = int)
@@ -294,10 +293,10 @@ def get_dataset(Xmat, wce_mat, HR_target):
         event_array[i] = ordered_events[patient_id]
         doses_aray[i] = Xmat_transposed[patient_id,time_start]
         i += 1
-        print(ordered_FUP_tis[patient_id])
     dataset_end = time.perf_counter()
+    elapsed_dataset_time = dataset_end-dataset_start
 
-    print(f"elapsed_time dataset :{dataset_end-dataset_start}")
+    print("elapsed_time dataset :",elapsed_dataset_time)
 
     # print(patient_id_array)
     # print(time_start_array)
@@ -313,7 +312,6 @@ def get_dataset(Xmat, wce_mat, HR_target):
     df_wce["stop"] = time_stop_array
     df_wce["event"] = event_array
     df_wce["dose"] = doses_aray
-    print(df_wce)
 
 
     
@@ -369,7 +367,7 @@ def get_scenario(scenario_name: int,cutoff:int):
     try:
         scenario_function = scenario_list[scenario_name]
     except KeyError:
-        print(f"The scenario {scenario_name} is not defined")
+        print("The scenario ",scenario_name, " is not defined")
 
 
     scenario_list = []
@@ -389,7 +387,7 @@ cutoff = 180
 HR_target = 1.5
 doses = [1,1.5,2,2.5,3]
 scenario= "exponential_scenario"
-HR_ratio = 1.5
+HR_ratio = 2.8
 
 # Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
 
