@@ -55,11 +55,20 @@ def generate_wce_vector(u, scenario_shape, Xmat):
     This function generate the wce vector of the n patients at time u
     """
     t_array = np.arange(1,u+1)
+    u_t_array = u +1 - t_array 
 
 
-    wce = np.multiply(scenario_shape[:u].reshape(u,1),Xmat[:u,:])
-    if u == 1:
-        return wce
+    # print("#################")
+    # print(Xmat)
+    # print()
+    # print(Xmat[:u,:])
+    # print()
+    # print(scenario_shape[:u])
+
+
+    
+    wce = np.multiply(scenario_shape[u_t_array].reshape(u,1),Xmat[t_array -1,:])
+
     return np.sum(wce, axis = 0)
 
 
@@ -69,8 +78,13 @@ def generate_wce_mat(scenario_name, Xmat, cutoff, max_time):
     This function generate the wce mattrix that keep the WCE wieght of all the patient at
     all the times intill the cutoff
     """
-    scenario_shape = np.concatenate((get_scenario(scenario_name,cutoff),np.zeros(max_time-cutoff)))
+    scenario_shape = np.concatenate((np.zeros(1),get_scenario(scenario_name,cutoff),np.zeros(max_time-cutoff)))
+
     wce_mat = np.vstack([generate_wce_vector(u, scenario_shape, Xmat) for u in range(1,max_time+1)])
+    # print("#####################")
+    # for u in range(1,max_time+1):
+    #     print(generate_wce_vector(u, scenario_shape, Xmat))
+
     return wce_mat
 
 
@@ -119,8 +133,9 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
     
     
-    for i in range(n_patients):       
-     
+    for i in range(n_patients):   
+
+    
         event = events[i]
         time_event = FUP_tis[i]
 
@@ -157,7 +172,6 @@ def get_dataset_taichi(Xmat, wce_mat, HR_target):
 
     max_time,n_patients = wce_mat.shape[0], wce_mat.shape[1]
     wce_id_indexes, events, FUP_tis = matching_algo(wce_mat, max_time,n_patients, HR_target) # wce_mat
-
 
 
     ordered_events = np.array(events)[wce_id_indexes]
@@ -253,7 +267,6 @@ def get_dataset(Xmat, wce_mat, HR_target):
     wce_id_indexes, events, FUP_tis = matching_algo(wce_mat, max_time,n_patients, HR_target) # wce_mat
 
 
-
     ordered_events = np.array(events)[wce_id_indexes]
     ordered_FUP_tis = np.array(FUP_tis)[wce_id_indexes]
 
@@ -312,6 +325,8 @@ def get_dataset(Xmat, wce_mat, HR_target):
     df_wce["stop"] = time_stop_array
     df_wce["event"] = event_array
     df_wce["dose"] = doses_aray
+
+    print(df_wce)
 
 
     
@@ -381,9 +396,9 @@ def get_scenario(scenario_name: int,cutoff:int):
 
         
 
-n_patients = 5
-max_time = 365
-cutoff = 180
+n_patients = 25
+max_time = 50
+cutoff = 5
 HR_target = 1.5
 doses = [1,1.5,2,2.5,3]
 scenario= "exponential_scenario"
