@@ -414,9 +414,9 @@ HR_target = 2.8
 doses = [1,1.5,2,2.5,3]
 scenario= "exponential_scenario"
 
-# Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
+Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
 
-# wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses = doses, scenario = scenario, cutoff = cutoff, HR_target = HR_target)
+wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses = doses, scenario = scenario, cutoff = cutoff, HR_target = HR_target)
 
 
 
