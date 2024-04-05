@@ -370,7 +370,7 @@ def simulate_dataset(max_time, n_patients, doses, scenario, cutoff, HR_target):
 
 #### 
 def exponential_scenario(u_t, name = False):
-    return((7 * np.exp(-7*u_t/365)*0.5)) # divide by 365 in order to have a t in days
+    return((7 * np.exp(-7*u_t/365))) # divide by 365 in order to have a t in days
 
 def test_opposite_square_scenario(u_t):
     return 1/np.exp(u_t)
@@ -414,9 +414,12 @@ HR_target = 2.8
 doses = [1,1.5,2,2.5,3]
 scenario= "exponential_scenario"
 
-Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
+for i in range(365):
+    print(exponential_scenario(i))
 
-wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses = doses, scenario = scenario, cutoff = cutoff, HR_target = HR_target)
+# Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
+
+# wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses = doses, scenario = scenario, cutoff = cutoff, HR_target = HR_target)
 
 
 
