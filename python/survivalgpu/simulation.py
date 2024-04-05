@@ -416,7 +416,7 @@ scenario= "exponential_scenario"
 
 # Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
 
-wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses = doses, scenario = scenario, cutoff = cutoff, HR_target = HR_target)
+# wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses = doses, scenario = scenario, cutoff = cutoff, HR_target = HR_target)
 
 
 
@@ -424,7 +424,7 @@ wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses =
 
 # wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff, max_time= max_time)
 
-wce_mat.to_csv("test_df")
+# wce_mat.to_csv("test_df")
 
 
 
