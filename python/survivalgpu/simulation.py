@@ -147,8 +147,19 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
 
         else:
-
+            time_event = 3
             wce_mat_current_torch = wce_mat_torch[:,ids_torch]
+
+            print(wce_mat_torch[time_event - 1,])
+            print(ids_torch)
+            print(wce_mat_current_torch[time_event - 1,])
+            print("### HR taget and log here ")
+
+            print(HR_target)
+
+            print(np.log(HR_target))
+        
+            
             exp_vals = torch.exp(np.log(HR_target) * wce_mat_current_torch[time_event - 1,])
             exp_sum = torch.sum(exp_vals)
             proba_torch = exp_vals/exp_sum
@@ -349,7 +360,7 @@ def simulate_dataset(max_time, n_patients, doses, scenario, cutoff, HR_target):
 
     Xmat = generate_Xmat(max_time,n_patients,doses)
     wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff, max_time= max_time)
-    numpy_wce = get_dataset(Xmat, wce_mat, 1.5)
+    numpy_wce = get_dataset(Xmat, wce_mat, HR_target)
     df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
     return df_wce
 
@@ -396,13 +407,12 @@ def get_scenario(scenario_name: int,cutoff:int):
 
         
 
-n_patients = 25
-max_time = 50
-cutoff = 5
-HR_target = 1.5
+n_patients = 10
+max_time = 365
+cutoff = 180
+HR_target = 2.8
 doses = [1,1.5,2,2.5,3]
 scenario= "exponential_scenario"
-HR_ratio = 2.8
 
 # Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
 
