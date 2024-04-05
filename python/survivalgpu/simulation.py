@@ -153,8 +153,7 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
     return wce_id_indexes, events, FUP_tis
 
 
-
-def get_dataset(Xmat, wce_mat, HR_target):
+def get_dataset_taichi(Xmat, wce_mat, HR_target):
 
     max_time,n_patients = wce_mat.shape[0], wce_mat.shape[1]
     wce_id_indexes, events, FUP_tis = matching_algo(wce_mat, max_time,n_patients, HR_target) # wce_mat
@@ -208,8 +207,10 @@ def get_dataset(Xmat, wce_mat, HR_target):
                 data_field[line,1] = time
                 data_field[line,2] = time +1 
                 data_field[line,3] = 0
-                data_field[line,4] = Xmat_transposed[patient_id,time]          
-                
+                data_field[line,4] = ti.float64(Xmat_transposed[patient_id,time]) 
+                print(Xmat_transposed[patient_id,time] )        
+                print(data_field[line,4])
+               
 
 
 
@@ -237,12 +238,86 @@ def get_dataset(Xmat, wce_mat, HR_target):
 
 
 
-    data_numpy = data_field.to_numpy()
+    data_numpy = data_field.to_numpy(dtype=np.float64)
 
     filtered_data = data_numpy[~np.all(data_numpy == 0, axis=1)]
 
     
     return filtered_data
+
+
+
+def get_dataset(Xmat, wce_mat, HR_target):
+
+    max_time,n_patients = wce_mat.shape[0], wce_mat.shape[1]
+    wce_id_indexes, events, FUP_tis = matching_algo(wce_mat, max_time,n_patients, HR_target) # wce_mat
+
+
+
+    ordered_events = np.array(events)[wce_id_indexes]
+    ordered_FUP_tis = np.array(FUP_tis)[wce_id_indexes]
+
+
+    Xmat_transposed = Xmat.transpose()
+
+
+
+
+    number_lines = ordered_FUP_tis.sum()
+    print(number_lines)
+
+    patient_id_array = np.zeros(number_lines, dtype = int)
+    event_array = np.zeros(number_lines, dtype = int)
+    time_start_array = np.zeros(number_lines, dtype = int)
+    time_stop_array = np.zeros(number_lines, dtype = int)
+    doses_aray = np.zeros(number_lines, dtype = np.float64)
+
+    i = 0
+
+
+
+
+    dataset_start = time.perf_counter()
+    for patient_id in range(n_patients):
+
+        
+        for time_start in range(ordered_FUP_tis[patient_id] -1):
+            
+            patient_id_array[i] = patient_id +1
+            time_start_array[i] = time_start
+            time_stop_array[i] = time_start +1
+            doses_aray[i] = Xmat_transposed[patient_id,time_start]
+            i += 1
+        patient_id_array[i] = patient_id +1
+        time_start_array[i] = time_start +1
+        time_stop_array[i] = time_start +2
+        event_array[i] = ordered_events[patient_id]
+        doses_aray[i] = Xmat_transposed[patient_id,time_start]
+        i += 1
+        print(ordered_FUP_tis[patient_id])
+    dataset_end = time.perf_counter()
+
+    print(f"elapsed_time dataset :{dataset_end-dataset_start}")
+
+    # print(patient_id_array)
+    # print(time_start_array)
+    # print(time_stop_array)
+    # print(event_array)
+    # print(doses_aray)
+
+
+    df_wce = pd.DataFrame()
+    # ["patient","start","stop","event","dose"])
+    df_wce["patient"] = patient_id_array
+    df_wce["start"] = time_start_array
+    df_wce["stop"] = time_stop_array
+    df_wce["event"] = event_array
+    df_wce["dose"] = doses_aray
+    print(df_wce)
+
+
+    
+    return df_wce
 
 
 def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
@@ -252,12 +327,12 @@ def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
     saving_path = Path("../../simulated_datasets") / scenario / str(HR_target) / str(n_patients) / "dataset.csv"
     df_wce.to_csv(saving_path)
 
-def simulate_dataset(max_time, n_patients, doses, scenario, cutoff):
+def simulate_dataset(max_time, n_patients, doses, scenario, cutoff, HR_target):
 
     max_time = int(max_time)
     n_patients = int(n_patients)
     cutoff = int(cutoff)
-    ti.init(arch=ti.gpu)
+    # ti.init(arch=ti.gpu)
 
     Xmat = generate_Xmat(max_time,n_patients,doses)
     wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff, max_time= max_time)
@@ -307,19 +382,26 @@ def get_scenario(scenario_name: int,cutoff:int):
     return scenario_list/scenario_list.sum()
 
         
-# simulate_dataset(max_time = 365, n_patients = 500, doses = [1,2,3], scenario = "exponential_scenario", cutoff = 180)
 
-# n_patients = 10
-# max_time = 365
-# cutoff = 180
-# HR_target = 1.5
+n_patients = 5
+max_time = 365
+cutoff = 180
+HR_target = 1.5
+doses = [1,1.5,2,2.5,3]
+scenario= "exponential_scenario"
+HR_ratio = 1.5
 
 # Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
 
-# scenario= "exponential_scenario"
+wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses = doses, scenario = scenario, cutoff = cutoff, HR_target = HR_target)
+
+
+
 
 
 # wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff, max_time= max_time)
+
+wce_mat.to_csv("test_df")
 
 
 
