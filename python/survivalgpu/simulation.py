@@ -349,7 +349,7 @@ def simulate_dataset(max_time, n_patients, doses, scenario, cutoff, HR_target):
 
     Xmat = generate_Xmat(max_time,n_patients,doses)
     wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff, max_time= max_time)
-    numpy_wce = get_dataset(Xmat, wce_mat, 1.5)
+    numpy_wce = get_dataset(Xmat, wce_mat, HR_target)
     df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
     return df_wce
 
@@ -406,7 +406,7 @@ HR_ratio = 2.8
 
 # Xmat = generate_Xmat(max_time,n_patients,[1,2,3])
 
-wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses = doses, scenario = scenario, cutoff = cutoff, HR_target = HR_target)
+# wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses = doses, scenario = scenario, cutoff = cutoff, HR_target = HR_target)
 
 
 
@@ -414,7 +414,7 @@ wce_mat = simulate_dataset(max_time = max_time, n_patients = n_patients, doses =
 
 # wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff, max_time= max_time)
 
-wce_mat.to_csv("test_df")
+# wce_mat.to_csv("test_df")
 
 
 
