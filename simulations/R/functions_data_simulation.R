@@ -55,6 +55,9 @@ generate_Xmat_list<- function(observation_time,n_patients,n_bootstraps,doses){
 wce_vector <- function(u, scenario, Xmat,normalization_factor) {
     t <- 1:u
 
+    print(t)
+    print(list(u-t))
+
 
     # scenario_2 = exponential_weight
     # print(u)
@@ -165,37 +168,7 @@ matching_algo <- function(wce_mat) {
                 sample_id <- sample(id, 1)
             }else{
 
-            # print("HR test : ")
 
-            # HR_target = 2
-            # print("proba for HR 2 : ")
-
-            # proba2 <- (exp(log(HR_target))* wce_matrix[time_event,]) / sum(exp(log(HR_target)) * wce_matrix[time_event,])
-            # # print(proba2)
-            # sample_id <- sample(id, 1, prob = proba2)
-            # # print(sample_id)
-
-
-            # HR_target = 4
-
-            # print("proba for HR 4 : ")
-            # proba4 <- (exp(log(HR_target))* wce_matrix[time_event,]) / sum(exp(log(HR_target)) * wce_matrix[time_event,])
-            # # print(proba4)
-            # sample_id <- sample(id, 1, prob = proba4)
-
-            # print(proba2 == proba4)
-            # print(sample_id)
-
-            # proba <- (4 * wce_matrix[time_event,]) / sum(4 * wce_matrix[time_event,])
-            # proba <- exp((wce_matrix[time_event,]) / sum(exp(
-
-            # HR_target = 1.5
-            
-            
-            # proba <- (4 * wce_matrix[time_event,]) / sum(4 * wce_matrix[time_event,])
-
-            # proba <- (exp(log(HR_target)* wce_matrix[time_event,])) / sum(exp(log(HR_target) * wce_matrix[time_event,]))
-                
             proba <- (exp(wce_matrix[time_event,])) / sum(exp(wce_matrix[time_event,]))
             # proba <- (wce_matrix[time_event,]) / sum(wce_matrix[time_event,])
 
@@ -311,7 +284,8 @@ get_dataset <- function(Xmat, wce_mat,is_null_weight) {
         df_wce <- rbind(df_wce, df_dose)
     }
 
-    return(df_wce)
+    return(list(df_wce = df_wce,
+                matching_result =  matching_result))
 }
 
 binarization_dose_function <- function(doses){
@@ -319,6 +293,7 @@ binarization_dose_function <- function(doses){
     for(dose in doses){
         binary_dose <- dose
         if (dose > 1){
+         
             binary_dose = 1
         }
         binary_doses <- append(binary_doses,binary_dose)
@@ -340,12 +315,12 @@ generate_dataset_batch <- function(doses,observation_time, n_patients,scenario,c
 
 
     # TODO Will need to change the nomraliszation factor calcul in order to take into account the 
-    normalization_factor <- calculate_normalization_factor(scenario_function,HR_target,cutoff)
+    normalization_factor <- calculate_normalization_factor(scenario_function,HR_target,observation_time)
 
 
 
     # Generation of the WCEmat that calculate the WCE weight of the patient at every time        
-    wce_mat <- do.call("rbind", lapply(1:cutoff, wce_vector, scenario = scenario_function, Xmat = Xmat,normalization_factor = normalization_factor)) 
+    wce_mat <- do.call("rbind", lapply(1:observation_time, wce_vector, scenario = scenario_function, Xmat = Xmat,normalization_factor = normalization_factor)) 
 
     # Look if HR is 1
     if(HR_target == 1){
@@ -384,3 +359,4 @@ generate_dataset_batch <- function(doses,observation_time, n_patients,scenario,c
     }    
 
 }
+
