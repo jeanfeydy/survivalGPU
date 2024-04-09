@@ -6,6 +6,7 @@ import taichi.math as tm
 import torch
 import torchvision.models as models
 from torch.profiler import profile, record_function, ProfilerActivity
+from pathlib import Path 
 
 
 import time
@@ -119,10 +120,7 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
 
     
     
-    for i in range(n_patients):
-        if i % (n_patients/20) == 0:
-            print(i)
-        
+    for i in range(n_patients):       
      
         event = events[i]
         time_event = FUP_tis[i]
@@ -137,7 +135,7 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target):
         else:
 
             wce_mat_current_torch = wce_mat_torch[:,ids_torch]
-            exp_vals = torch.exp(HR_target * wce_mat_current_torch[time_event - 1,])
+            exp_vals = torch.exp(np.log(HR_target) * wce_mat_current_torch[time_event - 1,])
             exp_sum = torch.sum(exp_vals)
             proba_torch = exp_vals/exp_sum
             id_index = torch.multinomial(input = proba_torch, num_samples= 1)
@@ -247,6 +245,15 @@ def get_dataset(Xmat, wce_mat, HR_target):
     
     return filtered_data
 
+
+def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
+
+    df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
+    print( str(HR_target))
+    saving_path = Path("../../simulated_datasets") / scenario / str(HR_target) / str(n_patients) / "dataset.csv"
+    df_wce.to_csv(saving_path)
+
+
 n_patients = 10
 max_time = 365
 cutoff = 180
@@ -258,6 +265,9 @@ scenario= "exponential_scenario"
 
 
 wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, cutoff = cutoff, max_time= max_time)
+
+
+
 
 
 

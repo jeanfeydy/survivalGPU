@@ -156,11 +156,11 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target,events, FUP_t
 
         else:
             wce_mat_current_torch = wce_mat_torch[:,ids_torch]
-            print("#########")
-            print(time_event)
-            print("wce_mat_torch",wce_mat_torch[time_event - 1,])
-            print("ids torch",ids_torch)
-            print("wce_mat_current_torch",wce_mat_current_torch[time_event - 1,])
+            # print("#########")
+            # print(time_event)
+            # print("wce_mat_torch",wce_mat_torch[time_event - 1,])
+            # print("ids torch",ids_torch)
+            # print("wce_mat_current_torch",wce_mat_current_torch[time_event - 1,])
             
 
             print(HR_target)
@@ -381,15 +381,14 @@ def get_dataset_test_R(Xmat, wce_mat, HR_target, FUP_tis, events, wce_id_indexes
 
 
 
-def get_dataset(Xmat, wce_mat, HR_target, FUP_tis, events, wce_id_indexes):
+def get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis, events, wce_id_indexes):
 
 
     print(FUP_tis)
     print(events)
 
-    wce_id_indexes = np.array(wce_id_indexes, dtype = int) -1
+    wce_id_indexes = np.array(wce_id_indexes, dtype = int) 
 
-    max_time,n_patients = wce_mat.shape[0], wce_mat.shape[1]
      # wce_mat
 
 
@@ -397,8 +396,7 @@ def get_dataset(Xmat, wce_mat, HR_target, FUP_tis, events, wce_id_indexes):
     ordered_FUP_tis = FUP_tis
 
 
-    Xmat_transposed = Xmat.transpose()[wce_id_indexes,]
-
+    Xmat_transposed = Xmat.transpose()
 
 
 
@@ -417,27 +415,39 @@ def get_dataset(Xmat, wce_mat, HR_target, FUP_tis, events, wce_id_indexes):
 
 
     dataset_start = time.perf_counter()
+    print()
+    print("###################")
+
+    print("Xmat : \n",Xmat)
+    print("list FUP :",ordered_FUP_tis)
+    print("list event :",ordered_events)
+    print("wce_index_list :", wce_id_indexes)
+    
+
+
+    
+
     for patient_id in range(n_patients):
 
-        print(ordered_FUP_tis)
+        print("wce_id_indexes :", ordered_FUP_tis[patient_id])
+        print("event :", ordered_events[patient_id])
+        print("id for doeses :",wce_id_indexes[patient_id])
 
-        print(ordered_FUP_tis[patient_id])
 
         
-        for time_start in range(ordered_FUP_tis[patient_id] -1 ):
-            print(time_start)
+        for time_start in range(ordered_FUP_tis[patient_id]):
             
             patient_id_array[i] = patient_id +1
             time_start_array[i] = time_start
             time_stop_array[i] = time_start +1
-            doses_aray[i] = Xmat_transposed[patient_id,time_start]
+            doses_aray[i] = Xmat_transposed[wce_id_indexes[patient_id],time_start]
+            
+            if time_start == ordered_FUP_tis[patient_id] - 1:
+                event_array[i] = ordered_events[patient_id]
+            else:
+                event_array[i] = 0
             i += 1
-        patient_id_array[i] = patient_id +1
-        time_start_array[i] = time_start +1
-        time_stop_array[i] = time_start +2
-        event_array[i] = ordered_events[patient_id]
-        doses_aray[i] = Xmat_transposed[patient_id,time_start]
-        i += 1
+ 
     dataset_end = time.perf_counter()
     elapsed_dataset_time = dataset_end-dataset_start
 
@@ -492,7 +502,7 @@ def simulate_dataset(max_time, n_patients, doses, scenario, cutoff, HR_target,Xm
     df_wce_mat.to_csv("wce_mat")
     events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
     wce_id_indexes  = matching_algo(wce_mat, max_time,n_patients, HR_target,events, FUP_tis)
-    numpy_wce = get_dataset(Xmat, wce_mat, HR_target, FUP_tis,events,wce_id_indexes)
+    numpy_wce = get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis,events,wce_id_indexes)
     df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
     df_wce.to_csv("data")
     return df_wce
