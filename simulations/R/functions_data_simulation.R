@@ -37,31 +37,27 @@ generate_Xmat <- function(observation_time,n_patients,doses){
   return(Xmat)
   }
 
-generate_Xmat_list<- function(observation_time,n_patients,n_bootstraps,doses){
 
-    print("start test")
-    Xmat_list = list()
-    for(i in 1:n_bootstraps){
-        print(i)
-        Xmat <- generate_Xmat(observation_time,n_patients,doses)
-        Xmat_list <- append(Xmat_list, list(Xmat))
-    }
-
-    return(Xmat_list)
-
-}
 
   # Function to obtain WCE vector
 wce_vector <- function(u, scenario, Xmat,normalization_factor) {
     t <- 1:u
 
-    print(t)
-    print(list(u-t))
+
 
 
     # scenario_2 = exponential_weight
     # print(u)
     scenario_shape <- do.call(scenario, list((u - t) / 365))/365*normalization_factor
+
+    # t = 1:365
+    # u = 365
+    # scenario_shape_total <- do.call(scenario, list((u - t) / 365))/365*normalization_factor
+
+    # print(sum(scenario_shape_total))
+    # quit()
+    
+
 
     
     # print(sum(scenario_shape))
@@ -78,13 +74,18 @@ wce_vector <- function(u, scenario, Xmat,normalization_factor) {
     return(res)
 }
 
-calculate_normalization_factor <- function(scenario, HR_target,cutoff){
-    t<- 1:cutoff
+calculate_normalization_factor <- function(scenario, HR_target,observation_time){
+    t<- 0:365
+
 
     normalization_target <- log(HR_target)
 
-    scenario_function <- do.call(scenario, list((cutoff - t) / 365))
-    scenario_sum <- sum(scenario_function)/365 
+
+    t<- 0:365
+    scenario_function <- do.call(scenario, list((365 - t) / 365))
+    scenario_sum <- sum(scenario_function)/365
+
+
     
 
     if (scenario_sum ==0 ){
@@ -128,9 +129,9 @@ event_censor_generation <- function(max_time,n_patients) {
 }
 
 # Function for 'the final step of the permutational algorithm'
-matching_algo <- function(wce_mat) {
+matching_algo <- function(wce_mat,events_generation) {
     n_patient <- ncol(wce_mat)
-    events_generation <- event_censor_generation(dim(wce_mat)[1],dim(wce_mat)[2])
+    
     
     df_event <- data.frame(patient = 1:n_patient,
                            eventRandom = events_generation$eventRandom,
@@ -199,69 +200,17 @@ matching_algo <- function(wce_mat) {
     }   
 }
 
-# Function for 'the final step of the permutational algorithm'
-matching_algo_null <- function(wce_mat) {
-    print("using null matching algo")
-    n_patient <- ncol(wce_mat)
-    events_generation <- event_censor_generation(dim(wce_mat)[1],dim(wce_mat)[2])
-    
-    df_event <- data.frame(patient = 1:n_patient,
-                           eventRandom = events_generation$eventRandom,
-                           censorRandom = events_generation$censorRandom)
-    df_event <- df_event %>%
-        group_by(patient) %>%
-        mutate(FUP_Ti = min(eventRandom, censorRandom)) %>%
-        mutate(event = ifelse(FUP_Ti == eventRandom, 1, 0)) %>%
-        ungroup() %>%
-        arrange(FUP_Ti)
-
-    # init
-    patient_order <- df_event$patient
-    j = 1
-    id <- 1:n_patient
-    wce_mat_df <- wce_mat %>% as.data.frame()
-    matching_result <- data.frame()
-
-    # Iterative matching, start with the lowest FUP
-    for (i in patient_order) {
-        event <- df_event[j, "event"] %>% pull()
-        time_event <- df_event[j, "FUP_Ti"] %>% pull()
-
-        first <- TRUE
-        
-
-        sample_id <- sample(id, 1)
-
-
-        matching_result <- rbind(matching_result,
-                                 data.frame(id_patient = i,
-                                            id_dose_wce = sample_id))
-        id <- id[!id %in% sample_id]
-        j = j + 1
-
-        # Stop when last id of iterative algo
-        if(length(id) == 1) {
-            matching_result <- rbind(matching_result,
-                                     data.frame(id_patient = patient_order[n_patient],
-                                                id_dose_wce = id))
-            return(list(matching_result = matching_result,
-                        df_event = df_event,
-                        patient_order = patient_order))
-        }
-    }   
-}
-
 # Function to render dataset after the matching algo
-get_dataset <- function(Xmat, wce_mat,is_null_weight) {
+get_dataset <- function(Xmat, wce_mat,matching_result) {
     df_wce <- data.frame()
     Xmat_df <- Xmat %>%
         as.data.frame()
+
+
     
-    if(is_null_weight == TRUE){
-        matching_result <- matching_algo_null(wce_mat)
-    }else{
-        matching_result <- matching_algo(wce_mat)
-    }
+
+    
+
 
     for (i in matching_result$patient_order) {
         fu <- matching_result$df_event[matching_result$df_event$patient == i, "FUP_Ti"] %>% pull()
@@ -282,10 +231,10 @@ get_dataset <- function(Xmat, wce_mat,is_null_weight) {
                               event = event_vec,
                               dose = Xmat_df[1:fu, paste0("V", id_dose)])
         df_wce <- rbind(df_wce, df_dose)
+        
     }
-
-    return(list(df_wce = df_wce,
-                matching_result =  matching_result))
+    df_wce <- df_wce[order(df_wce$patient),]
+    return(df_wce)
 }
 
 binarization_dose_function <- function(doses){
@@ -299,6 +248,18 @@ binarization_dose_function <- function(doses){
         binary_doses <- append(binary_doses,binary_dose)
     }
     return(binary_doses)
+}
+
+genrate_dataset_process = function(doses,observation_time, n_patients,scenario,cutoff,HR_target){
+    Xmat <- generate_Xmat(observation_time,n_patients,doses)
+    scenario_function <- scenario_translator(scenario)
+    normalization_factor <- calculate_normalization_factor(scenario_function,HR_target,365)
+    wce_mat <- do.call("rbind", lapply(1:observation_time, wce_vector, scenario = scenario_function, Xmat = Xmat,normalization_factor = normalization_factor)) 
+    events_generation <- event_censor_generation(dim(wce_mat)[1],dim(wce_mat)[2])
+    matching_result <- matching_algo(wce_mat,events_generation)
+    df_wce <- get_dataset(Xmat = Xmat, wce_mat = wce_mat_batch,matching_result = matching_result)
+    return(df_wce)
+
 }
 
 
