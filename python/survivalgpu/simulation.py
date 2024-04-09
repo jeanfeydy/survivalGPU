@@ -68,7 +68,7 @@ def generate_wce_vector(u, scenario_shape, Xmat):
 
 
     
-    wce = np.multiply(scenario_shape[u_t_array].reshape(u,1),Xmat[t_array,:])
+    wce = np.multiply(scenario_shape[u_t_array].reshape(u,1),Xmat[t_array -1,:])
 
     return np.sum(wce, axis = 0)
 
@@ -81,9 +81,9 @@ def generate_wce_mat(scenario_name, Xmat, max_time):
     """
 
     max_time = int(max_time)
-    scenario_shape = get_scenario(scenario_name,max_time+2)
+    scenario_shape = get_scenario(scenario_name,365)
 
-    wce_mat = np.vstack([generate_wce_vector(u, scenario_shape, Xmat) for u in range(0,max_time)])
+    wce_mat = np.vstack([generate_wce_vector(u, scenario_shape, Xmat) for u in range(1,max_time+1)])
     # print("#####################")
     # for u in range(1,max_time+1):
     #     print(generate_wce_vector(u, scenario_shape, Xmat))
@@ -104,19 +104,38 @@ def event_censor_generation(max_time, n_patients, censoring_ratio):
 
      # Event times : Uniform[1;365] for all scenarios
     eventRandom = np.round(np.random.uniform(low = 1, high = max_time, size = n_patients)).astype(int)
+    # print(eventRandom)
+    
 
     # TODO Maybe change the way the censoring times are determined to that there is no randolness on the number of 
     # TODO patients that are not censored
     censorRandom = np.round(np.random.uniform(low = 1, high = max_time* int(1/censoring_ratio), size = n_patients)).astype(int)
+    # print(censorRandom)
 
-    event = np.array([1 if eventRandom[i]< censorRandom[i] else 0 for i in range(len(eventRandom))])
-    FUP_Ti = np.minimum(eventRandom,censorRandom)
+    event = np.array([1 if eventRandom[i]< censorRandom[i] else 0 for i in range(len(eventRandom))]).astype(int)
+    # print(event)
+    FUP_Ti = np.minimum(eventRandom,censorRandom).astype(int)
+    # print(FUP_Ti)
+
+    # quit()
 
 
     return event, FUP_Ti
 
 
 def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target,events, FUP_tis):
+    events = events.copy()
+    FUP_tis = FUP_tis.copy()
+    wce_mat = wce_mat.copy()
+    events = np.array(events, dtype = int)
+    FUP_tis = np.array(FUP_tis, dtype = int)
+
+    df_wce_mat = pd.DataFrame(wce_mat)
+    df_wce_mat.to_csv("wce_mat_not_pure")
+
+    print("test events FUP_tis")
+    print("events sum: ", events.sum())
+    print("FUP_tis sum: ", FUP_tis.sum())
 
     n_patients = int(n_patients)
     max_time = int(max_time)
@@ -151,7 +170,7 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target,events, FUP_t
             wce_mat_current_torch = wce_mat_torch[:,ids_torch]
 
 
-            exp_vals = torch.exp(np.log(HR_target) * wce_mat_current_torch[time_event - 1,])
+            exp_vals = torch.exp(np.log(HR_target) * wce_mat_current_torch[time_event - 1,]) 
             exp_sum = torch.sum(exp_vals)
             proba_torch = exp_vals/exp_sum
             selection_list = torch.zeros(len(proba_torch))
@@ -356,9 +375,11 @@ def get_dataset_test_R(Xmat, wce_mat, HR_target, FUP_tis, events, wce_id_indexes
 
 def get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis, events, wce_id_indexes):
 
+    FUP_tis = np.array(FUP_tis, dtype = int)
+    events = np.array(events, dtype = int)
+    n_patients = int(n_patients)
 
-    print(FUP_tis)
-    print(events)
+
 
     wce_id_indexes = np.array(wce_id_indexes, dtype = int) 
 
@@ -455,14 +476,16 @@ def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
     saving_path = Path("../../simulated_datasets") / scenario / str(HR_target) / str(n_patients) / "dataset.csv"
     df_wce.to_csv(saving_path)
 
-def simulate_dataset(max_time, n_patients, doses, scenario, cutoff, HR_target,Xmat):
+def simulate_dataset(max_time, n_patients, doses, scenario, cutoff, HR_target, Xmat,wce_mat_enter,events_enter,FUP_tis_enter):
 
-    print(max_time)
+
+    events_enter = np.array(events_enter, dtype = int)
+    FUP_tis_enter = np.array(FUP_tis_enter, dtype = int)
+
 
     max_time = int(max_time)
     n_patients = int(n_patients)
     cutoff = int(cutoff)
-    # ti.init(arch=ti.gpu)
 
     # if Xmat != None:
     # Xmat = generate_Xmat(max_time,n_patients,doses)
@@ -471,15 +494,29 @@ def simulate_dataset(max_time, n_patients, doses, scenario, cutoff, HR_target,Xm
     Xmat_df.to_csv("Xmat")
     wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, max_time= max_time)
     df_wce_mat = pd.DataFrame(wce_mat)
-    print(df_wce_mat)
+    print(df_wce_mat.head())
     df_wce_mat.to_csv("wce_mat")
+
     events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
+
+    # print("##########################")
+
+    # print(events)
+    # print()
+    # print(FUP_tis)
+    # print()
+    # print(events_enter)
+    # print()
+    # print(FUP_tis_enter)
+    # print("##########################")
+
+    # events = events_enter
+    # FUP_tis = FUP_tis_enter
     wce_id_indexes  = matching_algo(wce_mat, max_time,n_patients, HR_target,events, FUP_tis)
     numpy_wce = get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis,events,wce_id_indexes)
     df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
     df_wce.to_csv("data")
     return df_wce
-
 
 
 
@@ -514,7 +551,7 @@ def get_scenario(scenario_name: int,cutoff:int):
 
     scenario_list = []
 
-    for i in range(1,cutoff+1):
+    for i in range(0,cutoff):
         scenario_list.append(scenario_function(i)) 
     scenario_list = np.array(scenario_list)
 
