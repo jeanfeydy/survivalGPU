@@ -26,7 +26,7 @@ max_time = 365
 doses = c(1,1.5,2,2.5,3)
 
 
-n_patients = 1000
+n_patients = 10000
 print(class(n_patients))
 
 cutoff = 180
@@ -126,7 +126,7 @@ batchsize = 0
 
 wce_model_GPU_bootstraps_R <- wceGPU(df_wce, n_knots, cutoff, constrained = "R",
                id = "patient", event = "event", start = "start",
-               stop = "stop", expos = "dose",nbootstraps = 1,batchsize = 0, verbosity=0)
+               stop = "stop", expos = "dose",nbootstraps = 1000,batchsize = 100, verbosity=0)
 
 
 

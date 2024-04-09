@@ -57,13 +57,7 @@ def generate_wce_vector(u, scenario_shape, Xmat):
     This function generate the wce vector of the n patients at time u
     """
     t_array = np.arange(1,u+1)
-    print(t_array)
     u_t_array = u  - t_array 
-    print(u_t_array)
-
-    print(scenario_shape)
-    print(scenario_shape[u_t_array])
-
 
     # print("#################")
     # print(Xmat)
@@ -132,8 +126,7 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target,events, FUP_t
     total_checking_choice = 0
     
 
-    print(events)
-    print(FUP_tis)
+
     ids_torch = torch.arange(0,n_patients, dtype = int).to(device)
     wce_id_indexes = torch.zeros(len(ids_torch),dtype = int).to(device)
 
@@ -156,45 +149,25 @@ def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target,events, FUP_t
 
         else:
             wce_mat_current_torch = wce_mat_torch[:,ids_torch]
-            # print("#########")
-            # print(time_event)
-            # print("wce_mat_torch",wce_mat_torch[time_event - 1,])
-            # print("ids torch",ids_torch)
-            # print("wce_mat_current_torch",wce_mat_current_torch[time_event - 1,])
-            
 
-            print(HR_target)
 
-            print(np.log(HR_target))
-        
-            
             exp_vals = torch.exp(np.log(HR_target) * wce_mat_current_torch[time_event - 1,])
-            print(exp_vals)
             exp_sum = torch.sum(exp_vals)
-            print(exp_sum)
             proba_torch = exp_vals/exp_sum
-            print(proba_torch)
             selection_list = torch.zeros(len(proba_torch))
             # for i in range(100000):
             #     id_index = torch.multinomial(input = proba_torch, num_samples= 1)
             #     selection_list[id_index] += 1
             # print(selection_list/100000)
             id_index = torch.multinomial(input = proba_torch, num_samples= 1)
-            print(id_index)
 
-            print(ids_torch)
-            print(id_index)
-
+   
             wce_id = ids_torch[id_index]
             ids_torch = ids_torch[ids_torch != wce_id]
 
-            print(wce_id)
-
-            print(ids_torch)
 
 
         wce_id_indexes[i] = wce_id
-        print(wce_id_indexes)
 
             
 
@@ -415,13 +388,13 @@ def get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis, events, wce_id_in
 
 
     dataset_start = time.perf_counter()
-    print()
-    print("###################")
+    # print()
+    # print("###################")
 
-    print("Xmat : \n",Xmat)
-    print("list FUP :",ordered_FUP_tis)
-    print("list event :",ordered_events)
-    print("wce_index_list :", wce_id_indexes)
+    # print("Xmat : \n",Xmat)
+    # print("list FUP :",ordered_FUP_tis)
+    # print("list event :",ordered_events)
+    # print("wce_index_list :", wce_id_indexes)
     
 
 
@@ -429,9 +402,9 @@ def get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis, events, wce_id_in
 
     for patient_id in range(n_patients):
 
-        print("wce_id_indexes :", ordered_FUP_tis[patient_id])
-        print("event :", ordered_events[patient_id])
-        print("id for doeses :",wce_id_indexes[patient_id])
+        # print("wce_id_indexes :", ordered_FUP_tis[patient_id])
+        # print("event :", ordered_events[patient_id])
+        # print("id for doeses :",wce_id_indexes[patient_id])
 
 
         
