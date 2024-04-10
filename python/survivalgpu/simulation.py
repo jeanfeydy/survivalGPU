@@ -90,6 +90,10 @@ def generate_wce_mat(scenario_name, Xmat, max_time):
 
     return wce_mat
 
+def event_censor_from_R(eventRandom, censorRandom):
+    event = np.array([1 if eventRandom[i]<= censorRandom[i] else 0 for i in range(len(eventRandom))]).astype(int)
+    FUP_Ti = np.minimum(eventRandom,censorRandom).astype(int)
+    return event, FUP_Ti
 
 def event_censor_generation(max_time, n_patients, censoring_ratio):
     """
@@ -118,6 +122,10 @@ def event_censor_generation(max_time, n_patients, censoring_ratio):
     # print(FUP_Ti)
 
     # quit()
+
+    sorted_indices = np.argsort(FUP_Ti)
+    event = event[sorted_indices]
+    FUP_Ti = FUP_Ti[sorted_indices]
 
 
     return event, FUP_Ti
@@ -518,7 +526,54 @@ def simulate_dataset(max_time, n_patients, doses, scenario, cutoff, HR_target, X
     df_wce.to_csv("data")
     return df_wce
 
+def simulate_dataset_ReventCensor(max_time, n_patients, doses, scenario, cutoff, HR_target, Xmat,
+                                  wce_mat_enter,events_enter,FUP_tis_enter,eventRandom,censorRandom):
 
+
+    events_enter = np.array(events_enter, dtype = int)
+    FUP_tis_enter = np.array(FUP_tis_enter, dtype = int)
+
+
+    max_time = int(max_time)
+    n_patients = int(n_patients)
+    cutoff = int(cutoff)
+
+    # if Xmat != None:
+    # Xmat = generate_Xmat(max_time,n_patients,doses)
+    Xmat_df = pd.DataFrame(Xmat)
+    print(Xmat_df)
+    Xmat_df.to_csv("Xmat")
+    wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, max_time= max_time)
+    df_wce_mat = pd.DataFrame(wce_mat)
+    print(df_wce_mat.head())
+    df_wce_mat.to_csv("wce_mat")
+
+    events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
+    
+
+    wce_id_indexes  = matching_algo(wce_mat, max_time,n_patients, HR_target,events, FUP_tis)
+    numpy_wce = get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis,events,wce_id_indexes)
+    df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
+    df_wce_python = df_wce
+
+
+    events, FUP_tis = event_censor_from_R(eventRandom, censorRandom)
+    
+
+    wce_id_indexes  = matching_algo(wce_mat, max_time,n_patients, HR_target,events, FUP_tis)
+    numpy_wce = get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis,events,wce_id_indexes)
+    df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
+    df_wce_mixed = df_wce
+    
+    events, FUP_tis = events_enter, FUP_tis_enter
+ 
+
+    wce_id_indexes  = matching_algo(wce_mat, max_time,n_patients, HR_target,events, FUP_tis)
+    numpy_wce = get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis,events,wce_id_indexes)
+    df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
+    df_wce_R = df_wce
+
+    return df_wce_python, df_wce_mixed, df_wce_R
 
 
 #### 
