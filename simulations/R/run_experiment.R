@@ -1,0 +1,347 @@
+library(WCE)
+library(boot)
+library(jsonlite)
+library(devtools)
+library(dplyr)
+
+options(scipen = 999)
+
+devtools::load_all("../../../survivalGPU/R")
+
+
+
+source("functions_data_simulation.R")
+source("weight_functions.R")
+source("experiment_parameters.R")
+source("simulation_and_analysis.R")
+
+########################################## EXPERIMENTS DATA ##########################################
+
+#Generate parameters
+experiment_parameters = generate_parameters()
+
+
+# get experiment_name
+experiment_name <- experiment_parameters$experiment_name
+
+# get number of repetitions of simulations 
+number_of_simulations = experiment_parameters$number_of_simulations
+
+
+# Get simulation parameters 
+HR_target_list= experiment_parameters$simulation$HR_target_list
+scenario_functions_list= experiment_parameters$simulation$scenario_functions_list
+n_patients_list= experiment_parameters$simulation$n_patients_list
+max_time_list= experiment_parameters$simulation$max_time_list
+doses_list = experiment_parameters$simulation$doses_list
+binarization_dose_list = experiment_parameters$simulation$binarization_dose_list
+
+
+# Get analysis parameters 
+n_knots_list= experiment_parameters$analysis$n_knots_list
+constraint_list = experiment_parameters$analysis$constraint_list
+cutoff_list= experiment_parameters$analysis$cutoff_list
+n_bootstraps_list = experiment_parameters$analysis$n_bootstraps_list
+
+
+########################################## EXPERIMENTS SCRIPT ########################################
+
+print("#######")
+
+
+simulation_id = list()
+
+HR_target_result = list()
+scenario_functions_result = list()
+n_patients_result = list()
+max_time_result = list()
+doses_result = list()
+binarization_dose_result = list()
+n_knots_result = list() 
+constraint_result = list() 
+cutoff_result = list() 
+n_bootstraps_result = list() 
+
+BIC_results = list()
+HR_results = list()
+lower_IC_results = list()
+higher_IC_results = list()
+
+
+
+combinations_simulations_parameters <- expand.grid(HR_target = HR_target_list,
+                                                   scenario_function = scenario_functions_list, 
+                                                   max_time = max_time_list,
+                                                   n_patients = n_patients_list,
+                                                   doses = doses_list,
+                                                   binarization_dose_list = binarization_dose_list)
+
+combinations_analysis_parameters <- expand.grid(n_knots_list = n_knots_list,
+                                                n_bootstraps = n_bootstraps_list,
+                                                constraint_list = constraint_list, 
+                                                cutoff = cutoff_list, 
+                                                n_bootstraps = n_bootstraps_list)
+
+
+
+number_line_df = nrow(combinations_simulations_parameters) * nrow(combinations_analysis_parameters)
+print(number_line_df)
+
+
+
+results_df = data.frame(simulation_id = integer(number_line_df),
+                        HR_target = integer(number_line_df),
+                        scenario_functions = character(number_line_df),
+                        n_patients = integer(number_line_df),
+                        max_time = integer(number_line_df),
+                        doses = integer(number_line_df),
+                        binarization_dose = character(number_line_df),
+                        n_knots = integer(number_line_df),
+                        constraint = character(number_line_df),
+                        cutoff = integer(number_line_df),
+                        n_bootstraps = integer(number_line_df),
+                        BIC = integer(number_line_df),
+                        HR = integer(number_line_df),
+                        lower_IC = integer(number_line_df),
+                        higher_IC = integer(number_line_df))
+print(results_df)
+
+
+print(combinations_simulations_parameters)
+
+print(combinations_analysis_parameters)
+
+
+
+
+result_dict_path = file.path("../Simulation_results",experiment_name)
+
+if (dir.exists(result_dict_path)){
+    stop("this experiment already exist")
+}else{
+    dir.create(result_dict_path)
+}
+
+condition_simulation_id <- 0
+number_of_analyzed_models <- 0
+
+for (i in 1:nrow(combinations_simulations_parameters)){
+
+    condition_simulation_id <- condition_simulation_id + 1
+
+    for(simulation_number in 1:number_of_simulations )
+
+        HR_target <- combinations_simulations_parameters$HR_target[i]
+        scenario_function <- combinations_simulations_parameters$scenario_function[i]
+        n_patients <- combinations_simulations_parameters$n_patients[i]
+        max_time <- combinations_simulations_parameters$max_time[i]
+        doses <- combinations_simulations_parameters$doses[i]
+        binarization_dose <- combinations_simulations_parameters$binarization_dose[i]
+
+
+        simulated_dataset <- simulate_dataset(max_time, n_patients, doses, scenario_function, HR_target)
+
+        simulation_id <- paste0(experiment_name,"_condition-",as.character(condition_simulation_id),"_",as.character(simulation_number))
+
+        for(j in 1:nrow(combinations_analysis_parameters)){
+
+            number_of_analyzed_models <- number_of_analyzed_models + 1
+            print("##################")
+            print(number_of_analyzed_models)
+
+            n_knots <- combinations_analysis_parameters$n_knots_list[j]
+            n_bootstraps <- combinations_analysis_parameters$n_bootstraps[j]
+            constraint <- combinations_analysis_parameters$constraint_list[j]
+            cutoff <- combinations_analysis_parameters$cutoff[j]
+            n_bootstraps <- combinations_analysis_parameters$n_bootstraps[j]
+
+
+            wce_model <- modelize_dataset(max_time, n_patients, cutoff, n_bootstraps, n_knots,simulated_dataset, constraint)
+            HR <- analyze_model(wce_model, n_patients, cutoff)
+
+
+            BIC <- mean(wce_model$info.criterion)
+
+
+
+
+            results_df$simulation_id[number_of_analyzed_models] <- simulation_id
+            results_df$HR_target[number_of_analyzed_models] <- HR_target
+            results_df$scenario_functions[number_of_analyzed_models] <- as.character(scenario_function)
+            results_df$n_patients[number_of_analyzed_models] <- n_patients
+            results_df$max_time[number_of_analyzed_models] <- max_time
+            results_df$doses[number_of_analyzed_models] <- paste(doses, collapse ='')
+            results_df$binarization_dose[number_of_analyzed_models] <- binarization_dose
+            results_df$n_knots[number_of_analyzed_models] <- n_knots
+            results_df$constraint[number_of_analyzed_models] <- as.character(constraint)
+            results_df$cutoff[number_of_analyzed_models] <- cutoff
+            results_df$n_bootstraps[number_of_analyzed_models] <- n_bootstraps
+            results_df$BIC[number_of_analyzed_models] <- BIC
+            results_df$HR[number_of_analyzed_models] <- HR[1]
+            results_df$lower_IC[number_of_analyzed_models] <- HR[2]
+            results_df$higher_IC[number_of_analyzed_models] <- HR[3]
+        }
+
+}
+
+print(HR_results)
+print(HR_target_result)
+
+
+
+print(results_df)
+
+
+result_df_path = file.path("../Simulation_results",experiment_name)
+file_result_name = paste0("analyzed_",experiment_name,".csv")
+file_result_path = file.path(result_df_path,file_result_name)
+write.csv(results_df, file_result_path)
+
+quit()
+
+
+
+
+for (i in 1:nrow(combinations_simulations_parameters)){
+
+    HR_target <- combinations_simulations_parameters$HR_target[i]
+    weight_function <- combinations_simulations_parameters$weight_function[i]
+    n_patients <- combinations_simulations_parameters$n_patients[i]
+    n_knots <- combinations_simulations_parameters$n_knots[i]
+    binarization_dose <- combinations_simulations_parameters$binarization_dose_list[i]
+    experiment_number <- combinations_simulations_parameters$experiment_number[i]
+
+    print(paste0("Starting computation for :" ,as.character(n_patients),"patients - HR_target = ",HR_target," - weight function = ",weight_function,"- ",as.character(n_knots)," knots"))
+
+
+    # file_name = paste0(weight_function,"_",as.character(n_patients),".csv")
+    # file_path = file.path("../WCEmat",paste0("HR-",as.character(HR_target)),file_name)
+
+    file_path = file.path("../simulated_datasets",weight_function,paste0("HR-",as.character(HR_target)),paste0("n_",as.character(n_patients)),paste0("dataset_",as.character(experiment_number),".csv"))
+
+    print(file_path)
+
+
+    if (n_patients < 10000){
+        batchsize = 100
+    }else{
+        batchsize = 10
+    }
+
+
+
+    data = read.csv(file_path)
+
+    if(binarization_dose == TRUE){
+        print("effective binarization dose")
+        data["dose"] <- lapply(data["dose"], binarization_dose_function)
+    }
+
+    wce_model_GPU_bootstraps <- wceGPU(data, n_knots, cutoff, constrained = "R",
+               id = "patient", event = "event", start = "start",
+               stop = "stop", expos = "dose",nbootstraps = n_bootstraps,batchsize = batchsize, verbosity=0)
+
+    BIC = mean(wce_model_GPU_bootstraps$info.criterion)
+
+    exposed   <- rep(1, cutoff)
+    non_exposed   <- rep(0, cutoff)
+
+    HR_result_GPU_bootstraps = HR(wce_model_GPU_bootstraps,vecnum = exposed, vecdenom= non_exposed)
+
+    print(paste0("HR GPU_bootstraps :",HR_result_GPU_bootstraps))
+
+    t = 1:cutoff
+
+    print("########")
+    scenario_function = scenario_translator(weight_function)
+    target_WCE_function = calcul_exposition(scenario_function,HR_target,cutoff)
+    print(exp(sum(target_WCE_function)))
+
+
+    mean_WCE_function_result_GPU_bootstraps = c()
+    lower_WCE_function_result_GPU_bootstraps = c()
+    higher_WCE_function_result_GPU_bootstraps = c()
+
+
+    
+
+    for (t in 1:cutoff){
+
+        quantiles = quantile(wce_model_GPU_bootstraps$WCEmat[,t],probs=c(0.025,0.975))
+        
+        mean_WCE_function_result_GPU_bootstraps = c(mean_WCE_function_result_GPU_bootstraps, mean(wce_model_GPU_bootstraps$WCEmat[,t]))
+        lower_WCE_function_result_GPU_bootstraps = c(lower_WCE_function_result_GPU_bootstraps, quantiles[1])
+        higher_WCE_function_result_GPU_bootstraps = c(higher_WCE_function_result_GPU_bootstraps, quantiles[2])
+
+
+    }
+
+
+    maximum  = max(max(higher_WCE_function_result_GPU_bootstraps),max(target_WCE_function))
+    minimum = min(0,lower_WCE_function_result_GPU_bootstraps)
+
+    file_name = paste0(weight_function," patients : ",n_patients," HR : ",HR_target," nknots : ",n_knots,".png")
+
+    file_path = file.path("../Simulation_results",experiment_name,file_name)
+
+    png(file_path, width = 800, height = 600)
+
+    plot(1:cutoff,
+    target_WCE_function,
+    type="l",
+    col="red",
+    ylim = c(minimum - 0.2*minimum,maximum+0.2*maximum),
+    xlab = "time (days)",
+    ylab = "WCE weight",
+    main = paste0(weight_function," patients : ",n_patients," HR : ",HR_target," nknots : ",n_knots)
+    )
+    lines(1:cutoff,mean_WCE_function_result_GPU_bootstraps,col="black")
+    lines(1:cutoff,lower_WCE_function_result_GPU_bootstraps,col ="black", lty ="dashed" )    
+    lines(1:cutoff,higher_WCE_function_result_GPU_bootstraps,col ="black", lty ="dashed" )
+
+    dev.off()
+
+
+
+    weight_function_results = append(weight_function_results,weight_function) #c(weight_function_results,weight_function)  
+    n_patients_results = append(n_patients_results,n_patients)  
+    n_bootstraps_results = append(n_bootstraps_results,n_bootstraps)  
+    cutoff_results = append(cutoff_results,cutoff)  
+    HR_target_results = append(HR_target_results,HR_target)       
+    HR_GPU_bootstraps_results = append(HR_GPU_bootstraps_results,HR_result_GPU_bootstraps[1])  
+    HR_GPU_bootstraps_2_5_results = append(HR_GPU_bootstraps_2_5_results,HR_result_GPU_bootstraps[2]) 
+    HR_GPU_bootstraps_97_5_results = append(HR_GPU_bootstraps_97_5_results,HR_result_GPU_bootstraps[3])  
+    BIC_results = append(BIC_results,BIC)
+    n_knots_results = append(n_knots_results,n_knots)
+
+result_dict = list("weight_function"= weight_function_results,
+                   "n_patients"= n_patients_results,
+                   "n_bootstraps"= n_bootstraps_results,
+                   "cutoff"= cutoff_results,
+                   "HR_target"= HR_target_results,
+                   "HR_calculated_GPU_bootstraps"= HR_GPU_bootstraps_results,
+                   "HR_calculated_GPU_bootstraps_2_5"= HR_GPU_bootstraps_2_5_results,
+                   "HR_calculated_GPU_bootstraps_97_5"= HR_GPU_bootstraps_97_5_results,
+                   "BIC_results" = BIC_results,
+                   "nknots" = n_knots_results
+                   )
+
+print(result_dict)
+
+
+
+result_dict_path = file.path("../Simulation_results",experiment_name)
+
+file_result_name = paste0("analyzed_",experiment_name,".csv")
+file_result_path = file.path(result_dict_path,file_result_name)
+
+write.csv(result_dict, file_result_path)
+
+
+}
+
+
+
+
+
+
