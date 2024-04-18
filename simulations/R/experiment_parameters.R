@@ -2,19 +2,19 @@ generate_parameters <- function(){
 
     #################### Parameters Selection
 
-    experiment_name = "big_fat_test_4"
+    experiment_name = "New simulations : exonential scenario 100 - 100 000"
 
 
     # number of simulations by experiment 
 
-    number_of_simulations = 2
+    number_of_simulations = 1
 
 
     # Simulation parameters 
 
-    HR_target_list = c(1.25,1.5)#c(1)#c(2.8)#c(1)#c(1.25,1.5,2,2.8)#c(1)#c(2.8)
+    HR_target_list = c(1,1.25,1.5,2,2.8)#c(1.25,1.5,2,2.8)#c(1)#c(2.8)#c(1)#c(1.25,1.5,2,2.8)#c(1)#c(2.8)
     scenario_functions_list = c("exponential_scenario")#c("early_peak_scenario")#c("bi_linear_scenario") #, early_peak_scenario, inverted_u_scenario") #c("exponential_scenario")
-    n_patients_list = c(50)#c(100,200,500,1000,2000,5000,10000) #,20000) #,50000,100000)#c(100,1000,10000,100000)##c(100,1000,10000,100000)#c(100,200,500,1000,2000,5000,10000,20000,50000,100000)#,10000)
+    n_patients_list = c(100,200,500,1000,2000,5000,10000,20000,50000,100000)#c(100,200,500,1000,2000,5000,10000) #,20000) #,50000,100000)#c(100,1000,10000,100000)##c(100,1000,10000,100000)#c(100,200,500,1000,2000,5000,10000,20000,50000,100000)#,10000)
     max_time_list = c(365)
     binarization_dose_list = c(FALSE) #,TRUE) #FALSE
     doses_list = list(c(1,1.5,2,2.5,3))
