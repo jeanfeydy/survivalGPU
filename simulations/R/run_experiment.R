@@ -21,11 +21,12 @@ source("simulation_and_analysis.R")
 experiment_parameters = generate_parameters()
 
 
-# get experiment_name
+# get experiment paramters
 experiment_name <- experiment_parameters$experiment_name
+number_of_simulations <- experiment_parameters$number_of_simulations
+save_models <- experiment_parameters$save_models
 
-# get number of repetitions of simulations 
-number_of_simulations = experiment_parameters$number_of_simulations
+
 
 
 # Get simulation parameters 
@@ -104,8 +105,12 @@ results_df = data.frame(simulation_id = integer(number_line_df),
                         HR = integer(number_line_df),
                         lower_IC = integer(number_line_df),
                         higher_IC = integer(number_line_df))
-print(results_df)
 
+if (save_models == TRUE){
+    results_df$path_model <- character(number_line_df)
+    print(results_df["path_model"])
+
+}
 
 print(combinations_simulations_parameters)
 
@@ -147,9 +152,7 @@ for (i in 1:nrow(combinations_simulations_parameters)){
 
         simulation_id <- paste0(experiment_name,"_condition-",as.character(condition_simulation_id),"_",as.character(simulation_number))
 
-        print("Simualtion OK")
-        print(n_patients)
-
+ 
         for(j in 1:nrow(combinations_analysis_parameters)){
 
             number_of_analyzed_models <- number_of_analyzed_models + 1
@@ -188,8 +191,18 @@ for (i in 1:nrow(combinations_simulations_parameters)){
             results_df$lower_IC[number_of_analyzed_models] <- HR[2]
             results_df$higher_IC[number_of_analyzed_models] <- HR[3]
 
-            print("Analysis OK")
-            print(n_patients)
+            if (save_models == TRUE){
+                model_name = paste0("saved_model_",as.character(number_of_analyzed_models))
+                results_df$path_model = model_name
+
+
+                model_result_name = paste0(model_name,".rds")
+                model_result_path = file.path(result_df_path,model_result_name)
+                saveRDS(wce_model, model_result_path)
+                
+            }
+
+ 
 
 
             write.csv(results_df, file_result_path)
