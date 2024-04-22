@@ -15,7 +15,7 @@ source("simulation_and_analysis.R")
 
 
 
-n_patients_list = c(100,200,500,1000,2000,5000,10000)#c(100,100,200,5000,1000,2000,5000,10000,20000,50000,100000)
+n_patients_list = c(100,200,500,1000,2000,5000,10000,20000,50000,100000)#c(100,100,200,5000,1000,2000,5000,10000,20000,50000,100000)
 
 observation_time = 365
 doses = c(1,1.5,2,2.5,3)
@@ -27,7 +27,7 @@ n_bootstraps = 1000
 cutoff = 180
 n_knots = 1
 
-experiment_name <- "2024-04-22 : benchmark CPU old permalgo_19"
+experiment_name <- "2024-04-22 : benchmark CPU old permalgo"
 
 
 result_dict_path = file.path("../Simulation_results",experiment_name)

@@ -34,23 +34,22 @@ modelize_dataset <- function(max_time, n_patients, cutoff, n_bootstraps, n_knots
 
 
     if (n_bootstraps == 1){
-        batchsize = 0
+        batchsize = 1
     }else if (n_patients < 100){
         batchsize = n_patients
     }
     else if (n_patients <= 10000){
         batchsize = 100
-
     }else{
         batchsize = 10
     }
+    print(batchsize)
 
-    wce_model_list = list()
 
 
     wce_model <- wceGPU(dataset, n_knots, cutoff, constrained = constraint,
                         id = "patient", event = "event", start = "start",
-                        stop = "stop", expos = "dose",nbootstraps = n_bootstraps,batchsize = , verbosity=0)
+                        stop = "stop", expos = "dose",nbootstraps = n_bootstraps,batchsize = batchsize, verbosity=0)
 
 
 
