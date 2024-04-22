@@ -27,9 +27,9 @@ n_bootstraps = 1000
 cutoff = 180
 n_knots = 1
 
-experiment_name <- "2024-04-22 : benchmark GPU"
+experiment_name <- "2024-04-22 : benchmark CPU test memory error"
 
-computation_type <- "GPU"
+computation_type <- "CPU"
 
 result_dict_path = file.path("../Simulation_results",experiment_name)
 
@@ -66,19 +66,20 @@ for (n_patients in n_patients_list){
     start_simulation_time = Sys.time()
     dataset = simulate_dataset(max_time, n_patients, doses, scenario, HR_target, constraint)
     end_simulation_time = Sys.time()
-    elapsed_simulation_time = end_simulation_time - start_simulation_time
+    elapsed_simulation_time <- as.numeric(difftime(end_simulation_time, start_simulation_time, units = "secs"))
+
     df_results$simulation_time[number_analyzed_conditions] = elapsed_simulation_time
     
     start_no_bootstraps_time = Sys.time()
     wce_model_without_bootstraps = modelize_dataset(max_time, n_patients, cutoff, n_bootstraps =1, n_knots =n_knots,dataset =dataset, constraint = constraint)
     end_no_bootstraps_time = Sys.time()
-    elapsed_no_bootstraps_time = end_no_bootstraps_time - start_no_bootstraps_time
+    elapsed_simulation_time <- as.numeric(difftime(end_no_bootstraps_time, start_no_bootstraps_time, units = "secs"))
     df_results$computation_time_no_bootstraps[number_analyzed_conditions] = elapsed_no_bootstraps_time
 
     start_1000_bootstraps_time = Sys.time()
     wce_model_1000_bootstraps = modelize_dataset(max_time, n_patients, cutoff, n_bootstraps, n_knots,dataset, constraint)
     end_1000_bootstraps_time = Sys.time()
-    elapsed_1000_bootstraps_time = end_1000_bootstraps_time - start_1000_bootstraps_time
+    elapsed_simulation_time <- as.numeric(difftime(end_1000_bootstraps_time, start_1000_bootstraps_time, units = "secs"))
     df_results$computation_time_1000_bootstraps[number_analyzed_conditions] = elapsed_1000_bootstraps_time
 
     write.csv(df_results, file_result_path)

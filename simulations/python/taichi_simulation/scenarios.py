@@ -3,6 +3,9 @@ import numpy as np
 def exponential_scenario(u_t, name = False):
     return((7 * np.exp(-7*u_t/365)*0.5)) # divide by 365 in order to have a t in days
 
+def test_opposite_square_scenario(u_t):
+    return 1/np.exp(u_t)
+
 
 def get_scenario(scenario_name: int,cutoff:int):
     """
@@ -15,6 +18,7 @@ def get_scenario(scenario_name: int,cutoff:int):
 
     scenario_list = {
         "exponential_scenario" : exponential_scenario,
+        "test_opposite_square_scenario" : test_opposite_square_scenario
     }
 
     try:
@@ -28,6 +32,7 @@ def get_scenario(scenario_name: int,cutoff:int):
     for i in range(1,cutoff+1):
         scenario_list.append(scenario_function(i)) 
     scenario_list = np.array(scenario_list)
+
 
     return scenario_list/scenario_list.sum()
 

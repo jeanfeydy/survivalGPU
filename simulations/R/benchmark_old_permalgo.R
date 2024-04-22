@@ -62,10 +62,9 @@ for (n_patients in n_patients_list){
 
     start_simulation_time = Sys.time()
     dataset = genrate_dataset_process(doses,observation_time, n_patients,scenario,cutoff,HR_target)
-
-    print("dataset")
     end_simulation_time = Sys.time()
-    elapsed_simulation_time = end_simulation_time - start_simulation_time
+    
+    elapsed_simulation_time  <- as.numeric(difftime(end_simulation_time, start_simulation_time, units = "secs"))
     df_results$simulation_time[number_analyzed_conditions] = elapsed_simulation_time
     
     write.csv(df_results, file_result_path)
