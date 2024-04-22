@@ -5,6 +5,8 @@ import torch
 import torchvision.models as models
 from torch.profiler import profile, record_function, ProfilerActivity
 from pathlib import Path 
+from scipy.stats import norm
+
 
 from .coxph import coxph_torch
 
@@ -383,6 +385,19 @@ def exponential_scenario(u_t, name = False):
 def test_opposite_square_scenario(u_t):
     return 1/np.exp(u_t)
 
+def bi_linear_scenario(u_t):
+    if u_t < 50:
+        return (1- (u_t/365)/(50/365))
+    return 0 
+
+def early_peak_scenario(u_t):
+    return norm.pdf(u_t/365, 0.04, 0.05)
+
+
+def inverted_u_scenario(u_t):
+    return norm.pdf(u_t/365, 0.04, 0.05)
+
+
 
 def get_scenario(scenario_name: int,max_time:int):
     """
@@ -394,7 +409,11 @@ def get_scenario(scenario_name: int,max_time:int):
     """
 
     scenario_list = {
-        "exponential_scenario" : exponential_scenario
+        "exponential_scenario" : exponential_scenario,
+        "bi_linear_scenario" : bi_linear_scenario,
+        "early_peak_scenario" :early_peak_scenario,
+        "inverted_u_scenario" : inverted_u_scenario,
+
     }
 
     try:
