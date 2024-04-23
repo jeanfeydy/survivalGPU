@@ -27,7 +27,7 @@ n_bootstraps = 1000
 cutoff = 180
 n_knots = 1
 
-experiment_name <- "2024-04-22 : benchmark CPU test memory error"
+experiment_name <- "2024-04-22 : benchmark CPU no bootstraps"
 
 computation_type <- "CPU"
 
@@ -49,8 +49,8 @@ number_conditions = length(n_patients_list)
 df_results = data.frame(n_patients = integer(number_conditions),
                        computation_type = integer(number_conditions),
                        simulation_time = integer(number_conditions),
-                       computation_time_no_bootstraps = integer(number_conditions),
-                       computation_time_1000_bootstraps =integer(number_conditions)
+                       computation_time_no_bootstraps = integer(number_conditions)
+                    #    computation_time_1000_bootstraps =integer(number_conditions)
                        )
 
 number_analyzed_conditions = 0
@@ -73,14 +73,14 @@ for (n_patients in n_patients_list){
     start_no_bootstraps_time = Sys.time()
     wce_model_without_bootstraps = modelize_dataset(max_time, n_patients, cutoff, n_bootstraps =1, n_knots =n_knots,dataset =dataset, constraint = constraint)
     end_no_bootstraps_time = Sys.time()
-    elapsed_simulation_time <- as.numeric(difftime(end_no_bootstraps_time, start_no_bootstraps_time, units = "secs"))
+    elapsed_no_bootstraps_time <- as.numeric(difftime(end_no_bootstraps_time, start_no_bootstraps_time, units = "secs"))
     df_results$computation_time_no_bootstraps[number_analyzed_conditions] = elapsed_no_bootstraps_time
 
-    start_1000_bootstraps_time = Sys.time()
-    wce_model_1000_bootstraps = modelize_dataset(max_time, n_patients, cutoff, n_bootstraps, n_knots,dataset, constraint)
-    end_1000_bootstraps_time = Sys.time()
-    elapsed_simulation_time <- as.numeric(difftime(end_1000_bootstraps_time, start_1000_bootstraps_time, units = "secs"))
-    df_results$computation_time_1000_bootstraps[number_analyzed_conditions] = elapsed_1000_bootstraps_time
+    # start_1000_bootstraps_time = Sys.time()
+    # wce_model_1000_bootstraps = modelize_dataset(max_time, n_patients, cutoff, n_bootstraps, n_knots,dataset, constraint)
+    # end_1000_bootstraps_time = Sys.time()
+    # elapsed_1000_bootstraps_time <- as.numeric(difftime(end_1000_bootstraps_time, start_1000_bootstraps_time, units = "secs"))
+    # df_results$computation_time_1000_bootstraps[number_analyzed_conditions] = elapsed_1000_bootstraps_time
 
     write.csv(df_results, file_result_path)
 
