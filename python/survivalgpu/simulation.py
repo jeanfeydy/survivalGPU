@@ -382,9 +382,6 @@ def simulate_dataset(max_time, n_patients, doses, scenario, HR_target):
 def exponential_scenario(u_t, name = False):
     return((7 * np.exp(-7*u_t/365))) # divide by 365 in order to have a t in days
 
-def test_opposite_square_scenario(u_t):
-    return 1/np.exp(u_t)
-
 def bi_linear_scenario(u_t):
     if u_t < 50:
         return (1- (u_t/365)/(50/365))
