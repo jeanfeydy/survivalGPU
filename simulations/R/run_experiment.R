@@ -85,7 +85,7 @@ combinations_analysis_parameters <- expand.grid(n_knots_list = n_knots_list,
 
 
 
-number_line_df = nrow(combinations_simulations_parameters) * nrow(combinations_analysis_parameters)
+number_line_df = nrow(combinations_simulations_parameters) * nrow(combinations_analysis_parameters) * number_of_simulations
 print(number_line_df)
 
 
@@ -138,7 +138,14 @@ for (i in 1:nrow(combinations_simulations_parameters)){
 
     condition_simulation_id <- condition_simulation_id + 1
 
-    for(simulation_number in 1:number_of_simulations )
+    print(number_of_simulations)
+
+    for(simulation_number in 1:number_of_simulations ){
+
+
+        # print("########## NEW SIMULATION" )
+        # print("number of simulations")
+        print(simulation_number)
 
         HR_target <- combinations_simulations_parameters$HR_target[i]
         scenario_function <- combinations_simulations_parameters$scenario_function[i]
@@ -151,9 +158,11 @@ for (i in 1:nrow(combinations_simulations_parameters)){
         simulated_dataset <- simulate_dataset(max_time, n_patients, doses, scenario_function, HR_target)
 
         simulation_id <- paste0(experiment_name,"_condition-",as.character(condition_simulation_id),"_",as.character(simulation_number))
-
+        print(simulation_id)
  
         for(j in 1:nrow(combinations_analysis_parameters)){
+
+
 
             number_of_analyzed_models <- number_of_analyzed_models + 1
             print("##################")
@@ -172,7 +181,10 @@ for (i in 1:nrow(combinations_simulations_parameters)){
 
             BIC <- mean(wce_model$info.criterion)
 
+            print("OK")
+            print(simulation_id)
 
+            print(results_df)
 
 
             results_df$simulation_id[number_of_analyzed_models] <- simulation_id
@@ -206,6 +218,8 @@ for (i in 1:nrow(combinations_simulations_parameters)){
 
 
             write.csv(results_df, file_result_path)
+            
+        }
         }
 
 }
