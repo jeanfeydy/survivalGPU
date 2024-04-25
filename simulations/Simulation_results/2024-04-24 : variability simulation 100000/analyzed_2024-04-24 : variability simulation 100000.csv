@@ -1,0 +1,2 @@
+"","simulation_id","HR_target","scenario_functions","n_patients","max_time","doses","binarization_dose","n_knots","constraint","cutoff","n_bootstraps","BIC","HR","lower_IC","higher_IC","path_model"
+"1","2024-04-24 : variability simulation 100000_condition-1_20",1.5,"exponential_scenario",100000,365,"c(1, 1.5, 2, 2.5, 3)","FALSE",1,"R",180,1000,1563909.09014506,1.44809175507064,1.40472241908657,1.50073396579088,"saved_model_1"
