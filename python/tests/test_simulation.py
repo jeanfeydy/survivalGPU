@@ -5,6 +5,74 @@ from survivalgpu.simulation import event_FUP_Ti_generation
 from survivalgpu.simulation import generate_wce_mat
 from survivalgpu.simulation import matching_algo
 from survivalgpu.simulation import get_dataset
+from survivalgpu.simulation import get_scenario
+from scipy.stats import norm
+
+import pytest
+import pandas as pd
+
+
+def test_get_scenario():
+
+    # For exponential scenario
+
+
+    expected_scenario_shape = np.zeros(365)
+    for i in range(365):
+        expected_scenario_shape[i] = 7*np.exp(-7*i/365)
+    
+    normalization_factor = np.sum(expected_scenario_shape)
+    expected_scenario_shape = expected_scenario_shape/normalization_factor
+    real_scenario_shape = get_scenario("exponential_scenario", 365)
+    assert np.allclose(real_scenario_shape, expected_scenario_shape)
+
+
+
+    # For bi-linear scenario
+
+
+    expected_scenario_shape = np.zeros(365)
+    for i in range(365):
+        if i < 50:
+            expected_scenario_shape[i] = 1- (i/365)/(50/365)
+        else:
+            expected_scenario_shape[i] = 0
+
+    normalization_factor = np.sum(expected_scenario_shape)
+    expected_scenario_shape = expected_scenario_shape/normalization_factor
+    real_scenario_shape = get_scenario("bi_linear_scenario", 365)
+    assert np.allclose(real_scenario_shape, expected_scenario_shape)
+
+    # For early peak scenario
+
+    expected_scenario_shape = np.zeros(365)
+    for i in range(365):
+        expected_scenario_shape[i] = norm.pdf(i/365, 0.04, 0.05)
+
+    
+    normalization_factor = np.sum(expected_scenario_shape)
+    expected_scenario_shape = expected_scenario_shape/normalization_factor
+    real_scenario_shape = get_scenario("early_peak_scenario", 365)
+    assert np.allclose(real_scenario_shape, expected_scenario_shape)
+
+    # for inverted u scenario
+
+    expected_scenario_shape = np.zeros(365)
+    for i in range(365):
+        expected_scenario_shape[i] = norm.pdf(i/365, 0.2, 0.06)
+
+    normalization_factor = np.sum(expected_scenario_shape)
+    expected_scenario_shape = expected_scenario_shape/normalization_factor
+    real_scenario_shape = get_scenario("inverted_u_scenario", 365)
+    assert np.allclose(real_scenario_shape, expected_scenario_shape)
+
+
+    # for a function that is not implemented
+
+def test_get_scenario_not_implemented():
+    # For non-existent scenario
+    with pytest.raises(ValueError, match="The scenario 'unknown_scenario' is not defined"):
+        get_scenario("unknown_scenario", 365)
 
 
 def test_generate_wce_mat():
@@ -130,20 +198,67 @@ def test_matching_algo():
     ordered_wce_id_indexes = np.sort(wce_id_indexes)
 
     ordered_expected_id_indexes = np.arange(0, n_patients, 1)
+    print("OK")
 
     assert np.allclose(ordered_wce_id_indexes, ordered_expected_id_indexes)
 
 
 
 
-# def test_get_dataset():
+def test_get_dataset():
+
+    n_patients = 4
+    max_time = 5
+    HR_target = 1.5
+
+
+    Xmat = np.array([[1, 2, 0, 0],
+                     [2, 3, 1, 1],
+                     [0, 2, 2, 2],
+                     [0, 5, 0, 3],
+                     [0, 5, 0, 3]])
+    print(Xmat)
+
+    FUP_tis = [3,2,1,2]
+    events = [1,0,0,1]
+
+    wce_id_indexes = [2,0,3,1]
+
+
+    expected_result_numpy = np.array([[1,0,1,0,0],
+                                      [1,1,2,0,1],
+                                      [1,2,3,1,2],
+                                      [2,0,1,0,1],
+                                      [2,1,2,0,2],
+                                      [3,0,1,0,0],
+                                      [4,0,1,0,2],
+                                      [4,1,2,1,3],
+                                      ])
+    
+    expected_result_dataframe = pd.DataFrame(expected_result_numpy, columns=["patient","start","stop","event","dose"])
+    
+    print("OK")
+    print(expected_result_dataframe)
+
+    real_result_dataframe = get_dataset(Xmat, max_time, n_patients, HR_target, FUP_tis, events, wce_id_indexes)
+
+    print(real_result_dataframe)
+
+    assert np.allclose(expected_result_dataframe, real_result_dataframe)
 
     
 
+
+
+
+    
+test_get_scenario()
+test_get_scenario_not_implemented()
 test_generate_wce_mat()
 test_event_FUP_Ti_generation()
-test_matching_algo()
 test_get_probas()
+test_matching_algo()
+test_get_dataset()
 
 
 

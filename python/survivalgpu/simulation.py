@@ -186,78 +186,68 @@ def get_probas(wce_mat_current, HR_target, time_event):
 
 
 
-def get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis, events, wce_id_indexes):
+def get_dataset(Xmat, max_time, n_patients, HR_target, FUP_tis, events, wce_id_indexes):
+    """
+    Generate a dataset based on the given inputs.
 
-    FUP_tis = np.array(FUP_tis, dtype = int)
-    events = np.array(events, dtype = int)
+    Args:
+        Xmat (numpy.ndarray): The input matrix.
+        max_time (int): The maximum time.
+        n_patients (int): The number of patients.
+        HR_target (float): The target hazard ratio.
+        FUP_tis (list): The follow-up times.
+        events (list): The events.
+        wce_id_indexes (list): The WCE ID indexes.
+
+    Returns:
+        pandas.DataFrame: The generated dataset.
+    """
+    FUP_tis = np.array(FUP_tis, dtype=int)
+    events = np.array(events, dtype=int)
     n_patients = int(n_patients)
 
-
-
-    wce_id_indexes = np.array(wce_id_indexes, dtype = int) 
-
-     # wce_mat
-
+    wce_id_indexes = np.array(wce_id_indexes, dtype=int)
 
     ordered_events = events
     ordered_FUP_tis = FUP_tis
 
-
     Xmat_transposed = Xmat.transpose()
-
-
-
 
     number_lines = ordered_FUP_tis.sum()
 
-    patient_id_array = np.zeros(number_lines, dtype = int)
-    event_array = np.zeros(number_lines, dtype = int)
-    time_start_array = np.zeros(number_lines, dtype = int)
-    time_stop_array = np.zeros(number_lines, dtype = int)
-    doses_aray = np.zeros(number_lines, dtype = np.float64)
+    patient_id_array = np.zeros(number_lines, dtype=int)
+    event_array = np.zeros(number_lines, dtype=int)
+    time_start_array = np.zeros(number_lines, dtype=int)
+    time_stop_array = np.zeros(number_lines, dtype=int)
+    doses_aray = np.zeros(number_lines, dtype=np.float64)
 
     i = 0
 
-
-
-
     dataset_start = time.perf_counter()
 
-
     for patient_id in range(n_patients):
-
-
-
-        
         for time_start in range(ordered_FUP_tis[patient_id]):
-            
-            patient_id_array[i] = patient_id +1
+            patient_id_array[i] = patient_id + 1
             time_start_array[i] = time_start
-            time_stop_array[i] = time_start +1
-            doses_aray[i] = Xmat_transposed[wce_id_indexes[patient_id],time_start]
-            
+            time_stop_array[i] = time_start + 1
+            doses_aray[i] = Xmat_transposed[wce_id_indexes[patient_id], time_start]
+
             if time_start == ordered_FUP_tis[patient_id] - 1:
                 event_array[i] = ordered_events[patient_id]
             else:
                 event_array[i] = 0
             i += 1
- 
+
     dataset_end = time.perf_counter()
-    elapsed_dataset_time = dataset_end-dataset_start
-
-
+    elapsed_dataset_time = dataset_end - dataset_start
 
     df_wce = pd.DataFrame()
-    # ["patient","start","stop","event","dose"])
     df_wce["patient"] = patient_id_array
     df_wce["start"] = time_start_array
     df_wce["stop"] = time_stop_array
     df_wce["event"] = event_array
     df_wce["dose"] = doses_aray
 
-
-
-    
     return df_wce
 
 
@@ -304,12 +294,12 @@ def early_peak_scenario(u_t):
 
 
 def inverted_u_scenario(u_t):
-    return norm.pdf(u_t/365, 0.04, 0.05)
+    return norm.pdf(u_t/365, 0.2, 0.06)
 
 
 def get_scenario(scenario_name: int,max_time:int):
     """
-    For each scenario function implemeted, this function will take into input the scenario name and the cutoff
+    For each scenario function implemented, this function will take into input the scenario name and the cutoff
     and return the list of the scenario shape normalized so that the sum of the weights is 
     equal to 1.
 
@@ -327,7 +317,7 @@ def get_scenario(scenario_name: int,max_time:int):
     try:
         scenario_function = scenario_list[scenario_name]
     except KeyError:
-        print("The scenario ",scenario_name, " is not defined")
+        raise ValueError(f"The scenario '{scenario_name}' is not defined")
 
 
     scenario_list = []
