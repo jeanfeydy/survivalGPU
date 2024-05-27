@@ -242,18 +242,18 @@ def get_dataset(Xmat, max_time, n_patients, HR_target, FUP_tis, events, wce_id_i
     elapsed_dataset_time = dataset_end - dataset_start
 
     df_wce = pd.DataFrame()
-    df_wce["patient"] = patient_id_array
+    df_wce["patients"] = patient_id_array
     df_wce["start"] = time_start_array
     df_wce["stop"] = time_stop_array
-    df_wce["event"] = event_array
-    df_wce["dose"] = doses_aray
+    df_wce["events"] = event_array
+    df_wce["doses"] = doses_aray
 
     return df_wce
 
 
 def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
 
-    df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
+    df_wce = pd.DataFrame(numpy_wce, columns = ["patients","start","stop","events","doses"])
     print( str(HR_target))
     saving_path = Path("../../simulated_datasets") / scenario / str(HR_target) / str(n_patients) / "dataset.csv"
     df_wce.to_csv(saving_path)
@@ -274,7 +274,7 @@ def simulate_dataset(max_time, n_patients, doses, scenario, HR_target):
 
     wce_id_indexes  = matching_algo(wce_mat, max_time,n_patients, HR_target,events, FUP_tis)
     numpy_wce = get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis,events,wce_id_indexes)
-    df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
+    df_wce = pd.DataFrame(numpy_wce, columns = ["patients","start","stop","events","doses"])
 
     return df_wce
 
