@@ -1,20 +1,58 @@
 import numpy as np
 import random
-import pandas as pd
-import torch
-import torchvision.models as models
-from torch.profiler import profile, record_function, ProfilerActivity
-from pathlib import Path 
-from scipy.stats import norm
+# import pandas as pd
+# import torch
+# import torchvision.models as models
+# from torch.profiler import profile, record_function, ProfilerActivity
+# from pathlib import Path 
+# from scipy.stats import norm
 
 
-from .coxph import coxph_torch
+# from .coxph import coxph_torch
 
 
-import time
+# import time
+
+
+import numpy as np
 
 
 
+
+class Covariate:
+    def __init__(self, name, values):
+        self.name = name
+        self.values = values
+        
+
+class ConstantCovariate(Covariate):
+    def __init__(self, name, values,weights):
+        super().__init__(name, values)
+        self.weights = weights
+
+    def generate_Xmat(self, observation_time, n_patients):
+        """
+        Generate the Xmat of the constant covariates
+        """
+        proba = self.weights / np.sum(self.weights)
+        Xvect = np.random.choice(self.values, size = n_patients, p = proba)
+        Xmat = np.repeat(Xvect, observation_time).reshape(n_patients,observation_time).transpose()
+
+
+        return Xmat
+
+class TimeDependentCovariate(Covariate):
+    def __init__(self, name, values):
+        super().__init__(name, values)
+    
+    def generate_Xmat(self, observation_time, n_patients):
+        """
+        Generate the Xmat of TDHist for each individual patient
+        """
+        Xmat = np.array([TDhist(observation_time,self.values) for i in range(n_patients)]).transpose()
+        
+        return Xmat
+    
 # TODO : modify the TDhist to be able to manage a bigger variety of cases, 
 # maybe create another  TDhist that is more in tune with the kind of data given by the SNDS
 def TDhist(observation_time,doses):
@@ -40,6 +78,87 @@ def TDhist(observation_time,doses):
         exposure_vector = np.concatenate((exposure_vector,np.repeat(0,repeats = intermission),np.repeat(dose,repeats = duration)))
 
     return exposure_vector[:observation_time]
+
+def generate_Xmat(covariates :list[Covariate],observation_time,n_patients):
+
+    Xmat = np.zeros((observation_time,n_patients*len(covariates)))
+
+
+    print("Ok")
+
+    covariate_matrix_list = [covariate.generate_Xmat(observation_time, n_patients) for covariate in covariates]
+    print(covariate_matrix_list)
+
+
+
+    for patient_number in range(n_patients):
+        for covariate_number in range(len(covariates)):
+            Xmat[:,patient_number*len(covariates)  + covariate_number] = covariate_matrix_list[covariate_number][:,patient_number]
+    
+
+        
+
+    return Xmat
+
+
+
+covariates = [ConstantCovariate("Age", [0,1], [1,3]),
+                            ConstantCovariate("Sex", [0,1], [1,1]),
+                            TimeDependentCovariate("Variable1", [1, 1.5, 2, 2.5, 3]),
+                            TimeDependentCovariate("Variable2", [1, 2, 3, 4, 5])]
+
+Xmat = generate_Xmat(covariates, 10, 3)
+
+print(Xmat)
+    
+
+ 
+    
+    
+
+
+
+
+
+def constant_covariate_Xmat(covariate : ConstantCovariate,
+                            n_patients: int):
+    """
+    Generate the Xmat of the constant covariates
+    """
+    Xmat = np.zeros(n_patients)
+
+    weights = covariate.weights
+    proba = weights / np.sum(weights)
+
+
+    Xmat = np.random.choice(covariate.values, size = n_patients, p = proba)
+
+    return Xmat
+
+
+
+
+# a = ConstantCovariate("Age", [0,1], [1,3])
+# print("###########")
+# Xmat = a.generate_Xmat(100,9)
+# print(Xmat)
+
+# b = TimeDependentCovariate("Variable1", [1, 1.5, 2, 2.5, 3])
+# print("###########")
+# Xmat = b.generate_Xmat(100, 9)
+# # print(Xmat.shape)
+# print(Xmat)
+
+
+
+
+
+
+quit()
+
+# create object with definition of a variable,
+# this object will be used to generate the Xmat of the TDHist
+variable_definition = VariableDefinition("Variable1", [1, 2, 3, 4, 5])
 
 
 # TODO : here should have a way to use more things for TDhist
