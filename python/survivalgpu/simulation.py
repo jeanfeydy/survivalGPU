@@ -18,7 +18,7 @@ import time
 
 # TODO : modify the TDhist to be able to manage a bigger variety of cases, 
 # maybe create another  TDhist that is more in tune with the kind of data given by the SNDS
-def TDhist(observation_time,doses):
+def TDhist(max_time,doses):
     """
     This function is used to generate individual time-dependant exposure history 
     Generate prescirption of different duration and doses 
@@ -32,7 +32,7 @@ def TDhist(observation_time,doses):
 
 
 
-    while len(exposure_vector) <= observation_time:
+    while len(exposure_vector) <= max_time:
         intermission = int(7 + 7*np.round(np.random.lognormal(mean =0.5, sigma =0.8, size = 1)).item())
         duration = int(7 + 7*np.round(np.random.lognormal(mean =0.5, sigma =0.8, size = 1)).item())
 
@@ -40,16 +40,16 @@ def TDhist(observation_time,doses):
 
         exposure_vector = np.concatenate((exposure_vector,np.repeat(0,repeats = intermission),np.repeat(dose,repeats = duration)))
 
-    return exposure_vector[:observation_time]
+    return exposure_vector[:max_time]
 
 
 # TODO : here should have a way to use more things for TDhist
 # cannot test
-def generate_Xmat(observation_time,n_patients,doses):
+def generate_Xmat(max_time,n_patients,doses):
     """
     Generate the Xmat of TDHist for each indivudual patient
     """
-    Xmat = np.matrix([TDhist(observation_time,doses) for i in range(n_patients)]).transpose()
+    Xmat = np.matrix([TDhist(max_time,doses) for i in range(n_patients)]).transpose()
     return Xmat
 
 
@@ -58,6 +58,7 @@ def generate_wce_vector(u, scenario_shape, Xmat):
     """
     This function generate the wce vector of the n patients at time u
     """
+
     t_array = np.arange(1,u+1)
     u_t_array = u  - t_array 
 
@@ -125,13 +126,14 @@ class ConstantCovariate(Covariate):
         self.weights = weights
         self.beta = beta
 
-    def generate_Xmat(self, observation_time, n_patients):
+    def generate_Xmat(self, max_time, n_patients):
         """
         Generate the Xmat of the constant covariates
         """
+
         proba = self.weights / np.sum(self.weights)
         Xvect = np.random.choice(self.values, size = n_patients, p = proba)
-        Xmat = np.repeat(Xvect, observation_time).reshape(n_patients,observation_time).transpose()
+        Xmat = np.repeat(Xvect, max_time).reshape(n_patients,max_time).transpose()
         self.Xmat = Xmat
 
         return self
@@ -142,9 +144,9 @@ class TimeDependentCovariate(Covariate):
         self.values = values
         self.beta = beta
     
-    def generate_Xmat(self, observation_time, n_patients):
+    def generate_Xmat(self, max_time, n_patients):
 
-        Xmat = np.array([TDhist(observation_time,self.values) for i in range(n_patients)]).transpose()
+        Xmat = np.array([TDhist(max_time,self.values) for i in range(n_patients)]).transpose()
         self.Xmat = Xmat
         
         return self
@@ -161,6 +163,7 @@ class WCECovariate(Covariate):
         """
         Generate the Xmat of TDHist for each individual patient
         """
+
         Xmat = np.array([TDhist(max_time,self.doses) for i in range(n_patients)]).transpose()
         self.Xmat = Xmat
         return self 
@@ -176,11 +179,11 @@ class WCECovariate(Covariate):
             Xmat = self.Xmat
         except AttributeError:
             raise ValueError("The Xmat has not been generated yet")
-
-
+        
         scenario_shape = get_scenario(self.scenario_name,365)
 
         max_time = Xmat.shape[0]
+
 
         wce_mat = np.vstack([generate_wce_vector(u, scenario_shape, Xmat) for u in range(1,max_time+1)])
 
@@ -204,10 +207,9 @@ def global_Xmat_wce_mat(list_wce_covariates:list[WCECovariate],
 
 
     wce_matrix = np.array(np.zeros(( max_time + 1,n_patients * n_covariates)))
-    # print(wce_matrix.shape)
-    # print(wce_matrix)
 
     Xmat_matrix = np.array(np.zeros(( max_time + 1,n_patients * n_covariates)))
+
 
     for i in range(n_patients):
         wce_matrix[0,i*n_covariates:i*n_covariates+n_covariates] = i
@@ -220,11 +222,12 @@ def global_Xmat_wce_mat(list_wce_covariates:list[WCECovariate],
             column_index = patient_number * n_covariates + covariate_number
 
 
-            # print(list_wce_covariates[covariate_number].wce_mat)
 
             wce_matrix[1:, column_index] = np.array(list_wce_covariates[covariate_number].wce_mat[:,patient_number])
 
+
             Xmat_matrix[1:, column_index] = np.array(list_wce_covariates[covariate_number].Xmat[:,patient_number])
+
 
     for covariate_number in range(n_cox_covariates):
 
@@ -461,10 +464,9 @@ def simulate_dataset(max_time, n_patients,
     n_covariates = n_wce_covariates + n_cox_covariates
 
     # generate the Xmat and wce_mat for the wce covariates
-    list_wce_covariates = [covariate.generate_Xmat(n_patients,max_time).generate_wce_mat() for covariate in list_wce_covariates]
-
+    list_wce_covariates = [covariate.generate_Xmat(max_time = max_time,n_patients=n_patients).generate_wce_mat() for covariate in list_wce_covariates]
     # generate the Xmat for the cox covariates
-    list_cox_covariates = [covariate.generate_Xmat(n_patients,max_time) for covariate in list_cox_covariates]
+    list_cox_covariates = [covariate.generate_Xmat(max_time = max_time,n_patients = n_patients) for covariate in list_cox_covariates]
 
 
     eventRandom, censorRandom = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)

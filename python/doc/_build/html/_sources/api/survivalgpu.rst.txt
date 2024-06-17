@@ -1,0 +1,98 @@
+survivalgpu package
+===================
+
+.. automodule:: survivalgpu
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Submodules
+----------
+
+survivalgpu.autodiff module
+---------------------------
+
+.. automodule:: survivalgpu.autodiff
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+survivalgpu.cox\_simualtion module
+----------------------------------
+
+.. automodule:: survivalgpu.cox_simualtion
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+survivalgpu.coxph module
+------------------------
+
+.. automodule:: survivalgpu.coxph
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+survivalgpu.coxph\_likelihood module
+------------------------------------
+
+.. automodule:: survivalgpu.coxph_likelihood
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+survivalgpu.coxph\_likelihood\_keops module
+-------------------------------------------
+
+.. automodule:: survivalgpu.coxph_likelihood_keops
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+survivalgpu.datasets module
+---------------------------
+
+.. automodule:: survivalgpu.datasets
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+survivalgpu.optimizers module
+-----------------------------
+
+.. automodule:: survivalgpu.optimizers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+survivalgpu.simulation module
+-----------------------------
+
+.. automodule:: survivalgpu.simulation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+survivalgpu.utils module
+------------------------
+
+.. automodule:: survivalgpu.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+survivalgpu.wce module
+----------------------
+
+.. automodule:: survivalgpu.wce
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+survivalgpu.wce\_features module
+--------------------------------
+
+.. automodule:: survivalgpu.wce_features
+   :members:
+   :undoc-members:
+   :show-inheritance:

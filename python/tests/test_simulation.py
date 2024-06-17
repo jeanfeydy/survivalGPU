@@ -77,6 +77,7 @@ def test_get_scenario_not_implemented():
 
 def test_generate_wce_mat():
 
+
     scenario = "exponential_scenario"
 
     Xmat = np.array([[1, 2, 0, 5], [4, 0, 0, 6], [7, 8, 1, 0]])

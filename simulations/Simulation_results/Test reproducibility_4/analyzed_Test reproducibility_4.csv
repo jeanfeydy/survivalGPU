@@ -1,0 +1,2 @@
+"","simulation_id","HR_target","scenario_functions","n_patients","max_time","doses","binarization_dose","n_knots","constraint","cutoff","n_bootstraps","BIC","HR","lower_IC","higher_IC","path_model"
+"1","Test reproducibility_4_condition-1_1",1.5,"exponential_scenario",50,365,"c(1, 1.5, 2, 2.5, 3)","FALSE",1,"R",180,50,202.907509333394,0.810374628910318,0.0713205406710668,11.6608307857024,"saved_model_1"

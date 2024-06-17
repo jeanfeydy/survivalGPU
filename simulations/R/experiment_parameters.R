@@ -5,8 +5,8 @@ generate_parameters <- function(){
 
 
     # Experiment parameters
-    experiment_name = "Test save models_2"
-    number_of_simulations = 1
+    experiment_name = "Test reproducibility"
+    number_of_simulations = 10
     save_models = TRUE
 
 
@@ -22,8 +22,8 @@ generate_parameters <- function(){
 
     # analysis parameters
 
-    n_knots_list = c(1,2,3)#c(1,2,3)
-    n_bootstraps_list = c(1000)
+    n_knots_list = c(1)#c(1,2,3)
+    n_bootstraps_list = c(50)
     cutoff_list = c(180)
     constraint_list = ("R")
 

@@ -53,6 +53,8 @@ class TimeDependentCovariate(Covariate):
         
         return Xmat
     
+
+    
 # TODO : modify the TDhist to be able to manage a bigger variety of cases, 
 # maybe create another  TDhist that is more in tune with the kind of data given by the SNDS
 def TDhist(observation_time,doses):
@@ -95,9 +97,7 @@ def generate_Xmat(covariates :list[Covariate],observation_time,n_patients):
         for covariate_number in range(len(covariates)):
             Xmat[:,patient_number*len(covariates)  + covariate_number] = covariate_matrix_list[covariate_number][:,patient_number]
     
-
-        
-
+       
     return Xmat
 
 
@@ -111,13 +111,6 @@ Xmat = generate_Xmat(covariates, 10, 3)
 
 print(Xmat)
     
-
- 
-    
-    
-
-
-
 
 
 def constant_covariate_Xmat(covariate : ConstantCovariate,
@@ -136,29 +129,6 @@ def constant_covariate_Xmat(covariate : ConstantCovariate,
     return Xmat
 
 
-
-
-# a = ConstantCovariate("Age", [0,1], [1,3])
-# print("###########")
-# Xmat = a.generate_Xmat(100,9)
-# print(Xmat)
-
-# b = TimeDependentCovariate("Variable1", [1, 1.5, 2, 2.5, 3])
-# print("###########")
-# Xmat = b.generate_Xmat(100, 9)
-# # print(Xmat.shape)
-# print(Xmat)
-
-
-
-
-
-
-quit()
-
-# create object with definition of a variable,
-# this object will be used to generate the Xmat of the TDHist
-variable_definition = VariableDefinition("Variable1", [1, 2, 3, 4, 5])
 
 
 # TODO : here should have a way to use more things for TDhist
@@ -233,7 +203,7 @@ def event_censor_generation(max_time, n_patients, censoring_ratio):
 
 
 
-def matching_algo(wce_mat, max_time:int, n_patients:int, HR_target,events, FUP_tis):
+def matching_algo(Xmat, max_time:int, n_patients:int, betas,events, FUP_tis):
     events = events.copy()
     FUP_tis = FUP_tis.copy()
     wce_mat = wce_mat.copy()
@@ -377,40 +347,39 @@ def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
     saving_path = Path("../../simulated_datasets") / scenario / str(HR_target) / str(n_patients) / "dataset.csv"
     df_wce.to_csv(saving_path)
 
-def simulate_dataset_complete(max_time, n_patients, doses, scenario, HR_target):
+def simulate_dataset(max_time, n_patients, doses, scenario, betas):
 
 
     max_time = int(max_time)
     n_patients = int(n_patients)
 
     Xmat = generate_Xmat(max_time,n_patients,doses)
-    wce_mat = generate_wce_mat(scenario_name= scenario, Xmat = Xmat, max_time= max_time)
     df_wce_mat = pd.DataFrame(wce_mat)
 
-    # events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
-    eventRandom, censorRandom = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
-    events, FUP_tis = event_FUP_Ti_generation(eventRandom, censorRandom)
+    df_Xmat = pd.DataFrame(Xmat)
 
-    wce_id_indexes  = matching_algo(wce_mat, max_time,n_patients, HR_target,events, FUP_tis)
+    events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
+    cox_id_indexes  = matching_algo(Xmat, max_time,n_patients, betas,events, FUP_tis)
     numpy_wce = get_dataset(Xmat, max_time,n_patients, HR_target, FUP_tis,events,wce_id_indexes)
-    df_wce = pd.DataFrame(numpy_wce, columns = ["patients","start","stop","events","doses"])
+    df_wce = pd.DataFrame(numpy_wce, columns = ["patient","start","stop","event","dose"])
 
     return df_wce
 
 
-def simulate_dataset(Xmat, scenario, HR_target):
-    max_time = Xmat.shape[0]
 
 
 
-
-
-def simulate_dataset_coxph(Xmat, scenario, betas):
+def simulate_dataset_coxph(Xmat, betas):
     """
     This version of the permutation algorithm generate a dataset 
     """
 
+    Max_time = Xmat.shape[0]
+    n_patients = Xmat.shape[1]/len(betas)
 
+    events, FUP_tis = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
+
+    
 
 
 
