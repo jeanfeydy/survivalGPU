@@ -8,7 +8,7 @@ torch.backends.cuda.matmul.allow_tf32 = False
 
 from .coxph import coxph_torch, coxph_numpy, coxph_R
 from .wce import wce_torch, wce_numpy, wce_R
-from .simulation import simulate_dataset,generate_wce_mat,get_dataset, matching_algo
+from .simulation import simulate_dataset,get_dataset, matching_algo
 from . import utils, optimizers
 from .utils import use_cuda, device, float32, int32, int64
 
