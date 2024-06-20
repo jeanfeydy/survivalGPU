@@ -2,17 +2,14 @@ import numpy as np
 import random
 import pandas as pd
 import torch
-import torchvision.models as models
-from torch.profiler import profile, record_function, ProfilerActivity
 from pathlib import Path 
 from scipy.stats import norm
 
-
-from .coxph import coxph_torch
-from .utils import device
-
-
 import time
+
+
+
+
 
 
 
@@ -113,6 +110,33 @@ class TimeDependentCovariate(Covariate):
 
         self.Xvector = Xvector
         
+        return self
+    
+    def cumulative_exposure(self,cutoff):
+
+        try: 
+            Xvector = self.Xvector
+        except AttributeError:
+            raise ValueError("The Xvector has not been generated yet")
+        
+
+        Xmat = Xvector.reshape(self.n_patients,self.max_time).transpose()
+
+   
+
+        cumulative_Xmat = np.zeros((self.max_time,self.n_patients))
+
+
+        for j in range(self.n_patients):
+            vector = Xmat[:,j]
+            for i in range(self.max_time):
+                sum = np.sum(vector[max(0,i-cutoff):i+1])
+                cumulative_Xmat[i,j] = sum
+
+
+        self.Xvector = cumulative_Xmat.transpose().flatten()
+   
+
         return self
     
 
@@ -283,6 +307,8 @@ def matching_algo(WCEmat: np.ndarray,
     FUP_tis = np.array(FUP_tis, dtype = int)
 
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 
     covariates_id_indexes = torch.arange(0,n_patients, dtype = int).to(device)
@@ -450,7 +476,7 @@ def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
 
 
 def simulate_dataset(max_time, n_patients, 
-                     list_wce_covariates: list[WCECovariate], 
+                     list_wce_covariates:list[WCECovariate], 
                      list_cox_covariates:list[(TimeDependentCovariate, ConstantCovariate)]):
 
 
@@ -540,11 +566,6 @@ def simulate_dataset(max_time, n_patients,
 
 
 
-def simulate_dataset_coxph(Xmat, scenario, betas):
-    """
-    This version of the permutation algorithm generate a dataset 
-    """
-
 
 
 
@@ -606,4 +627,3 @@ def get_scenario(scenario_name: int, max_time: int):
     return scenario_list / normalization_factor
 
 
-        
