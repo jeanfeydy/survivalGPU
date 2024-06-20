@@ -68,13 +68,7 @@ def event_censor_generation(max_time, n_patients, censoring_ratio):
     if censoring_ratio < 0:
         raise ValueError("The censoring ration must be positive")
 
-     # Event times : Uniform[1;365] for all scenarios
     eventRandom = np.round(np.random.uniform(low = 1, high = max_time, size = n_patients)).astype(int)
-    # print(eventRandom)
-    
-
-    # TODO Maybe change the way the censoring times are determined to that there is no randolness on the number of 
-    # TODO patients that are not censored
     censorRandom = np.round(np.random.uniform(low = 1, high = max_time* int(1/censoring_ratio), size = n_patients)).astype(int)
 
     return eventRandom, censorRandom
@@ -157,23 +151,27 @@ class WCECovariate(Covariate):
         
         n_patients = self.n_patients
         max_time = self.max_time
+
+
         
 
-        covariate_Xmat = Xvector.reshape(self.max_time,self.n_patients)
+        covariate_Xmat = Xvector.reshape(self.n_patients,self.max_time).transpose()
 
         scenario_shape = get_scenario(self.scenario_name, self.max_time)
+
 
         
         def generate_wce_vector(u, scenario_shape, covariate_Xmat):
             t_array = np.arange(1,u+1)
             u_t_array = u  - t_array 
-
             wce = np.multiply(scenario_shape[u_t_array].reshape(u,1),covariate_Xmat[t_array -1,:])
+
+            
 
             return np.sum(wce, axis = 0)
             
         wce_mat = np.vstack([generate_wce_vector(u, scenario_shape, covariate_Xmat) for u in range(1,max_time+1)])
-        
+
 
         
         WCEvector = np.zeros((max_time*n_patients))
@@ -205,7 +203,6 @@ def generate_Xmat(list_wce_covariates:list[WCECovariate],
     i = 1
 
     for covariate in list_wce_covariates:
-        print("##############")
         Xmat[:,i] = covariate.Xvector
         i += 1
 
@@ -234,7 +231,6 @@ def generate_WCEmat(list_wce_covariates:list[WCECovariate],
     i = 1
 
     for covariate in list_wce_covariates:
-        print("##############")
         WCEmat[:,i] = covariate.WCEvector
         i += 1
 
@@ -246,19 +242,29 @@ def generate_WCEmat(list_wce_covariates:list[WCECovariate],
     return WCEmat
 
 
+def get_WCEmat_time_event(WCEmat, time_event, max_time):
+    """
+    This function is used to get the WCE matrix at a given time event
+    """
+
+    WCEmat_time_event = WCEmat[(time_event-1)::max_time,:]
+
+    return WCEmat_time_event
 
 
 
-def get_probas(WCEmat, HR_target_list, max_time, time_event):
+
+
+def get_probas(WCEmat_time_event, HR_target_list):
     """
     This function is used to get the probability of selection of each patient
     """
 
-    WCEmat_time_event = WCEmat[time_event::max_time,:]
     partial_proba_list = WCEmat_time_event[:,1:] * torch.log(HR_target_list)
     exp_vals = torch.exp(partial_proba_list.sum(dim = 1)) 
     exp_sum = torch.sum(exp_vals)
     probas = exp_vals/exp_sum  
+
 
 
     return probas
@@ -294,20 +300,16 @@ def matching_algo(WCEmat: np.ndarray,
 
 
 
-
-    # non_selected_indices = torch.arange(0,n_patients, dtype = int).to(device)
     selected_indices = torch.zeros(n_patients,dtype = int).to(device)
 
     non_selected_indices = torch.arange(0,n_patients)
-    print("solve here")
-    print(WCEmat)
+
     WCEmat_current = torch.from_numpy(WCEmat).to(device)
-    print(WCEmat_current)
     HR_target_tensor = torch.from_numpy(HR_target_list).to(device)
 
-    print(non_selected_indices)
 
-    
+
+
        
     for i in range(n_patients):   
 
@@ -315,23 +317,14 @@ def matching_algo(WCEmat: np.ndarray,
         event = events[i]
         time_event = FUP_tis[i]
 
-        print(event)
-        print(time_event)
-
         event = 1
+
+
         if event == 0:
 
-            print()
-            print("time = ",time_event)
-            print("event = 0")
-            
-            print("WCEmat_current before = ",WCEmat_current)
             id_index = torch.randint(0,len(non_selected_indices),(1,))
-            print("id_index = ",id_index)
             WCEmat_current = torch.cat((WCEmat_current[:id_index*max_time] , WCEmat_current[(id_index+1)*max_time:]))
             wce_id = non_selected_indices[id_index]
-            print("wce_id = ",wce_id)
-            print("WCEmat_current after = ",WCEmat_current)
             non_selected_indices = non_selected_indices[non_selected_indices != wce_id]
 
 
@@ -340,13 +333,13 @@ def matching_algo(WCEmat: np.ndarray,
 
         else:
 
-            
-            probas = get_probas(WCEmat_current, HR_target_tensor, max_time, time_event)
+
+            WCEmat_time_event = get_WCEmat_time_event(WCEmat_current, time_event, max_time)
+            probas = get_probas(WCEmat_time_event, HR_target_tensor)
             id_index = torch.multinomial(input = probas, num_samples= 1)
             wce_id = non_selected_indices[id_index]
             WCEmat_current = torch.cat((WCEmat_current[:id_index*max_time] , WCEmat_current[(id_index+1)*max_time:]))
             non_selected_indices = non_selected_indices[non_selected_indices != wce_id]
-          
 
 
         selected_indices[i] = wce_id
@@ -368,7 +361,7 @@ def matching_algo(WCEmat: np.ndarray,
 
 
 
-def get_dataset(Xmat,covariate_names, n_patients, FUP_tis, events, wce_id_indexes):
+def get_dataset(Xmat,covariate_names, n_patients, FUP_tis, events, wce_id_indexes, max_time):
     """
     Generate a dataset based on the given inputs.
 
@@ -397,6 +390,7 @@ def get_dataset(Xmat,covariate_names, n_patients, FUP_tis, events, wce_id_indexe
     number_lines = ordered_FUP_tis.sum()
 
     patient_id_array = np.zeros(number_lines, dtype=int)
+    fup_id_array = np.zeros(number_lines, dtype=int)
     event_array = np.zeros(number_lines, dtype=int)
     time_start_array = np.zeros(number_lines, dtype=int)
     time_stop_array = np.zeros(number_lines, dtype=int)
@@ -413,22 +407,27 @@ def get_dataset(Xmat,covariate_names, n_patients, FUP_tis, events, wce_id_indexe
         covariate_dict[covariate_name] = np.zeros(number_lines, dtype=np.float64)
 
     n_covariates = len(covariate_names)
-    
+
+
+    id_t0 = 0
+  
 
     for patient_id in range(n_patients):
-        for time_start in range(ordered_FUP_tis[patient_id]):
-            patient_id_array[i] = patient_id + 1
-            time_start_array[i] = time_start
-            time_stop_array[i] = time_start + 1
-            for covariate_id in range(len(covariate_names)):
-      
-                covariate_dict[covariate_names[covariate_id]][i] = Xmat[time_start +1, (patient_id)*n_covariates + covariate_id]
 
-            if time_start == ordered_FUP_tis[patient_id] - 1:
-                event_array[i] = ordered_events[patient_id]
-            else:
-                event_array[i] = 0
-            i += 1
+        Fup = ordered_FUP_tis[patient_id]
+        patient_id_array[id_t0:id_t0 + Fup] = patient_id + 1
+        fup_id_array[id_t0:id_t0 + Fup] = Fup
+        time_start_array[id_t0:id_t0 + Fup] = np.arange(Fup)
+        time_stop_array[id_t0:id_t0 + Fup] = np.arange(1,Fup+1)
+        event_array[id_t0:id_t0 + Fup] = 0
+        if ordered_events[patient_id] == 1:
+            event_array[id_t0 + Fup - 1] = 1
+
+        Xmat_id = wce_id_indexes[patient_id]
+
+        for covariate_id in range(n_covariates):
+            covariate_dict[covariate_names[covariate_id]][id_t0:id_t0 + Fup] = Xmat[Xmat_id*max_time:Xmat_id*max_time + Fup, covariate_id+1]
+        id_t0 += Fup
 
     dataset_end = time.perf_counter()
     elapsed_dataset_time = dataset_end - dataset_start
@@ -437,6 +436,7 @@ def get_dataset(Xmat,covariate_names, n_patients, FUP_tis, events, wce_id_indexe
 
     df_wce = pd.DataFrame()
     df_wce["patients"] = patient_id_array
+    df_wce["fup"] = fup_id_array
     df_wce["start"] = time_start_array
     df_wce["stop"] = time_stop_array
     df_wce["events"] = event_array
@@ -486,6 +486,7 @@ def simulate_dataset(max_time, n_patients,
                              list_cox_covariates, 
                              max_time = max_time,
                              n_patients = n_patients)
+    
 
 
 
@@ -500,7 +501,6 @@ def simulate_dataset(max_time, n_patients,
         HR_target_list[i] = np.exp(covariate.beta)
         i+=1 
 
-    print(HR_target_list)
 
 
     wce_id_selected = matching_algo(WCEmat = WCEmat,
@@ -513,12 +513,7 @@ def simulate_dataset(max_time, n_patients,
                                     FUP_tis = FUP_tis)
     
     
-    
-    print("############ WCE SELECTED" )
-    
-    print(wce_id_selected)
 
-    quit()
 
     covariate_names = [covariate.name for covariate in list_wce_covariates] + [covariate.name for covariate in list_cox_covariates]
 
@@ -531,7 +526,6 @@ def simulate_dataset(max_time, n_patients,
     #                                 events = events, 
     #                                 FUP_tis = FUP_tis)
     
-    print(Xmat)
 
 
     dataset = get_dataset(Xmat = Xmat,
@@ -539,7 +533,8 @@ def simulate_dataset(max_time, n_patients,
                       n_patients =n_patients, 
                       FUP_tis = FUP_tis, 
                       events = events, 
-                      wce_id_indexes = wce_id_selected)
+                      wce_id_indexes = wce_id_selected,
+                      max_time =max_time)
     
     # df_wce = pd.DataFrame(numpy_wce, columns = ["patients","start","stop","events","doses"])
 
