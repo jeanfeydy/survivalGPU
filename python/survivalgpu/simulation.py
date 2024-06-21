@@ -73,11 +73,7 @@ class Covariate:
     def __init__(self, name):
         self.name = name
 
-    def initialize_experiment(self, n_patients, max_time):
-        self.n_patients = n_patients
-        self.max_time = max_time
-
-        return self
+    
         
         
 
@@ -88,11 +84,15 @@ class ConstantCovariate(Covariate):
         self.weights = weights
         self.beta = beta
 
-    def generate_Xvector(self):
-        """
-        Generate the Xvector of the constant covariates
-        """
+    def initialize_experiment(self, n_patients, max_time):
+        self.n_patients = n_patients
+        self.max_time = max_time
+        self.generate_Xvector()
 
+        return self
+
+    def generate_Xvector(self):
+    
         proba = self.weights / np.sum(self.weights)
         
         Xvect = np.random.choice(self.values, size = self.n_patients, p = proba)
@@ -102,10 +102,22 @@ class ConstantCovariate(Covariate):
         return self
 
 class TimeDependentCovariate(Covariate):
-    def __init__(self, name, values, beta):
+    def __init__(self, name, values, beta, cumulative = False, cutoff = None):
         super().__init__(name)
         self.values = values
         self.beta = beta
+        self.cumulative = cumulative
+        self.cutoff = cutoff
+
+    def initialize_experiment(self, n_patients, max_time):
+        self.n_patients = n_patients
+        self.max_time = max_time
+        self.generate_Xvector()
+
+        if self.cumulative:
+            self.cumulate_exposure(cutoff = self.cutoff)
+
+        return self
     
     def generate_Xvector(self):
 
@@ -115,6 +127,33 @@ class TimeDependentCovariate(Covariate):
         
         return self
     
+    def cumulate_exposure(self,cutoff):
+
+        try: 
+            Xvector = self.Xvector
+        except AttributeError:
+            raise ValueError("The Xvector has not been generated yet")
+        
+
+        Xmat = Xvector.reshape(self.n_patients,self.max_time).transpose()
+
+   
+
+        cumulative_Xmat = np.zeros((self.max_time,self.n_patients))
+
+
+        for j in range(self.n_patients):
+            vector = Xmat[:,j]
+            for i in range(self.max_time):
+                sum = np.sum(vector[max(0,i-cutoff):i+1])
+                cumulative_Xmat[i,j] = sum
+
+
+        self.Xvector = cumulative_Xmat.transpose().flatten()
+   
+
+        return self
+    
 
 class WCECovariate(Covariate):
     def __init__(self, name, values, scenario_name, HR_target):
@@ -122,6 +161,14 @@ class WCECovariate(Covariate):
         self.values = values
         self.scenario_name = scenario_name
         self.HR_target = HR_target 
+
+    def initialize_experiment(self, n_patients, max_time):
+        self.n_patients = n_patients
+        self.max_time = max_time
+        self.generate_Xvector()
+        self.generate_WCEvector()
+
+        return self
 
     def generate_Xvector(self):
         """
@@ -178,6 +225,7 @@ class WCECovariate(Covariate):
         self.WCEvector = WCEvector
 
         return self
+    
     
 
 def generate_Xmat(list_wce_covariates:list[WCECovariate], 
@@ -511,16 +559,6 @@ def simulate_dataset(max_time, n_patients,
 
 
     covariate_names = [covariate.name for covariate in list_wce_covariates] + [covariate.name for covariate in list_cox_covariates]
-
-    
-    # wce_id_indexes  = matching_algo(WCEmat = WCEmat, 
-    #                                 n_wce_covariates = n_wce_covariates,
-    #                                 n_cox_covariates = n_cox_covariates, 
-    #                                 max_time = max_time,
-    #                                 n_patients = n_patients,
-    #                                 events = events, 
-    #                                 FUP_tis = FUP_tis)
-    
 
 
     dataset = get_dataset(Xmat = Xmat,
