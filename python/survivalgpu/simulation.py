@@ -72,17 +72,27 @@ def event_censor_generation(max_time, n_patients, censoring_ratio):
 class Covariate:
     def __init__(self, name):
         self.name = name
-
-    
-        
-        
+     
 
 class ConstantCovariate(Covariate):
-    def __init__(self, name, values,weights, beta):
+    """
+    This class is used to define a constant cox covariate, it's a covariate that impacts
+    the values taken by the patients at each time point are constant
+    It impact the log-likelihood like in the cox model
+
+    Attributes : 
+    - name : the name of the covariate
+    - values : the possible values of the covariate
+    - weights : the weights of each value, for each patient, the value is chosen with a probability proportional to the weights
+    - coef : the coefficient of the covariate in the cox model (the coefficient is equal to the log of the hazard ratio of the covariate
+    for a value of 1 compared to a value of 0)
+
+    """
+    def __init__(self, name, values,weights, coef):
         super().__init__(name)
         self.values = values
         self.weights = weights
-        self.beta = beta
+        self.coef = coef
 
     def initialize_experiment(self, n_patients, max_time):
         self.n_patients = n_patients
@@ -102,10 +112,25 @@ class ConstantCovariate(Covariate):
         return self
 
 class TimeDependentCovariate(Covariate):
-    def __init__(self, name, values, beta, cumulative = False, cutoff = None):
+    """
+    This class is used to define a time-dependent cox covariate, it's a covariate that impact
+    The values are time-dependant and can be cumulative or not. If they are cumulative the values are summed over a 
+    period determined by the cutoff
+    It impact the log-likelyhood like in the cox model
+
+    Attributes :
+    - name : the name of the covariate 
+    - values : the possible values of the covariate
+    - coef : the coefficient of the covariate in the cox model (the coefficient is equal to the log of the hazard ratio of the covariate
+    for a value of 1 compared to a value of 0)
+    - cumulative : a boolean that indicates if the values are cumulative or not
+    - cutoff : the cutoff period for the cumulative values, if a cumulative covariate is not given a cutoff, the cutoff is set to the max_time
+
+    """
+    def __init__(self, name, values, coef, cumulative = False, cutoff = None):
         super().__init__(name)
         self.values = values
-        self.beta = beta
+        self.coef = coef
         self.cumulative = cumulative
         self.cutoff = cutoff
 
@@ -114,7 +139,10 @@ class TimeDependentCovariate(Covariate):
         self.max_time = max_time
         self.generate_Xvector()
 
+
         if self.cumulative:
+            if  self.cutoff == None:
+                self.cutoff = self.max_time
             self.cumulate_exposure(cutoff = self.cutoff)
 
         return self
@@ -154,8 +182,19 @@ class TimeDependentCovariate(Covariate):
 
         return self
     
+    
 
 class WCECovariate(Covariate):
+    """
+    This class is used to define a WCE covariate, it's a covariate that impact the log likelyhood following a time-dependent pattern 
+    of cumulative exposure. The WCE covariate is defined by a scenario that is used to generate the weight of the covariate at each time point
+
+    Attributes :
+    - name : the name of the covariate
+    - values : the possible values of the covariate
+    - scenario_name : the name of the scenario used to generate the weight of the covariate
+    - HR_target : the target hazard ratio of the covariate given a value of 1 for a time equal to the cutoff compared to a value of 0 for the time of the cutoff
+    """
     def __init__(self, name, values, scenario_name, HR_target):
         self.name = name
         self.values = values
@@ -399,11 +438,6 @@ def matching_algo(WCEmat: np.ndarray,
     return selected_indices
 
 
-
-
-
-
-
 def get_dataset(Xmat,covariate_names, n_patients, FUP_tis, events, wce_id_indexes, max_time):
     """
     Generate a dataset based on the given inputs.
@@ -498,8 +532,22 @@ def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
 
 
 def simulate_dataset(max_time, n_patients, 
-                     list_wce_covariates: list[WCECovariate], 
-                     list_cox_covariates:list[(TimeDependentCovariate, ConstantCovariate)]):
+                     list_covariates: list[WCECovariate, TimeDependentCovariate, ConstantCovariate]):
+    
+
+    list_wce_covariates = []
+    list_cox_covariates = []
+
+    if list_covariates is None:
+        raise ValueError("The list of covariates is empty")
+
+    for covariate in list_covariates:
+        if type(covariate) is WCECovariate:
+            list_wce_covariates.append(covariate)
+        elif type(covariate) in [TimeDependentCovariate, ConstantCovariate]:
+            list_cox_covariates.append(covariate)
+        else:
+            raise ValueError("The covariate is not recognized as a WCE or a Cox covariate")
 
 
     max_time = int(max_time)
@@ -513,6 +561,8 @@ def simulate_dataset(max_time, n_patients,
     for covariate in list_wce_covariates:
         covariate = covariate.initialize_experiment(max_time = max_time,n_patients = n_patients).generate_Xvector().generate_WCEvector()
     for covariate in list_cox_covariates:
+        if type(covariate) is TimeDependentCovariate:
+            covariate = covariate.initialize_experiment(max_time = max_time,n_patients = n_patients).generate_Xvector().cumulate_exposure(cutoff = max_time)
         covariate = covariate.initialize_experiment(max_time = max_time,n_patients = n_patients).generate_Xvector()
 
 
@@ -541,7 +591,7 @@ def simulate_dataset(max_time, n_patients,
         i+=1 
     
     for covariate in list_cox_covariates:   
-        HR_target_list[i] = np.exp(covariate.beta)
+        HR_target_list[i] = np.exp(covariate.coef)
         i+=1 
 
 
@@ -573,15 +623,6 @@ def simulate_dataset(max_time, n_patients,
 
     
     return dataset
-
-
-
-
-
-def simulate_dataset_coxph(Xmat, scenario, betas):
-    """
-    This version of the permutation algorithm generate a dataset 
-    """
 
 
 

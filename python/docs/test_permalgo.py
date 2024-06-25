@@ -3,86 +3,72 @@ import os
 import sys
 
 sys.path.append("dev/survivalGPU/python")
-from survivalgpu.simulation import simulate_dataset, WCECovariate, TimeDependentCovariate, ConstantCovariate, simulate_dataset
+from survivalgpu.simulation import simulate_dataset, WCECovariate, TimeDependentCovariate, ConstantCovariate, global_Xmat_wce_mat, get_probas,matching_algo,event_censor_generation,event_FUP_Ti_generation, get_dataset
 from survivalgpu.coxph import coxph_R
 from survivalgpu.wce import wce_R
 
 import matplotlib.pyplot as plt
-import numpy as np
-import torch
 
 wce_covariate_1 = WCECovariate(name="wce_1",
-                            values = [1,1.5,2,2.5,3],
+                            doses= [1,1.5,2,2.5,3],
                             scenario_name="exponential_scenario",
                             HR_target=1.5)
 
 
 wce_covariate_2 = WCECovariate(name="wce_2",
-                            values = [1,1.5,2,2.5,3],
+                            doses= [1,1.5,2,2.5,3],
                             scenario_name="exponential_scenario",
                             HR_target=2)
 
-list_wce_covariates = [wce_covariate_1,wce_covariate_2]
-list_wce_covariates = [wce_covariate_1,wce_covariate_2]
+list_wce_covariate = [wce_covariate_1,wce_covariate_2]
+list_wce_covariate = [wce_covariate_1]
 
 constant_covariate = ConstantCovariate(name="constant",
                                         values=[0,1],
                                         weights=[1,2],
-                                        coef = np.log(2))
+                                        beta = 1)
 
 time_dependent_covariate = TimeDependentCovariate(name="time_dependent",
                                                 values = [0,1,1.5,2,2.5,3],
-                                                coef = np.log(1.5))
+                                                beta = 0.5)
 
-time_dependent_covariate_cumulative = TimeDependentCovariate(name="time_dependent",
-                                                values = [0,1,1.5,2,2.5,3],
-                                                coef = np.log(1.5),
-                                                cumulative = True,
-                                                cutoff = 3)
+list_cox_covariate = [constant_covariate,time_dependent_covariate]
+list_cox_covariate = [constant_covariate]
 
 
+import numpy as np
 
+import torch
+
+device = "cpu"
+
+n_patients = 10
+n_covariates = len(list_wce_covariate) + len(list_cox_covariate)
 max_time = 10
-n_patients = 5
 
 
 
+dataset = simulate_dataset(max_time = max_time, n_patients = n_patients, 
+                     list_wce_covariates = list_wce_covariate, 
+                     list_cox_covariates= list_cox_covariate)
+
+print(dataset)
 
 
+# res = coxph_R(
+#             dataset,
+#             "stop",
+#             "events",
+#             ["constant"],
+#             bootstrap=1,
+#             profile=None,
+#         )
 
-# covariate = constant_covariate.initialize_experiment(max_time=max_time, n_patients=n_patients).generate_Xvector()
-
-# covariate = time_dependent_covariate.initialize_experiment(max_time=max_time, n_patients=n_patients).generate_Xvector().cumulative_exposure(cutoff = 10).Xvector
-
-constant_covariate = constant_covariate.initialize_experiment(max_time=max_time, n_patients=n_patients)
-print(constant_covariate.Xvector)
-time_dependent_covariate = time_dependent_covariate.initialize_experiment(max_time=max_time, n_patients=n_patients)
-print(time_dependent_covariate.Xvector)
-time_dependent_covariate_cumulative = time_dependent_covariate_cumulative.initialize_experiment(max_time=max_time, n_patients=n_patients)
-print(time_dependent_covariate_cumulative.Xvector)
-
-wce_covariate_1 = wce_covariate_1.initialize_experiment(max_time=max_time, n_patients=n_patients)
-print(wce_covariate_1.Xvector)
-print(wce_covariate_1.WCEvector)
-
-
-quit()
-
-# cox_result = coxph_R(
-
-# result_cox = coxph_R(data= dataset,
-#                      stop = "stop",
-#                      death= "events",
-#                      covars = ["constant", "time_dependent"])
-
-# print(result_cox["coef"])
-
-                     
-
+# print(res["coef"])
 
 result = wce_R(data= dataset, 
                ids = "patients", 
-               covars = ["constant","time_dependent"],
+               covars = None,
                stop = "stop",
                doses = "wce_1", 
                events = "events",
@@ -91,10 +77,7 @@ result = wce_R(data= dataset,
                constrained = "Right")
 
 
-
-
-
-print(result["coef"])
+print(result)
 
 
 # def plot_wce(
@@ -144,10 +127,6 @@ def HR(WCE_object, vecnum, vecdenom):
 
 vecnum = np.ones(180)
 vecdenom = np.zeros(180)
-RH_result = HR(result, vecnum, vecdenom)
+HR(result, vecnum, vecdenom)
 
-print(RH_result)
-
-
-
-
+print(HR)
