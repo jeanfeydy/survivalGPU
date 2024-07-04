@@ -548,6 +548,7 @@ def simulate_dataset(max_time, n_patients,
             list_cox_covariates.append(covariate)
         else:
             raise ValueError("The covariate is not recognized as a WCE or a Cox covariate")
+        
 
 
     max_time = int(max_time)
@@ -559,11 +560,11 @@ def simulate_dataset(max_time, n_patients,
 
 
     for covariate in list_wce_covariates:
-        covariate = covariate.initialize_experiment(max_time = max_time,n_patients = n_patients).generate_Xvector().generate_WCEvector()
+        covariate = covariate.initialize_experiment(max_time = max_time,n_patients = n_patients)
     for covariate in list_cox_covariates:
         if type(covariate) is TimeDependentCovariate:
-            covariate = covariate.initialize_experiment(max_time = max_time,n_patients = n_patients).generate_Xvector().cumulate_exposure(cutoff = max_time)
-        covariate = covariate.initialize_experiment(max_time = max_time,n_patients = n_patients).generate_Xvector()
+            covariate = covariate.initialize_experiment(max_time = max_time,n_patients = n_patients)
+        covariate = covariate.initialize_experiment(max_time = max_time,n_patients = n_patients)
 
 
     eventRandom, censorRandom = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
