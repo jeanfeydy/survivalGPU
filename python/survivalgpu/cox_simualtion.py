@@ -86,7 +86,6 @@ def generate_Xmat(covariates :list[Covariate],observation_time,n_patients):
     Xmat = np.zeros((observation_time,n_patients*len(covariates)))
 
 
-    print("Ok")
 
     covariate_matrix_list = [covariate.generate_Xmat(observation_time, n_patients) for covariate in covariates]
     print(covariate_matrix_list)

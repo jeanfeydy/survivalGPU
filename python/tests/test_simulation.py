@@ -199,7 +199,6 @@ def test_matching_algo():
     ordered_wce_id_indexes = np.sort(wce_id_indexes)
 
     ordered_expected_id_indexes = np.arange(0, n_patients, 1)
-    print("OK")
 
     assert np.allclose(ordered_wce_id_indexes, ordered_expected_id_indexes)
 

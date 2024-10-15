@@ -34,7 +34,7 @@ def coxph_torch(
     bootstrap=1,
     batchsize=0,
     ties="efron",
-    backend="csr",
+    backend="torch",
     maxiter=20,
     init=None,
     eps=1e-9,
@@ -190,7 +190,7 @@ def coxph_torch(
             groups=bootstrap_indices,
             reduction="sum",
             output_size=N,
-            backend="pyg",
+            backend="torch",
         )
         weights = weights.to(device=device, dtype=float32)
         # Equivalent to:
@@ -224,7 +224,7 @@ def coxph_torch(
             groups=dead_cluster_indices.long(),
             reduction="sum",
             output_size=T,
-            backend="pyg",
+            backend="torch",
         )
         # Equivalent to:
         # tied_dead_weights = torch.bincount(cluster_indices[deaths == 1],
@@ -276,6 +276,8 @@ def coxph_torch(
             return arr.view(b, 1, n).tile((1, C, 1)).view(b * C, n)
 
         # Step 2: select the proper backend and perform the last pre-computations ==
+        #backend = "torch"
+        print(backend)
         objective = coxph_objectives[backend](
             N=N,
             B=B * C,
@@ -290,6 +292,7 @@ def coxph_torch(
             cluster_indices=cluster_indices,
             backend=backend,
         )
+
 
         def loss(b):
             obj = objective(b)
@@ -436,7 +439,7 @@ def coxph_R(
             times=times,
             deaths=deaths,
             ties=ties,
-            backend="csr",
+            backend="torch",
             bootstrap=int(bootstrap),
             batchsize=int(batchsize),
             maxiter=int(maxiter) if profile is None else 1,
@@ -445,6 +448,7 @@ def coxph_R(
             alpha=0.0,
             doscale=doscale,
         )
+
 
     if profile is not None:
         prof.export_chrome_trace(profile)
