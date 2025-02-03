@@ -203,6 +203,7 @@ for (i in 1:nrow(combinations_simulations_parameters)){
             results_df$lower_IC[number_of_analyzed_models] <- HR[2]
             results_df$higher_IC[number_of_analyzed_models] <- HR[3]
 
+
             if (save_models == TRUE){
                 model_name = paste0("saved_model_",as.character(number_of_analyzed_models))
                 results_df$path_model = model_name
