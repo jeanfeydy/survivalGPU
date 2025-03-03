@@ -181,7 +181,150 @@ class TimeDependentCovariate(Covariate):
    
 
         return self
+
+class CoxCovariate(Covariate):
+    """
+    This class is used to define a time-dependent cox covariate, it's a covariate that impact
+    The values are time-dependant and can be cumulative or not. If they are cumulative the values are summed over a 
+    period determined by the cutoff
+    It impact the log-likelyhood like in the cox model
+
+    Attributes :
+    - name : the name of the covariate 
+    - values : the possible values of the covariate
+    - coef : the coefficient of the covariate in the cox model (the coefficient is equal to the log of the hazard ratio of the covariate
+    for a value of 1 compared to a value of 0)
+    - cumulative : a boolean that indicates if the values are cumulative or not
+    - cutoff : the cutoff period for the cumulative values, if a cumulative covariate is not given a cutoff, the cutoff is set to the max_time
+
+    """
+    def __init__(self, name, Xvector, coef):
+        super().__init__(name)
+        self.coef = coef
+        self.Xvector = Xvector
+
+    def initialize_experiment(self, n_patients, max_time):
+        self.n_patients = n_patients
+        self.max_time = max_time
+
+        return self
     
+    # def generate_Xvector(self):
+
+    #     Xvector = np.array([TDhist(self.max_time,self.values) for i in range(self.n_patients)],dtype=float).flatten()
+
+    #     self.Xvector = Xvector
+        
+    #     return self
+    
+    # def cumulate_exposure(self,cutoff):
+
+    #     try: 
+    #         Xvector = self.Xvector
+    #     except AttributeError:
+    #         raise ValueError("The Xvector has not been generated yet")
+        
+
+    #     Xmat = Xvector.reshape(self.n_patients,self.max_time).transpose()
+
+   
+
+    #     cumulative_Xmat = np.zeros((self.max_time,self.n_patients))
+
+
+    #     for j in range(self.n_patients):
+    #         vector = Xmat[:,j]
+    #         for i in range(self.max_time):
+    #             sum = np.sum(vector[max(0,i-cutoff):i+1])
+    #             cumulative_Xmat[i,j] = sum
+
+
+    #     self.Xvector = cumulative_Xmat.transpose().flatten()
+   
+
+    #     return self  
+
+class WCECovariate_new(Covariate):
+    """
+    This class is used to define a WCE covariate, it's a covariate that impact the log likelyhood following a time-dependent pattern 
+    of cumulative exposure. The WCE covariate is defined by a scenario that is used to generate the weight of the covariate at each time point
+
+    Attributes :
+    - name : the name of the covariate
+    - values : the possible values of the covariate
+    - scenario_name : the name of the scenario used to generate the weight of the covariate
+    - HR_target : the target hazard ratio of the covariate given a value of 1 for a time equal to the cutoff compared to a value of 0 for the time of the cutoff
+    """
+    def __init__(self, name, Xvector, scenario_name, HR_target):
+        self.name = name
+        self.scenario_name = scenario_name
+        self.HR_target = HR_target 
+        self.Xvector = Xvector
+
+
+    def initialize_experiment(self, n_patients, max_time):
+        self.n_patients = n_patients
+        self.max_time = max_time
+        # self.generate_Xvector()
+        self.generate_WCEvector()
+
+        return self
+
+    def generate_Xvector(self):
+        """
+        Generate the Xmat of TDHist for each individual patient
+        """
+
+        Xvector = np.array([TDhist(self.max_time,self.values) for i in range(self.n_patients)],dtype=float).flatten()
+        self.Xvector = Xvector
+        return self 
+
+    
+    def generate_WCEvector(self):
+        """
+        This function generate the wce matrix that keep the WCE weight of all the patient at
+        all the times until the cutoff
+        """
+
+        try: 
+            Xvector = self.Xvector
+        except AttributeError:
+            raise ValueError("The Xvector has not been generated yet")
+        
+        n_patients = self.n_patients
+        max_time = self.max_time
+
+
+        
+
+        covariate_Xmat = Xvector.reshape(self.n_patients,self.max_time).transpose()
+
+        scenario_shape = get_scenario(self.scenario_name, self.max_time)
+
+
+        
+        def generate_wce_vector(u, scenario_shape, covariate_Xmat):
+            t_array = np.arange(1,u+1)
+            u_t_array = u  - t_array 
+            wce = np.multiply(scenario_shape[u_t_array].reshape(u,1),covariate_Xmat[t_array -1,:])
+
+            
+
+            return np.sum(wce, axis = 0)
+            
+        wce_mat = np.vstack([generate_wce_vector(u, scenario_shape, covariate_Xmat) for u in range(1,max_time+1)])
+
+
+        
+        WCEvector = np.zeros((max_time*n_patients))
+
+        for i in range(self.n_patients):
+            WCEvector[i*max_time:(i+1)*max_time] = wce_mat[:,i]
+    
+
+        self.WCEvector = WCEvector
+
+        return self
     
 
 class WCECovariate(Covariate):
@@ -200,6 +343,7 @@ class WCECovariate(Covariate):
         self.values = values
         self.scenario_name = scenario_name
         self.HR_target = HR_target 
+
 
     def initialize_experiment(self, n_patients, max_time):
         self.n_patients = n_patients
@@ -542,6 +686,7 @@ def simulate_dataset(max_time, n_patients,
         raise ValueError("The list of covariates is empty")
 
     for covariate in list_covariates:
+
         if type(covariate) is WCECovariate:
             list_wce_covariates.append(covariate)
         elif type(covariate) in [TimeDependentCovariate, ConstantCovariate]:
@@ -627,6 +772,105 @@ def simulate_dataset(max_time, n_patients,
 
 
 
+def simulate_for_experiment(n_patients, max_time,HR_target, scenario_name):
+    dataset = []
+
+    wce_covariate = WCECovariate(
+        name = "dose", 
+        values = [1,1.5,2,2.5,3], 
+        scenario_name = scenario_name, 
+        HR_target = HR_target)
+    
+
+    print("############")
+    print(type(wce_covariate))
+    print("############")
+
+
+
+    dataset = simulate_dataset(
+        max_time = max_time, 
+        n_patients = n_patients, 
+        list_covariates = [wce_covariate])
+    
+
+    print(type(wce_covariate))
+
+    return dataset
+
+def WCE_permalgo(n_patients,
+                 max_time, 
+                 Xmat,
+                 betas,
+                 names, 
+                 wce_status: list[bool],
+                 scenarios,
+                 eventRandom,
+                 censorRandom
+                 ):
+
+
+    list_covariates = []
+
+    print(wce_status)
+
+    print(Xmat.shape)
+    
+    for i in range(len(wce_status)):
+        if wce_status[i] == True:
+            wce_covariate_name = names[i]
+            scenario_name = scenarios[i]
+            HR_target = betas[i]
+            Xvector = Xmat[:,i]
+            wce_covariate = WCECovariate(name = wce_covariate_name, 
+                                         Xvector = Xvector,
+                                         scenario_name = scenario_name,
+                                         HR_target = HR_target)
+            list_covariates.append(wce_covariate)
+            
+        elif wce_status[i] == False:
+            cox_covariate_name = names[i]
+            coef = betas[i]
+            cox_covariate = CoxCovariate(name = cox_covariate_name,
+                                                   Xvector = Xvector,
+                                                   coef = coef)
+            list_covariates.append(cox_covariate)
+
+
+    print(list_covariates)
+
+
+    # dataset = simulate_dataset(max_time = max_time,
+    #                              n_patients = n_patients,
+    #                              list_covariates = [wce_covariate, cox_covariate])
+
+    
+
+            
+
+        
+    
+    
+
+    # permalgorithm(numSubjects, maxTime, Xmat, XmatNames = NULL,
+    #     eventRandom = NULL, censorRandom = NULL, betas, groupByD = FALSE)
+
+
+    
+
+    WCE_covariate = WCECovariate(name = wce_covariate_name)
+    
+    
+    
+    dataset = simulate_dataset(max_time = max_time, 
+                               n_patients = n_patients, 
+                               list_covariates = list_covariates)
+    
+
+
+
+
+    return dataset
 
 #### 
 def exponential_scenario(u_t, name = False):
@@ -643,6 +887,24 @@ def early_peak_scenario(u_t):
 
 def inverted_u_scenario(u_t):
     return norm.pdf(u_t/365, 0.2, 0.06)
+
+def constant_scenario(u_t):
+    if u_t <= 180:
+        return 1/180
+    else:
+        return 0
+    
+def hat_scenario(u_t):
+    if u_t < 180:
+        return (u_t/180)
+    elif (u_t >= 180) and (u_t < 240):
+        return 1
+    else: 
+        return (1 - (u_t-240)/180)
+
+
+
+
 
 
 def get_scenario(scenario_name: int, max_time: int):
@@ -686,4 +948,5 @@ def get_scenario(scenario_name: int, max_time: int):
     return scenario_list / normalization_factor
 
 
-        
+
+

@@ -89,6 +89,8 @@ number_line_df = nrow(combinations_simulations_parameters) * nrow(combinations_a
 print(number_line_df)
 
 
+if (n_bootstraps == NULL){
+
 
 results_df = data.frame(simulation_id = integer(number_line_df),
                         HR_target = integer(number_line_df),
@@ -105,6 +107,8 @@ results_df = data.frame(simulation_id = integer(number_line_df),
                         HR = integer(number_line_df),
                         lower_IC = integer(number_line_df),
                         higher_IC = integer(number_line_df))
+
+}
 
 if (save_models == TRUE){
     results_df$path_model <- character(number_line_df)
@@ -200,14 +204,8 @@ for (i in 1:nrow(combinations_simulations_parameters)){
             results_df$n_bootstraps[number_of_analyzed_models] <- n_bootstraps
             results_df$BIC[number_of_analyzed_models] <- BIC
             results_df$HR[number_of_analyzed_models] <- HR[1]
-
-            if(n_bootstraps > 0){
-                results_df$lower_IC[number_of_analyzed_models] <- HR[2]
-                results_df$higher_IC[number_of_analyzed_models] <- HR[3]
-            }else{
-                results_df$lower_IC[number_of_analyzed_models] <- NA
-                results_df$higher_IC[number_of_analyzed_models] <- NA
-            }
+            results_df$lower_IC[number_of_analyzed_models] <- HR[2]
+            results_df$higher_IC[number_of_analyzed_models] <- HR[3]
 
 
             if (save_models == TRUE){
@@ -220,9 +218,6 @@ for (i in 1:nrow(combinations_simulations_parameters)){
                 saveRDS(wce_model, model_result_path)
                 
             }
-
-
-            
 
  
 

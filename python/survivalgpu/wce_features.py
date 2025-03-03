@@ -109,6 +109,7 @@ def bspline_conv(
     # 1 <= my_ev_i - stop_j < cutoff + 1
     cut_ = LazyTensor(window.float().view(1, 1, -1))
 
+
     # Symbolic KeOps computation.
     window_ij = cut_.bspline(events_i - doses_times_j, 0)
     atoms_ij = knots_.bspline(events_i - doses_times_j, order)
@@ -223,6 +224,8 @@ def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None):
 
     # Dummy vector of "ids" (we create one patient only):
     ids = torch.zeros(N, device=device, dtype=int32)
+
+    print(ids)
 
     # Doses:
     doses = torch.zeros(N, device=device, dtype=float32)
