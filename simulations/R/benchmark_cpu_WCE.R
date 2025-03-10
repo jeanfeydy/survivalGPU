@@ -56,10 +56,10 @@ patient_list = c()
 
 for (n_patients in c(
     100,
-    500#,
-    # 1000
-    # 5000,
-    # 10000
+    500,
+     1000,
+     5000,
+     10000
 )){
 
     survivalgpu <- use_survivalGPU()
@@ -80,9 +80,13 @@ for (n_patients in c(
 
     time_list = c(time_list, time)
 
+
+    
     patient_list = c(patient_list, results$n_patients)
 
     print(time_list)
+
+
 
     
     
