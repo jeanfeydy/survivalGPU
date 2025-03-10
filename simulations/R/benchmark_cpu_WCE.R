@@ -66,7 +66,7 @@ for (n_patients in c(
 
     simulate_for_experiment = survivalgpu$simulate_for_experiment
 
-    t
+    
     print(paste("n_patients: ", n_patients))
 
     results = one_benchmarl(
@@ -76,8 +76,10 @@ for (n_patients in c(
         scenario_name = "exponential_scenario"
     )
 
+    time = as.numeric(results$time_cpu, units = "secs")
 
-    time_list = c(time_list, results$time_cpu)
+    time_list = c(time_list, time)
+
     patient_list = c(patient_list, results$n_patients)
 
     print(time_list)
