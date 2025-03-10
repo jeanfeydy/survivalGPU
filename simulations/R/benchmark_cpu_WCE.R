@@ -6,25 +6,17 @@ library(dplyr)
 
 # options(scipen = 999)
 
-devtools::load_all("../../../survivalGPU/R")
+# devtools::load_all("../../../survivalGPU/R")
 
-library(survivalGPU)
-
-
+# library(survivalGPU)
 
 
-one_benchmarl <- function(
-    n_patients,
-    max_time,
-    HR_target,
-    scenario_name
+
+
+one_benchmark <- function(
+    dataset
 ){
-    dataset = simulate_for_experiment(
-        n_patients = n_patients, 
-        max_time = max_time, 
-        scenario_name = scenario_name,
-        HR_target = HR_target
-    )
+
 
     time_start = Sys.time()
 
@@ -56,24 +48,27 @@ patient_list = c()
 
 for (n_patients in c(
     100,
-    500,
-     1000,
-     5000,
-     10000
+    500
+    #  1000,
+    #  5000,
+    #  10000,
+    #  50000
 )){
 
-    survivalgpu <- use_survivalGPU()
 
-    simulate_for_experiment = survivalgpu$simulate_for_experiment
+    dataset_path =paste0("../benchmark_datasets/", n_patients, ".csv")
+
+
+    dataset = read.csv(dataset_path)
+
+    
+
 
     
     print(paste("n_patients: ", n_patients))
 
-    results = one_benchmarl(
-        n_patients = n_patients, 
-        max_time = 365,
-        HR_target = 4,
-        scenario_name = "exponential_scenario"
+    results = one_benchmark(
+        dataset
     )
 
     time = as.numeric(results$time_cpu, units = "secs")
