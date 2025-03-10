@@ -54,7 +54,8 @@ simulation_iteration <- function(
         start = "start",
         stop = "stop",
         expos = "dose",
-        constrained = "r"
+        constrained = "r",
+        verbosity = 0
     )
 
     HR_gpu = HR(model_gpu, exposed, unexposed)
@@ -90,6 +91,14 @@ multiple_simulation <- function(
             HR_target = HR_target,
             scenario_name = scenario_name
         )
+
+        print("#################################")
+
+        print("scenarion_name :")
+        print(scenario_name)
+        print("iteration_number :")
+        print(i)
+
 
         results_cpu = c(results_cpu, HRs$HR_cpu)
         results_gpu = c(results_gpu, HRs$HR_gpu)
@@ -165,7 +174,7 @@ for(scenario_name in c(
     "early_peak_scenario",
     "inverted_u_scenario")){
     print(scenario_name)
-    result = multiple_simulation(n_simualtions = 2,
+    result = multiple_simulation(n_simualtions = 100,
         n_patients = 500, 
         max_time = 365,
         HR_target = 4,

@@ -113,7 +113,7 @@
 wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
                    event, start, stop, expos, covariates = NULL,
                    nbootstraps = 1, batchsize = 0, confint = 0.95,
-                   controls = NULL, ...) {
+                   controls = NULL, verbosity = 1,...) {
   UseMethod("wceGPU")
 }
 
@@ -125,7 +125,7 @@ wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
 wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                            aic = FALSE, id, event, start, stop, expos,
                            covariates = NULL, nbootstraps = 1, batchsize = 0,
-                           confint = 0.95, controls = NULL, ...) {
+                           confint = 0.95, controls = NULL, verbosity = 1,...) {
   survivalgpu <- use_survivalGPU()
   wce_R <- survivalgpu$wce_R
 
@@ -146,7 +146,8 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     data = data, ids = id, covars = py_covariates, stop = stop,
     doses = expos, events = event, nknots = nknots,
     constrained = py_constrained, cutoff = cutoff,
-    bootstrap = nbootstraps, batchsize = batchsize
+    bootstrap = nbootstraps, batchsize = batchsize,
+    verbosity = verbosity
   )
 
   # --- outputs of wce_R :
