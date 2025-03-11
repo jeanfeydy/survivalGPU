@@ -41,6 +41,7 @@ simulation_paper <- function(
 
   simulate_for_experiment = survivalgpu$simulate_for_experiment
 
+  print("before going python")
   dataset = simulate_for_experiment(
     n_patients = n_patients, 
     max_time = max_time, 
