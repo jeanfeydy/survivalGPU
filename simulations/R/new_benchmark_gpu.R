@@ -4,7 +4,7 @@ library(jsonlite)
 library(devtools)
 library(dplyr)
 
-options(scipen = 999)
+# options(scipen = 999)
 
 devtools::load_all("../../../survivalGPU/R")
 
@@ -53,11 +53,12 @@ time_list = c()
 patient_list = c()
 
 for (n_patients in c(
-    100,
-    100,
-    200,
-    2000,
-    20000
+    500,
+    500,
+    1000,
+    5000,
+    10000,
+    50000
 )){
 
 
@@ -100,7 +101,7 @@ results_df <- data.frame(
 
 
 
-write.csv(results_df, "benchmark_survivalgpu_cpu_end.csv", row.names = FALSE)
+write.csv(results_df, "benchmark_survivalgpu_gpu.csv", row.names = FALSE)
 
 
 
