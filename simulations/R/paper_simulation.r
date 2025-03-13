@@ -28,6 +28,8 @@ simulation_iteration <- function(
         HR_target = HR_target
     )
 
+    time_start = Sys.time()
+
     model_cpu = WCE::WCE(
         data = dataset,
         analysis = "Cox",
@@ -38,12 +40,21 @@ simulation_iteration <- function(
         start = "start",
         stop = "stop",
         expos = "dose",
+        constrained = "Right"
     )
+
+    time_stop = Sys.time()
+
+    time_cpu = time_stop - time_start
+
 
     exposed   <- rep(1, 180)
     unexposed <- rep(0, 180)
 
     HR_cpu = WCE::HR.WCE(model_cpu, exposed, unexposed)
+
+
+    time_start <- Sys.time()
 
     model_gpu = wceGPU(
         data = dataset,
@@ -54,13 +65,21 @@ simulation_iteration <- function(
         start = "start",
         stop = "stop",
         expos = "dose",
-        constrained = "r",
+        constrained = "Right",
         verbosity = 0
     )
 
+    time_stop = Sys.time()
+
+    print(model_gpu)
+
+    time_gpu = time_start - time_stop
+
     HR_gpu = HR(model_gpu, exposed, unexposed)
 
-    return(list(HR_cpu = HR_cpu, HR_gpu = HR_gpu))
+    return(list(HR_cpu = HR_cpu, HR_gpu = HR_gpu, 
+                time_cpu = time_cpu, time_gpu = time_gpu,
+                model_gpu = model_gpu, model_cpu = model_cpu))
 }
 
 
@@ -84,8 +103,24 @@ multiple_simulation <- function(
     results_cpu= c()
     results_gpu= c()
 
-    for(i in 1:n_simualtions){
-        HRs = simulation_iteration(
+    # cpu_result_matrix = 
+
+    cutoff = 180
+
+    columns = c("iteration","library",paste0("t", 1:cutoff))
+    wce_df <- data.frame(matrix(ncol = length(columns), nrow = 0))
+    colnames(wce_df) <- columns
+
+
+    print(wce_df)
+
+
+    
+
+    for(i in 1:n_simualtions)
+    {
+
+        simulation_result = simulation_iteration(
             n_patients = n_patients, 
             max_time = max_time,
             HR_target = HR_target,
@@ -100,8 +135,11 @@ multiple_simulation <- function(
         print(i)
 
 
-        results_cpu = c(results_cpu, HRs$HR_cpu)
-        results_gpu = c(results_gpu, HRs$HR_gpu)
+        results_cpu = c(results_cpu, simulation_result$HR_cpu)
+        results_gpu = c(results_gpu, simulation_result$HR_gpu)
+
+
+        WCE_cpu = simulation_result$WCE
         
     }
 
@@ -113,10 +151,6 @@ multiple_simulation <- function(
         analysis_CPU = analysis_CPU,
         analysis_GPU = analysis_GPU
     ))
-
-
-
-
 }
 
 
@@ -134,6 +168,9 @@ result_analysis <- function(result_list, HR_target){
         sd_beta = sd_beta, 
         biais = biais))
 }
+
+
+
 
 
 
@@ -175,7 +212,7 @@ for(scenario_name in c(
     "inverted_u_scenario")){
     print(scenario_name)
     result = multiple_simulation(n_simualtions = 100,
-        n_patients = 500, 
+        n_patients = 10000, 
         max_time = 365,
         HR_target = 4,
         scenario_name = scenario_name
@@ -183,6 +220,8 @@ for(scenario_name in c(
 
     results[[scenario_name]] <- result
 }
+
+
 
 results_df <- do.call(rbind, lapply(names(results), function(scenario) {
     data.frame(
@@ -202,7 +241,7 @@ results_df <- do.call(rbind, lapply(names(results), function(scenario) {
     
 }))
 
-write.csv(results_df, "simulation_results.csv", row.names = FALSE)
+write.csv(results_df, "simulation_results_500.csv", row.names = FALSE)
 
 
 
