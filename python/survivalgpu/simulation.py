@@ -782,9 +782,6 @@ def simulate_for_experiment(n_patients, max_time,HR_target, scenario_name):
         HR_target = HR_target)
     
 
-    print("############")
-    print(type(wce_covariate))
-    print("############")
 
 
 
