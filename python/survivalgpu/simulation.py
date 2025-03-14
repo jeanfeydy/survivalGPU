@@ -528,7 +528,7 @@ def matching_algo(WCEmat: np.ndarray,
 
     selected_indices = torch.zeros(n_patients,dtype = int).to(device)
 
-    non_selected_indices = torch.arange(0,n_patients)
+    non_selected_indices = torch.arange(0,n_patients).to(device)
 
     WCEmat_current = torch.from_numpy(WCEmat).to(device)
     HR_target_tensor = torch.from_numpy(HR_target_list).to(device)
