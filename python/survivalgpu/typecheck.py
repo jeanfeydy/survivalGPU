@@ -1,6 +1,6 @@
 from beartype import beartype as typechecker
 import jaxtyping as jxt
-from typing import Optional, Callable, Union, List, Tuple, Literal
+from beartype.typing import Optional, Callable, Union, List, Tuple, Literal
 
 
 import torch
@@ -8,7 +8,7 @@ import numpy as np
 
 
 def typecheck(func):
-    return jxt.jaxtyped(typechecker(func))
+    return jxt.jaxtyped(func, typechecker=typechecker)
 
 
 Array = np.ndarray
