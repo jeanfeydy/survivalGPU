@@ -233,7 +233,6 @@ def test_bootstraps_stratification_1(
         groups=batch.view(1, -1).tile((n_bootstraps, 1)),
         reduction="sum",
         output_size=n_groups,
-        backend="pyg",
     )
 
     assert torch.allclose(weight_per_strata, new_weight_per_strata)

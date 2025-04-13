@@ -1,11 +1,6 @@
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
-# Use torch_scatter (https://github.com/rusty1s/pytorch_scatter)
-# from the PyTorch Geometric project for fast heterogeneous summations:
-import torch_scatter
-
-
 def make_2d(g):
     if len(g.shape) == 1:
         return g.view(1, -1)
@@ -80,133 +75,32 @@ class SumTorch(torch.autograd.Function):
         return torch.index_select(grad_output, 1, groups), None, None
 
 
-"""
-class GatherCSR(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, values, groups):
-        ctx.save_for_backward(groups)
-        return torch_scatter.gather_csr(values, groups)
+def group_reduce(*, values, groups, reduction, output_size):
+    # Compatibility switch for PyTorch.scatter_reduce:
+    if reduction == "max":
+        reduction = "amax"
 
-    @staticmethod
-    def backward(ctx, grad_output):
-        (groups,) = ctx.saved_tensors
-        return SumCSR.apply(grad_output, groups), None
-"""
-
-
-# Handcrafted fix for a bug in torch_scatter,
-# https://github.com/rusty1s/pytorch_scatter/issues/299
-class SumCSR(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, values, groups):
-        ctx.save_for_backward(groups)
-        return torch_scatter.segment_csr(values, groups, reduce="sum")
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (groups,) = ctx.saved_tensors
-        return GatherCSR.apply(grad_output, groups), None
-
-
-class GatherCSR(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, values, groups):
-        ctx.save_for_backward(groups)
-        return torch_scatter.gather_csr(values, groups)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (groups,) = ctx.saved_tensors
-        return SumCSR.apply(grad_output, groups), None
-
-
-class SumCOO(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, values, groups, dim_size):
-        ctx.save_for_backward(groups)
-        ctx.dim_size = dim_size
-        return torch_scatter.segment_coo(
-            values, groups, dim_size=dim_size, reduce="sum"
-        )
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (groups,) = ctx.saved_tensors
-        return GatherCOO.apply(grad_output, groups, ctx.dim_size), None, None
-
-
-class GatherCOO(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, values, groups, dim_size):
-        ctx.save_for_backward(groups)
-        ctx.dim_size = dim_size
-        return torch_scatter.gather_coo(values, groups)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (groups,) = ctx.saved_tensors
-        return SumCOO.apply(grad_output, groups, ctx.dim_size), None, None
-
-
-def group_reduce(*, values, groups, reduction, output_size, backend):
-    if backend == "torch":
-        # Compatibility switch for PyTorch.scatter_reduce:
-        if reduction == "max":
-            reduction = "amax"
-
-        assert len(values.shape) == 2
-        if reduction == "sum":
-            return SumTorch.apply(values, groups, output_size)
-        else:
-            return torch.zeros(
-                values.shape[0], output_size, dtype=values.dtype, device=values.device
-            ).scatter_reduce_(
-                dim=1,
-                index=make_2d(groups),
-                src=values,
-                reduce=reduction,
-                include_self=False,
-            )
-    elif backend == "pyg":
-        return torch_scatter.scatter(
-            values, make_2d(groups), dim=1, dim_size=output_size, reduce=reduction
-        )
-
-    elif backend == "coo":
-        if reduction == "sum":
-            return SumCOO.apply(values, make_2d(groups), output_size)
-        else:
-            return torch_scatter.segment_coo(
-                values, make_2d(groups), dim_size=output_size, reduce=reduction
-            )
-    elif backend == "csr":
-        if reduction == "sum":
-            return SumCSR.apply(values, groups)
-        else:
-            return torch_scatter.segment_csr(values, groups, reduce=reduction)
+    assert len(values.shape) == 2
+    if reduction == "sum":
+        return SumTorch.apply(values, groups, output_size)
     else:
-        raise ValueError(
-            f"Invalid value for the scatter backend ({backend}), "
-            "should be one of 'torch', 'pyg', 'coo' or 'csr'."
+        return torch.zeros(
+            values.shape[0], output_size, dtype=values.dtype, device=values.device
+        ).scatter_reduce_(
+            dim=1,
+            index=make_2d(groups),
+            src=values,
+            reduce=reduction,
+            include_self=False,
         )
 
 
-def group_expand(*, values, groups, output_size, backend):
-    if backend in ["torch", "pyg"]:
-        # return torch.gather(values, 1, groups)
-        return torch.index_select(values, 1, groups)
-    elif backend == "coo":
-        return GatherCOO.apply(values, make_2d(groups), output_size)
-    elif backend == "csr":
-        return GatherCSR.apply(values, groups)
-    else:
-        raise ValueError(
-            f"Invalid value for the scatter backend ({backend}), "
-            "should be one of 'torch', 'pyg', 'coo' or 'csr'."
-        )
+def group_expand(*, values, groups, output_size):
+    # return torch.gather(values, 1, groups)
+    return torch.index_select(values, 1, groups)
 
 
-def group_logsumexp(*, values, groups, output_size, backend):
+def group_logsumexp(*, values, groups, output_size):
     """Group-wise, numerically stable log-sum-exp reduction.
 
     We apply the log-sum-exp trick (https://en.wikipedia.org/wiki/LogSumExp)
@@ -219,11 +113,10 @@ def group_logsumexp(*, values, groups, output_size, backend):
         groups=groups,
         reduction="max",
         output_size=output_size,
-        backend=backend,
     )
     # Then, expand this information as a (B,N) tensor...
     maxima = group_expand(
-        values=group_maxima, groups=groups, output_size=output_size, backend=backend
+        values=group_maxima, groups=groups, output_size=output_size,
     )
     # And normalize the values so that they are all <= 0,
     # with at least one term per group equal to 0:
@@ -236,7 +129,6 @@ def group_logsumexp(*, values, groups, output_size, backend):
         groups=groups,
         reduction="sum",
         output_size=output_size,
-        backend=backend,
     )
     # Finally, apply the logarithm on the sum...
     # and don't forget to re-add the group maxima!

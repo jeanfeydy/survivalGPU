@@ -52,7 +52,6 @@ class CoxPHSurvivalAnalysis:
     Args:
         alpha (float): L2 regularization parameter.
         ties (str): Ties handling method. One of "efron", "breslow".
-        backend (str): Backend to use. One of "numpy", "csr", "torch".
         bootstrap (int): Number of bootstrap samples to use.
         batchsize (int): Number of bootstrap samples to process in parallel.
         maxiter (int): Maximum number of Newton iterations.
@@ -69,7 +68,6 @@ class CoxPHSurvivalAnalysis:
         self,
         alpha: Real = 0.0,
         ties: Literal["efron", "breslow"] = "efron",
-        backend: Literal["torch", "pyg", "coo", "csr"] = "csr",
         maxiter: Int = 20,
         eps: Real = 1e-5,
         doscale: Bool = False,
@@ -78,7 +76,6 @@ class CoxPHSurvivalAnalysis:
     ):
         self.alpha = alpha
         self.ties = ties
-        self.backend = backend
         self.maxiter = maxiter
         self.eps = eps
         self.doscale = doscale
@@ -169,7 +166,6 @@ class CoxPHSurvivalAnalysis:
             coxph_objective,
             dataset=dataset,
             ties=self.ties,
-            backend=self.backend,
             mode=mode,
         )
 
@@ -421,7 +417,6 @@ def coxph_numpy(
     ties="efron",
     survtype,
     strata=None,
-    backend="csr",
     maxiter=20,
     init=None,
     eps=1e-9,
@@ -442,10 +437,6 @@ def coxph_numpy(
             If you run into out of memory errors, please consider using batchsize=100, 10 or 1.
         ties (str, optional): method to handle ties - either "efron" or "breslow".
             Defaults to "efron".
-        backend (str, optional): method to compute the log-sum-exp reduction.
-            Use either "torch" for a torch.scatter-based implementation,
-            or "keops" for a LazyTensor-based implementation.
-            Defaults to "torch".
 
     Raises:
         ValueError: If the batchsize is non-zero and does not divide the requested
@@ -464,7 +455,6 @@ def coxph_numpy(
     model = CoxPHSurvivalAnalysis(
         alpha=alpha,
         ties=ties,
-        backend=backend,
         maxiter=maxiter,
         eps=eps,
         doscale=doscale,
@@ -565,7 +555,6 @@ def coxph_R(
             ties=ties,
             survtype=survtype,
             strata=strata,
-            backend="csr",
             bootstrap=int(bootstrap),
             batchsize=int(batchsize) if batchsize > 0 else None,
             maxiter=int(maxiter) if profile is None else 1,

@@ -99,7 +99,6 @@ def coxph_objective(
     *,
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
-    backend: Literal["torch", "pyg", "coo", "csr"],
     bootstrap: Resampling,
     mode: Literal["unit length", "start zero", "any"],
 ) -> Callable[[Float32Tensor["bootstraps intervals"]], Float32Tensor["batch_size"]]:
@@ -130,7 +129,6 @@ def coxph_objective(
     which is identified with len(bootstrap) vectors of length data.n_batch,
     concatenated with each other.
     """
-    coo_backend = "torch" if backend == "torch" else "pyg"
 
     # Pre-processing ---------------------------------------------------------------------
     # For each bootstrap and value of (batch, strata), aggregate the
@@ -157,7 +155,6 @@ def coxph_objective(
         groups=dead_cluster_indices,
         reduction="sum",
         output_size=dataset.n_groups,
-        backend=coo_backend,
     )
     # Equivalent to:
     # tied_dead_weights = torch.bincount(cluster_indices[deaths == 1],
@@ -200,27 +197,11 @@ def coxph_objective(
         # the multiplicative factor in front of the log-sum-exp term is equal to 1.
         # -> there is no need to define a weight_factor variable.
 
-    # Format the "group" vector as required by our backend for group-wise summations:
-    if backend in ["torch", "pyg", "coo"]:
-        assert group.shape == (dataset.n_intervals,)
-        # group is (n_intervals,),
-        # and indicates the summation group that is associated to each interval e.g.
-        # [0, 0, 0, 0, 0, 1, 1, 1, 2, 2]
-
-    elif backend == "csr":
-        # We assume that group looks like:
-        # [0, 0, 1, 1, 1, 3, 4, 4, ...]
-        assert dataset.is_sorted
-        assert (group[1:] >= group[:-1]).all()
-
-        cluster_sizes = torch.bincount(group, minlength=n_groups)
-        assert cluster_sizes.shape == (n_groups,)
-        group = torch.cat(
-            (torch.zeros_like(cluster_sizes[:1]), cluster_sizes.cumsum(dim=0))
-        )
-        group = group.view(1, n_groups + 1).repeat(len(bootstrap), 1)
-        # groups is (n_bootstraps, n_times+1) with Breslow,
-        #           (n_bootstraps, 2*n_times + 1) with Efron.
+    # Format the "group" vector for group-wise summations:
+    assert group.shape == (dataset.n_intervals,)
+    # group is (n_intervals,),
+    # and indicates the summation group that is associated to each interval e.g.
+    # [0, 0, 0, 0, 0, 1, 1, 1, 2, 2]
 
     @typecheck
     def negloglikelihood(
@@ -274,7 +255,6 @@ def coxph_objective(
             groups=dataset.batch_intervals,
             reduction="sum",
             output_size=dataset.n_batch,
-            backend=coo_backend,
         )
         assert lin.shape == (B, dataset.n_batch)
 
@@ -307,7 +287,6 @@ def coxph_objective(
                 values=weighted_scores,
                 groups=group,
                 output_size=n_groups,
-                backend=backend,
             )
             assert weight_factor.shape == (B, n_groups)
             assert group_scores.shape == (B, n_groups)
@@ -454,7 +433,6 @@ def coxph_objective(
                 groups=dataset.unique_groups[0],
                 reduction="sum",
                 output_size=dataset.n_batch,
-                backend=coo_backend,
             )
 
             assert lse.shape == (B, dataset.n_batch)
@@ -469,7 +447,6 @@ def coxph_objective(
                 values=weighted_scores,
                 groups=groups,
                 output_size=T * 2,
-                backend=backend,
             )
             # We reshape it as a (B,T,2) array that contains, for every batch b
             # and every death time t, the log-sum-exp values that correspond

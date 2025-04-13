@@ -40,7 +40,6 @@ def benchmark_coxph_simple(
     n_batch=1,
     n_strata=1,
     max_duration=None,
-    backend="csr",
     maxiter=20,
 ):
     if max_duration is None:
@@ -55,7 +54,7 @@ def benchmark_coxph_simple(
     )
 
     model = CoxPHSurvivalAnalysis(
-        ties="breslow", alpha=0.01, backend=backend, maxiter=maxiter
+        ties="breslow", alpha=0.01, maxiter=maxiter
     )
 
     if torch.cuda.is_available():
@@ -81,13 +80,12 @@ def benchmark_coxph_simple(
 n_covar = 5
 max_power = 7 if torch.cuda.is_available() else 5
 
-for backend in ["torch", "pyg", "coo", "csr"]:
+for backend in ["torch"]:
     print("backend:", backend)
     for n_patients in [int(10**k) for k in range(3, max_power + 1)]:
         benchmark_coxph_simple(
             n_covariates=n_covar,
             n_patients=n_patients,
-            backend=backend,
             maxiter=3,
         )
 
@@ -110,7 +108,6 @@ for backend in ["torch", "pyg", "coo", "csr"]:
             benchmark_coxph_simple(
                 n_covariates=n_covar,
                 n_patients=n_patients,
-                backend=backend,
                 maxiter=3,
             )
 

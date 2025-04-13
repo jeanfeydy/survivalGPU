@@ -94,7 +94,6 @@ class Resampling:
             groups=indices,
             reduction="sum",
             output_size=P,
-            backend="pyg",
         ).to(
             device=indices.device,
             dtype=torch.float32,

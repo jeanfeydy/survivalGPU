@@ -6,7 +6,7 @@ from hypothesis import strategies as st
 
 np.set_printoptions(precision=4)
 
-from survivalgpu import SUPPORTED_TIES, SUPPORTED_BACKENDS, CoxPHSurvivalAnalysis
+from survivalgpu import SUPPORTED_TIES, CoxPHSurvivalAnalysis
 from survivalgpu.datasets import simple_dataset
 
 from .survival_interface import survival_fit
@@ -38,7 +38,6 @@ def my_dataset(
     max_duration=st.sampled_from([None, 1, 10, 100]),
     ties=st.sampled_from(SUPPORTED_TIES),
     doscale=st.booleans(),
-    backend=st.sampled_from(SUPPORTED_BACKENDS),
     ridge=st.sampled_from([1e-2, 1e-1, 1, 10]),
     n_batch=st.integers(min_value=1, max_value=1),
     n_strata=st.integers(min_value=1, max_value=1),
@@ -50,7 +49,6 @@ def test_survival_equality(
     n_covariates,
     n_patients,
     max_duration,
-    backend,
     ties,
     doscale,
     ridge,
@@ -74,7 +72,6 @@ def test_survival_equality(
     # Fit our model:
     model = CoxPHSurvivalAnalysis(
         ties=ties,
-        backend=backend,
         doscale=doscale,
         alpha=ridge,
     )
