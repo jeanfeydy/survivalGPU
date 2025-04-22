@@ -5,7 +5,7 @@ import torch
 from matplotlib import pyplot as plt
 from torch.profiler import profile, record_function, ProfilerActivity
 
-from tests.utils import numpy, form, wce_features, coxph_fit
+from survivalGPU.python.examples.utils import numpy, form, wce_features, coxph_fit
 from survivalgpu.datasets import drug_dataset
 from survivalgpu import WCESurvivalAnalysis
 

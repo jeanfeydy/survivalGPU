@@ -1,6 +1,6 @@
 Package: survivalGPU
 Title: Fast and scalable implementations for survival models
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: c(
     person("Jean", "FEYDY", email = "jean.feydy@inria.fr",role = "aut"),
     person("Alexis", "van STRAATEN", email = "alexis.vanstraaten@outlook.fr", role = c("aut","cre")),

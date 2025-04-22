@@ -22,6 +22,8 @@ __all__ = sorted(
     ]
 )
 
+__version__ = "0.1.0"
+
 # Ties in the CoxPH model:
 SUPPORTED_TIES = ["breslow"]  # , "efron"]
 
