@@ -1,13 +1,15 @@
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
+
 def make_2d(g):
     if len(g.shape) == 1:
         return g.view(1, -1)
     elif len(g.shape) == 2:
         return g
     else:
-        raise ValueError("Invalid shape for groups")
+        msg = "Invalid shape for groups"
+        raise ValueError(msg)
 
 
 class SlicedSummation(torch.autograd.Function):
@@ -26,7 +28,7 @@ class SlicedSummation(torch.autograd.Function):
     def forward(ctx, slice_indices, *slices):
         ctx.save_for_backward(slice_indices)
         full_sum = slices[0].clone()
-        for slice_start, current_slice in zip(slice_indices, slices[1:]):
+        for slice_start, current_slice in zip(slice_indices, slices[1:], strict=False):
             full_sum[slice_start:] += current_slice
         return full_sum
 
@@ -95,7 +97,7 @@ def group_reduce(*, values, groups, reduction, output_size):
         )
 
 
-def group_expand(*, values, groups, output_size):
+def group_expand(*, values, groups, output_size):  # noqa: ARG001
     # return torch.gather(values, 1, groups)
     return torch.index_select(values, 1, groups)
 
@@ -132,6 +134,4 @@ def group_logsumexp(*, values, groups, output_size):
     )
     # Finally, apply the logarithm on the sum...
     # and don't forget to re-add the group maxima!
-    group_values = group_exps.log() + group_maxima
-
-    return group_values
+    return group_exps.log() + group_maxima

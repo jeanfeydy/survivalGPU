@@ -1,8 +1,6 @@
 import numpy as np
-
 from hypothesis import given, settings
 from hypothesis import strategies as st
-
 from survivalgpu import SUPPORTED_TIES, CoxPHSurvivalAnalysis
 
 np.set_printoptions(precision=4)
@@ -117,8 +115,7 @@ def test_iterations(*, ties):
 if __name__ == "__main__":
     # Use the PyTorch profiler to get a trace of the forward pass
     # and the backward pass.
-    import torch
-    from torch.profiler import profile, record_function, ProfilerActivity
+    from torch.profiler import ProfilerActivity, profile
 
     with profile(
         activities=[

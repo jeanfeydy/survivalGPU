@@ -1,13 +1,12 @@
+from math import ceil, sqrt
+
+import numpy as np
+import torch
 from hypothesis import given
 from hypothesis import strategies as st
-
-import torch
-import numpy as np
-from survivalgpu.datasets import load_drugs, SurvivalDataset
 from survivalgpu.bootstrap import Resampling
+from survivalgpu.datasets import SurvivalDataset
 from survivalgpu.group_reduction import group_reduce
-
-from math import ceil, sqrt
 
 small_int = st.integers(min_value=1, max_value=10)
 
@@ -77,7 +76,9 @@ def test_resampling_single(
     """Checks that 'resampling' a single sample works as expected."""
     unique_patient = torch.randint(0, n_patients, size=(1,)).item()
     # indices is constant: we only care about the unique patient above!
-    indices = unique_patient * torch.ones(n_bootstraps, n_samples, dtype=torch.int64)
+    indices = unique_patient * torch.ones(
+        n_bootstraps, n_samples, dtype=torch.int64
+    )
     patients = torch.randint(0, n_patients, size=(n_intervals,))
 
     # Make sure that we "use" all the patients:
@@ -146,7 +147,9 @@ def test_original_sample_simple(use_patient: bool, device: str):
     res = dataset.original_sample()
     assert res.patient_weights.shape == (1, n_patients)
     assert res.interval_weights.shape == (1, len(dataset.stop))
-    assert torch.allclose(res.patient_weights, torch.ones(1, n_patients, device=device))
+    assert torch.allclose(
+        res.patient_weights, torch.ones(1, n_patients, device=device)
+    )
     assert torch.allclose(
         res.interval_weights, torch.ones(1, len(dataset.stop), device=device)
     )
@@ -164,7 +167,9 @@ def test_bootstraps_simple(
     """Tests the bootstrap method on a simple handcrafted dataset."""
     dataset, n_patients = simple_dataset(use_patient, device)
 
-    boots = dataset.bootstraps(n_bootstraps=n_bootstraps, batch_size=batch_size)
+    boots = dataset.bootstraps(
+        n_bootstraps=n_bootstraps, batch_size=batch_size
+    )
     assert len(boots) == ceil(n_bootstraps / batch_size)
     assert sum([len(b) for b in boots]) == n_bootstraps
 
@@ -197,12 +202,13 @@ def test_bootstraps_stratification_1(
     """Checks that stratification works as expected."""
 
     # Stop, event and covariates don't really matter here:
-    stop = np.random.randint(1, 10, size=(n_intervals,))
-    event = np.random.randint(0, 2, size=(n_intervals,))
+    rng = np.random.default_rng()
+    stop = rng.integers(1, 10, size=(n_intervals,))
+    event = rng.integers(0, 2, size=(n_intervals,))
     covariates = np.zeros((n_intervals, 1))
 
     # Batch is a random vector that defines at most n_groups separate groups:
-    batch = np.random.randint(0, n_groups, size=(n_intervals,))
+    batch = rng.integers(0, n_groups, size=(n_intervals,))
 
     # Wrap the data in a TorchSurvivalDataset object:
     dataset = SurvivalDataset(
@@ -214,7 +220,9 @@ def test_bootstraps_stratification_1(
     dataset = dataset.to_torch(device).sort().count_deaths()
 
     # Retrieve our bootstraps in a single Resampling object:
-    boots = dataset.bootstraps(n_bootstraps=n_bootstraps, batch_size=n_bootstraps)[0]
+    boots = dataset.bootstraps(
+        n_bootstraps=n_bootstraps, batch_size=n_bootstraps
+    )[0]
 
     # Simple check on the shapes, as in test_bootstraps_simple():
     assert boots.patient_weights.shape == (n_bootstraps, n_intervals)
@@ -224,7 +232,9 @@ def test_bootstraps_stratification_1(
     batch = torch.from_numpy(batch).to(device=device)
     # Compute the original number of patients per strata:
     weight_per_strata = (
-        torch.bincount(batch, minlength=n_groups).tile((n_bootstraps, 1)).float()
+        torch.bincount(batch, minlength=n_groups)
+        .tile((n_bootstraps, 1))
+        .float()
     )
 
     # Compute the total weight per strata:

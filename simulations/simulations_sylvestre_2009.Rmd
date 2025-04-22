@@ -76,16 +76,16 @@ or 3, with the recommended daily dose corresponding to 1.
 # e.g. generate prescriptions of different durations and doses.
 
 TDhist <- function(m){
-  
+
   # Duration : lognormal distribution(0.5,0.8)
   duration <-  7 + 7*round(rlnorm(1, meanlog = 0.5, sdlog = 0.8), 0) # in weeks
-  
-  # Dose : random assigment of values 0.5, 1, 1.5, 2, 2.5 and 3
+
+  # Dose : random assignment of values 0.5, 1, 1.5, 2, 2.5 and 3
   dose <-  sample(seq(from = 0.5, to = 3, by = 0.5), size = 1)
-  
+
   # Start with drug exposure
   vec <- rep(dose, duration)
-  
+
   # Repeat until the vector larger than m
   while (length(vec) <= m){
     intermission <- 7 + 7*round(rlnorm(1, meanlog = 0.5, sdlog = 0.8), 0) # in weeks
@@ -98,7 +98,7 @@ TDhist <- function(m){
 
 # Create time-dependent variable - Dose
 Xmat[,1] <- do.call("c", lapply(1:n, function(i) TDhist(m)))
-dim(Xmat) <- c(365, 500) 
+dim(Xmat) <- c(365, 500)
 ```
 
 
@@ -179,14 +179,14 @@ function, we calculated the 500 individual vectors $WCE_i(u)$, of the true value
 dependent variable WCE in (2), for each day of potential follow-up $0 < u < 365$. To this
 end, for each subject i = 1, .., 500, we used the individual vector of the time-dependent daily
 drug exposure $X_i(t)$, 0 < t < 365 days (generated in Section 1.1), and the corresponding
-weight function $w(ut)$ (as described in Section 1.2). 
+weight function $w(ut)$ (as described in Section 1.2).
 
 ```{r}
 # Function to obtain WCE vector
 wce_vector <- function(u, scenario, Xmat){
-  
+
   t <- 1:u
-  
+
   if(scenario %in% c("exponential_function", "bi_linear_function", "constant_function")){
     scenario_function <- do.call(scenario, list((u - t)/365))
   }else if(scenario == "early_peak_function"){
@@ -194,15 +194,15 @@ wce_vector <- function(u, scenario, Xmat){
   }else if(scenario == "inverted_u_function"){
     scenario_function <- inverted_u_function[(u - t + 1)]
   }
-  
+
   wce <- scenario_function * Xmat[t,]
-  
+
   if(u == 1){
     res <- wce
   }else{
     res <- apply(wce, 2, sum)
   }
-  
+
   return(res)
 }
 
@@ -225,19 +225,19 @@ of exposure and event times, from uniform U [0, 730] days distribution which was
 to obtain an approximately 50% rate of right random censoring. Next, we determined the
 individual observed follow-up time $T_i = min(\tau_i,C_i)$ and censoring/event status at the end
 of his/her follow-up $\delta_i = I(T_i = \tau_i)$, which resulted in about 250 (un-censored) events per
-simulated sample.  
+simulated sample.
 
 
 ```{r}
 # Function to generate event times and censoring times
 event_censor_generation <- function(){
-  
+
   # Event times : Uniform[1;365] for all scenarios
   eventRandom <- round(runif(n, 1, 365), 0)
-  
+
   # Censoring times : Uniform[1;730] for all scenarios
   censorRandom <- round(runif(n, 1,730),0)
-  
+
   return(list(eventRandom = eventRandom,
               censorRandom = censorRandom))
 }
@@ -261,98 +261,98 @@ with probability of selecting a specific vector $T_i$ [4, 3]. Specifically, the 
 ```{r}
 # Function for 'the final step of the permutational algorithm'
 matching_algo <- function(wce_mat){
-  
+
   n_patient <- ncol(wce_mat)
   events_generation <- event_censor_generation()
-  
+
   df_event <- data.frame(patient      = 1:n_patient,
                          eventRandom  = events_generation$eventRandom,
                          censorRandom = events_generation$censorRandom)
-  
+
   df_event <- df_event %>%
     group_by(patient) %>%
     mutate(FUP_Ti = min(eventRandom, censorRandom)) %>%
     mutate(event  = ifelse(FUP_Ti == eventRandom, 1, 0)) %>%
     ungroup() %>%
     arrange(FUP_Ti)
-  
+
   # init
   patient_order <- df_event$patient
   j = 1
   id <- 1:n_patient
   wce_mat_df <- wce_mat %>% as.data.frame()
   matching_result <- data.frame()
-  
+
   # Iterative matching, start with the lowest FUP
   for (i in patient_order) {
-    
+
     event      <- df_event[j, "event"]  %>% pull()
     time_event <- df_event[j, "FUP_Ti"] %>% pull()
-    
+
     if(event == 0){
-      
+
       # If no event, all probabilities are the same
       sample_id <- sample(id, 1)
-      
+
     }else if(event == 1){
-      
-      # If event, matching with different probabilities 
+
+      # If event, matching with different probabilities
       wce_matrix <- wce_mat_df %>% select(paste0("V", id)) %>% as.matrix()
       proba <- (4 * wce_matrix[time_event,]) / sum(4 * wce_matrix[time_event,])
       sample_id <- sample(id, 1, prob = proba)
     }
-    
-    matching_result <- rbind(matching_result, 
+
+    matching_result <- rbind(matching_result,
                              data.frame(id_patient = i,
                                         id_dose_wce = sample_id))
-    
+
     id <- id[!id %in% sample_id]
     j = j + 1
-    
+
     # Stop when last id of iterative algo
     if(length(id) == 1){
-      
+
       matching_result <- rbind(matching_result,
                                data.frame(id_patient  = patient_order[n_patient],
                                           id_dose_wce = id))
-      
+
       return(list(matching_result = matching_result,
                   df_event        = df_event,
                   patient_order   = patient_order))
     }
   }
 }
-  
+
 # Function to render dataset after the matching algo
 get_dataset <- function(Xmat, wce_mat){
-  
+
   df_wce <- data.frame()
   Xmat_df <- Xmat %>%
     as.data.frame()
-  
+
   matching_result <- matching_algo(wce_mat)
-  
+
   for (i in matching_result$patient_order) {
-    
+
     fu <- matching_result$df_event[matching_result$df_event$patient == i, "FUP_Ti"] %>% pull()
     event_patient <- matching_result$df_event[matching_result$df_event$patient == i, "event"] %>% pull()
-    
+
     if(event_patient == 1){
       event_vec <- c(rep(0, (fu-1)),1)
     }else{
       event_vec <- rep(0, fu)
     }
-    
+
     id_dose <- matching_result$matching_result[matching_result$matching_result$id_patient == i, "id_dose_wce"]
-    
+
     df_dose <- data.frame(patient = rep(i, fu),
                           start = 0:(fu-1),
                           stop = 1:fu,
                           event = event_vec,
                           dose = Xmat_df[1:fu, paste0("V", id_dose)])
-    
+
     df_wce <- rbind(df_wce, df_dose)
-    
+
   }
   return(df_wce)
 }
@@ -367,23 +367,23 @@ get_dataset <- function(Xmat, wce_mat){
 # Function to simulate right constrained and unconstrained WCE with the same
 #  dataset according to a specific scenario
 Sylvestre_simulations <- function(scenario, Xmat){
-  
+
   wce_mat <- do.call("rbind", lapply(1:365, wce_vector, scenario = scenario, Xmat = Xmat))
   df_wce <- get_dataset(Xmat = Xmat, wce_mat = wce_mat)
-  
+
   # cutoff at 180 - right constrained and unconstrained with the same dataset
   wce_right_constrained <- WCE(df_wce, "Cox", 1:3, 180, constrained = "right",
                                id = "patient", event = "event", start = "start",
                                stop = "stop", expos = "dose")
-  
+
   wce_unconstrained <- WCE(df_wce, "Cox", 1:3, 180, constrained = FALSE,
                            id = "patient", event = "event", start = "start",
                            stop = "stop", expos = "dose")
-  
+
   # Best result according to BIC
   return(list(results_right_constrained = wce_right_constrained$WCEmat[which.min(wce_right_constrained$info.criterion), 1:180],
               results_unconstrained = wce_unconstrained$WCEmat[which.min(wce_unconstrained$info.criterion), 1:180]))
-  
+
 }
 
 n_simul <- 10
@@ -401,10 +401,10 @@ Sylvestre_simulations_results <- readRDS("results.rds")
 ```{r}
 # Function to extract results for plot correctly risk functions
 extract_simulations_result <- function(result){
-  
+
   right_constrained <- do.call("rbind", result[1,])
   unconstrained <- do.call("rbind", result[2,])
-  
+
   return(list(right_constrained = right_constrained,
               unconstrained = unconstrained))
 }
@@ -435,12 +435,12 @@ constant <- do.call("rbind", constant_list)
 
 # Function to plot simulations results
 wce_plot <- function(results, scenario_correct_shape){
- 
+
   matplot(scenario_correct_shape, type = "l", col = "red",
           ylim = c(-0.02, 0.04), ylab = " ")
   matlines(t(results), type = "l", col = "black", lty = 1)
   matlines(scenario_correct_shape, type = "l", col = "red", lty = 1)
- 
+
 }
 
 scenario_correct_shape <- list(expo_decay,
@@ -468,4 +468,3 @@ plot_right_constrained <- map2(results_right_constrained, scenario_correct_shape
 par(mfrow=c(2, 3))
 plot_unconstrained <- map2(results_unconstrained, scenario_correct_shape, wce_plot)
 ```
-

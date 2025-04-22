@@ -86,12 +86,9 @@ import numpy as np
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
-from .group_reduction import group_reduce, SlicedSummation, group_logsumexp
-
-
-from .typecheck import typecheck, Callable, Literal
-from .typecheck import Float32Tensor
 from .bootstrap import Resampling
+from .group_reduction import SlicedSummation, group_logsumexp, group_reduce
+from .typecheck import Callable, Float32Tensor, Literal, typecheck
 
 
 @typecheck
@@ -136,7 +133,7 @@ def coxph_objective(
     # These are required as multiplicative factors by the Efron and Breslow approximations.
 
     # Recall that bootstrap.interval_weights is a (n_bootstraps, n_intervals)
-    # Tensor of int64 that records the number of occurences of each interval.
+    # Tensor of int64 that records the number of occurrences of each interval.
 
     # Compute the total weight of dead samples for every event time:
     dead_weights = bootstrap.interval_weights[:, dataset.event == 1]
@@ -218,17 +215,19 @@ def coxph_objective(
 
         """
         if scores.shape[0] != len(bootstrap):
-            raise ValueError(
+            msg = (
                 f"The number of rows {scores.shape[0]} of the `scores` Tensor "
                 f"should be equal to the number of bootstrap samples {len(bootstrap)}."
             )
+            raise ValueError(msg)
 
         if scores.shape[1] != dataset.n_intervals:
-            raise ValueError(
+            msg = (
                 f"The number of columns {scores.shape[1]} of the `scores` Tensor "
                 f"should be equal to the number of intervals {dataset.n_intervals} "
                 "that are referenced in `dataset.stop`."
             )
+            raise ValueError(msg)
 
         B, I = len(bootstrap), dataset.n_intervals
 
@@ -439,9 +438,8 @@ def coxph_objective(
 
         # TODO: Update Efron too!
         elif ties == "efron":
-            raise NotImplementedError(
-                "We are currently re-writing the Efron approximation rule with support for batches and strata."
-            )
+            msg = "We are currently re-writing the Efron approximation rule with support for batches and strata."
+            raise NotImplementedError(msg)
             # groups_scores is (B,T*2)
             group_scores = group_logsumexp(
                 values=weighted_scores,
@@ -515,7 +513,6 @@ def coxph_objective(
 
         # lin and lse are (n_bootstrap, n_batch)
         ret_value = lse - lin  # (n_bootstrap, n_batch) values, computed in parallel
-        ret_value = ret_value.view(B * dataset.n_batch)
-        return ret_value
+        return ret_value.view(B * dataset.n_batch)
 
     return negloglikelihood

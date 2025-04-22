@@ -8,7 +8,7 @@
  **   matrix in its lower triangle.
  **        y[n] contains the right hand side
  **
- **  y is overwriten with b
+ **  y is overwritten with b
  **
  **  Terry Therneau
  */

@@ -1,7 +1,7 @@
 library(survival)
 
-options(na.action=na.exclude) # preserve missings
-options(contrasts=c('contr.treatment', 'contr.poly')) #ensure constrast type
+options(na.action=na.exclude) # preserve missing
+options(contrasts=c('contr.treatment', 'contr.poly')) #ensure contrast type
 aeq <- function(x, y, ...) all.equal(as.vector(x), as.vector(y), ...)
 
 

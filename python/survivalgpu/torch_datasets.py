@@ -11,21 +11,17 @@ We provide a TorchSurvivalDataset object with methods that implement:
 
 
 import torch
-import numpy as np
-from matplotlib import pyplot as plt
-from .typecheck import (
-    typecheck,
-    Optional,
-    Callable,
-    Union,
-    List,
-    Tuple,
-    TorchDevice,
-    Literal,
-)
-from .typecheck import Int, Real
-from .typecheck import Int64Tensor, Float32Tensor
+
 from .bootstrap import Resampling
+from .typecheck import (
+    Float32Tensor,
+    Int64Tensor,
+    List,
+    Literal,
+    TorchDevice,
+    Tuple,
+    typecheck,
+)
 
 
 @typecheck
@@ -150,7 +146,7 @@ class TorchSurvivalDataset:
     @typecheck
     def scale(
         self, *, rescale: bool
-    ) -> Tuple[Float32Tensor["covariates"], Optional[Float32Tensor["covariates"]]]:
+    ) -> Tuple[Float32Tensor["covariates"], Float32Tensor["covariates"] | None]:
         """Computes the mean and scale (= L1 norm) of each covariate.
 
         If rescale is False, we simply return the means and None.
@@ -206,11 +202,11 @@ class TorchSurvivalDataset:
 
     @typecheck
     def prune(
-        self, *, mode: Optional[Literal["unit length", "start zero", "any"]] = None
+        self, *, mode: Literal["unit length", "start zero", "any"] | None = None
     ):
         """Filters out the intervals that have no impact on the CoxPH likelihood.
 
-        This may be a common occurence in some datasets where the raw
+        This may be a common occurrence in some datasets where the raw
         "start-stop times" sample every single month or year, including
         times where no event occurs.
         This optimization should have zero impact on the final result of a CoxPH fit.
@@ -266,7 +262,7 @@ class TorchSurvivalDataset:
                 # We loop over the unique values of (batch, strata, stop)
                 # and the associated numbers of deaths:
                 for i, (b_s_s, deaths) in enumerate(
-                    zip(self.unique_groups.T, self.tied_deaths)
+                    zip(self.unique_groups.T, self.tied_deaths, strict=False)
                 ):
                     # Reset the counter if we are in a new (batch, strata):
                     if not torch.equal(current_batch_strata, b_s_s[0:2]):
@@ -331,7 +327,7 @@ class TorchSurvivalDataset:
         self,
         *,
         n_bootstraps: int,
-        batch_size: Optional[int],
+        batch_size: int | None,
         stratify: bool = True,
     ) -> List[Resampling]:
         """Returns a list of Resampling objects that correspond to bootstrap samples.

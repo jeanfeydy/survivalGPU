@@ -1,14 +1,9 @@
 # Standard imports:
-from tqdm import tqdm
-import numpy as np
 import torch
-from matplotlib import pyplot as plt
-from torch.profiler import profile, record_function, ProfilerActivity
-
-from survivalGPU.python.examples.utils import numpy, form, wce_features, coxph_fit
-from survivalgpu.datasets import drug_dataset
 from survivalgpu import WCESurvivalAnalysis
-
+from survivalgpu.datasets import drug_dataset
+from survivalGPU.python.examples.utils import coxph_fit, form
+from tqdm import tqdm
 
 # Setup ==================================================================================
 use_cuda = torch.cuda.is_available()
@@ -87,7 +82,7 @@ def cumulative_distributions(x):
 coefs = model["coef"][0]  # (Drugs, Features)
 risk_means = model["risk"][0]  # (Drugs,)
 
-
+"""
 # Compute the normalized rank of each
 all_risks = torch.cat((risk_means.view(1, Drugs), permutation_risks), dim=0)
 sorted_risks, indices = all_risks.sort(dim=0)
@@ -184,3 +179,4 @@ plt.hist(
     histtype="step",
 )
 plt.savefig("output_permutation_max_ranks.png")
+"""

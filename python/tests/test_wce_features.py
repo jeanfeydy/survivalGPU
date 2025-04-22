@@ -1,13 +1,9 @@
 import numpy as np
 import torch
-from pykeops.torch import LazyTensor
-
-
-from survivalgpu import use_cuda, device, float32, int32, int64
+from matplotlib import pyplot as plt
+from survivalgpu import device, float32, int32
 from survivalgpu.utils import numpy
 from survivalgpu.wce_features import wce_features_batch
-
-from matplotlib import pyplot as plt
 
 if False:
     import pykeops
@@ -47,7 +43,7 @@ features, knots = wce_features_batch(
 
 print("Knots:", knots)
 
-# Fancy diplay:
+# Fancy display:
 features = numpy(features)
 times = numpy(times)
 

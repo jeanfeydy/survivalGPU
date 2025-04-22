@@ -1,12 +1,8 @@
 import numpy as np
-
+import rpy2.robjects as ro
+from rpy2.robjects import Formula, numpy2ri
 from rpy2.robjects.packages import importr
 from rpy2.robjects.vectors import DataFrame
-from rpy2.robjects import Formula
-
-import rpy2.robjects as ro
-from rpy2.robjects import numpy2ri
-
 
 survival = importr("survival")
 
@@ -52,7 +48,8 @@ def survival_fit(*, dataset, ties, ridge) -> dict:
         formula += "+ strata(mystrata)"
 
     if np.any(dataset.batch != 0):
-        raise NotImplementedError("We should loop over batch values!")
+        msg = "We should loop over batch values!"
+        raise NotImplementedError(msg)
 
     with (ro.default_converter + numpy2ri.converter).context():
         # Thanks rpy2!

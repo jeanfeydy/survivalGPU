@@ -22,7 +22,7 @@
 \item{newdata}{
   Optional new data at which to do predictions.
   If absent predictions are for the  data frame used in the original
-  fit. 
+  fit.
   When coxph has been called with a formula argument created in another
   context, i.e., coxph has been called within another function and the
   formula was passed as an argument to that function, there can be
@@ -30,17 +30,17 @@
 }
 
 \item{type}{
-the type of predicted value. 
+the type of predicted value.
 Choices are the linear predictor (\code{"lp"}), the risk score exp(lp)
-(\code{"risk"}), 
-the expected number of events given the covariates and follow-up time 
+(\code{"risk"}),
+the expected number of events given the covariates and follow-up time
 (\code{"expected"}), and the terms of the linear predictor
 (\code{"terms"}).
 The survival probability for a subject is equal to exp(-expected).
 }
 
 \item{se.fit}{
-if TRUE, pointwise standard errors are produced for the predictions. 
+if TRUE, pointwise standard errors are produced for the predictions.
 }
 
 \item{na.action}{
@@ -51,14 +51,14 @@ if TRUE, pointwise standard errors are produced for the predictions.
   the na.action option of the original fit.}
 
 \item{terms}{
-if type="terms", this argument can be used to specify which terms should be 
-included; the default is all. 
+if type="terms", this argument can be used to specify which terms should be
+included; the default is all.
 }
 
 \item{collapse}{
-optional vector of subject identifiers.  
-If specified, the output will contain one entry per subject rather than one 
-entry per observation. 
+optional vector of subject identifiers.
+If specified, the output will contain one entry per subject rather than one
+entry per observation.
 }
 
 \item{reference}{reference for centering predictions, see details below}

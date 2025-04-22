@@ -12,7 +12,7 @@ The survivalGPU library allows you to perform survival analyzes using
 the resources of Graphic Processing Units (GPU) in order to accelerate
 the speed of calculations. Currently, two models have been implemented :
 
-- Cox Proportional Hazards regression model  
+- Cox Proportional Hazards regression model
 - Weighted Cumulative Exposure model
 
 It’s also possible to use the library without having Graphics Processing
@@ -20,7 +20,7 @@ Units (with CPU).
 
 ## Installation
 
-survivalGPU is a package based on a package written in python, dependant
+survivalGPU is a package based on a package written in python, dependent
 on the `reticulate` R package. To use it, it’s necessary to have
 installed some python libraries such as `torch`, `torch-scatter`, and
 `pykeops`. To use survivalGPU, you can create a virtual python
@@ -50,13 +50,13 @@ of survivalGPU from [GitHub](https://github.com/) with
 install_git_with_submodule <- function(x, subdir) {
   install_dir <- tempfile()
   system(paste("git clone --recursive", shQuote(x), shQuote(install_dir)))
-  
+
   # change name for windows install
   file.rename(file.path(install_dir, "R/inst/python/survivalgpu"),
               file.path(install_dir, "R/inst/python/survivalgpu_submodule"))
   file.copy(file.path(install_dir, "python/survivalgpu"),
             file.path(install_dir, "R/inst/python"), recursive = TRUE)
-  
+
   devtools::install(file.path(file.path(install_dir, subdir)))
 }
 
@@ -123,30 +123,30 @@ interval is also estimated for coefficients by bootstrap (if bootstrap
 ``` r
 summary(coxphGPU_bootstrap)
 #> Call:
-#> coxphGPU.default(formula = Surv(time, status) ~ age + sex + ph.ecog, 
+#> coxphGPU.default(formula = Surv(time, status) ~ age + sex + ph.ecog,
 #>     data = lung, ties = "breslow", bootstrap = n_bootstrap, batchsize = batchsize)
-#> 
-#>   n= 227, number of events= 164 
+#>
+#>   n= 227, number of events= 164
 #>    (1 observation effacée parce que manquante)
-#> 
-#>              coef exp(coef)  se(coef)      z Pr(>|z|)    
-#> age      0.011041  1.011102  0.009267  1.191    0.233    
-#> sex     -0.551889  0.575861  0.167742 -3.290    0.001 ** 
+#>
+#>              coef exp(coef)  se(coef)      z Pr(>|z|)
+#> age      0.011041  1.011102  0.009267  1.191    0.233
+#> sex     -0.551889  0.575861  0.167742 -3.290    0.001 **
 #> ph.ecog  0.462947  1.588749  0.113574  4.076 4.58e-05 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
+#>
 #>         exp(coef) exp(-coef) lower .95 upper .95
 #> age        1.0111     0.9890    0.9929     1.030
 #> sex        0.5759     1.7365    0.4145     0.800
 #> ph.ecog    1.5887     0.6294    1.2717     1.985
-#> 
+#>
 #> Concordance= 0.637  (se = 0.025 )
 #> Likelihood ratio test= 30.41  on 3 df,   p=1e-06
 #> Wald test            = 29.84  on 3 df,   p=1e-06
 #> Score (logrank) test = 30.41  on 3 df,   p=1e-06
-#> 
-#>  ---------------- 
+#>
+#>  ----------------
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>             2.5%    97.5%
 #> age     0.996991 1.026560
@@ -175,6 +175,6 @@ plot a forestplot of your model. All is explain in the
 
 ## Vignettes
 
-- `vignette("coxPH")`  
-- `vignette("WCE")`  
+- `vignette("coxPH")`
+- `vignette("WCE")`
 - `vignette("python_connect")`

@@ -43,7 +43,7 @@ newx = REAL(newx3);
 /*
  ** i= index of baseline subject, k= index of addition row
  **  oldid = prior id, id's for baseline are integers starting with 1
- ** hasone: 0 if nothing has yet been accumlated for this subject, 1
+ ** hasone: 0 if nothing has yet been accumulated for this subject, 1
  **  it it has
  */
 oldid = -1;  /* nobody */

@@ -430,4 +430,3 @@ test_that("test1 - H", {
 # # predict(fit,type="expected")
 # # predict(fit,type="risk",se.fit=TRUE)
 # # predict(fit,type="terms",se.fit=TRUE)
-

@@ -8,21 +8,21 @@
 }
 \arguments{
 \item{...}{
-The object will also contain the following, for documentation see the \code{lm} 
-object: \code{terms}, \code{assign}, \code{formula}, \code{call}, and, optionally, \code{x}, \code{y}, 
-and/or \code{frame}. 
+The object will also contain the following, for documentation see the \code{lm}
+object: \code{terms}, \code{assign}, \code{formula}, \code{call}, and, optionally, \code{x}, \code{y},
+and/or \code{frame}.
 }
 }
 \description{
-This class of objects is returned by the \code{coxph} class of functions 
-to represent a fitted proportional hazards model. 
-Objects of this class have methods for the functions \code{print}, 
+This class of objects is returned by the \code{coxph} class of functions
+to represent a fitted proportional hazards model.
+Objects of this class have methods for the functions \code{print},
 \code{summary}, \code{residuals}, \code{predict} and \code{survfit}.
 }
 \section{Components}{
 
-The following components must be included in a legitimate \code{coxph} 
-object. 
+The following components must be included in a legitimate \code{coxph}
+object.
 
 }
 

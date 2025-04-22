@@ -1,12 +1,11 @@
-import pytest
 from contextlib import nullcontext
 
+import numpy as np
+import pytest
+import torch
 from hypothesis import given
 from hypothesis import strategies as st
-
-import torch
-import numpy as np
-from survivalgpu.datasets import load_drugs, SurvivalDataset
+from survivalgpu.datasets import SurvivalDataset, load_drugs
 from survivalgpu.torch_datasets import torch_lexsort
 
 small_int = st.integers(min_value=1, max_value=10)
@@ -33,11 +32,16 @@ def test_dataset_drugs_shapes(
 
     # Catch exception if n_drugs == 0 and n_covariates == 0:
     invalid = n_drugs == 0 and n_covariates == 0
-    ctxt = pytest.raises(ValueError) if invalid else nullcontext()
+    ctxt = (
+        pytest.raises(ValueError) if invalid else nullcontext()  # noqa: PT011
+    )
 
     with ctxt:
         ds = load_drugs(
-            n_covariates=n_covariates, n_drugs=n_drugs, n_patients=n_patients, **kwargs
+            n_covariates=n_covariates,
+            n_drugs=n_drugs,
+            n_patients=n_patients,
+            **kwargs,
         )
     if invalid:
         return
@@ -69,7 +73,9 @@ def test_dataset_to_img(*, n_covariates: int, n_drugs: int, **kwargs):
 
     # Catch exception if n_drugs == 0 and n_covariates == 0:
     invalid = n_drugs == 0 and n_covariates == 0
-    ctxt = pytest.raises(ValueError) if invalid else nullcontext()
+    ctxt = (
+        pytest.raises(ValueError) if invalid else nullcontext()  # noqa: PT011
+    )
 
     with ctxt:
         ds = load_drugs(n_covariates=n_covariates, n_drugs=n_drugs, **kwargs)
@@ -96,7 +102,9 @@ def test_dataset_to_img(*, n_covariates: int, n_drugs: int, **kwargs):
     n_vectors=st.integers(min_value=1, max_value=100),
     use_cuda=st.booleans(),
 )
-def test_torch_lexsort(*, n_values: int, n_keys: int, n_vectors: int, use_cuda: bool):
+def test_torch_lexsort(
+    *, n_values: int, n_keys: int, n_vectors: int, use_cuda: bool
+):
     """Tests the torch_lexsort function from torch_datasets.py."""
     # Make random float vector with duplicates to test if it handles floating point well
     a = torch.randint(0, n_values, (n_keys, n_vectors))
@@ -171,7 +179,9 @@ def test_sort(
     rescale=st.booleans(),
     device=st_device,
 )
-def test_scale(n_intervals: int, n_covariates: int, rescale: bool, device: str):
+def test_scale(
+    n_intervals: int, n_covariates: int, rescale: bool, device: str
+):
     """Tests the `.scale()` method of TorchSurvivalDataset."""
 
     # Create a minimal random dataset:
@@ -243,7 +253,8 @@ def test_count_death_simple(n_covariates: int, device: str):
     )
     assert dataset.n_groups == 3
     assert torch.equal(
-        dataset.tied_deaths, torch.tensor([2, 1, 1], dtype=torch.int64, device=device)
+        dataset.tied_deaths,
+        torch.tensor([2, 1, 1], dtype=torch.int64, device=device),
     )
 
 
@@ -255,7 +266,7 @@ def test_count_death_simple(n_covariates: int, device: str):
     device=st_device,
 )
 def test_count_death(
-    n_intervals: int,
+    n_intervals: int,  # noqa: ARG001
     n_covariates: int,
     n_batches: int,
     n_strata: int,
@@ -270,9 +281,13 @@ def test_count_death(
     # Loop over the batches and stratas:
     for b in range(n_batches):
         for s in range(n_strata):
-            n_total = 0  # total number of intervals for the current batch and strata
+            n_total = (
+                0  # total number of intervals for the current batch and strata
+            )
             time = 0  # start time
-            n_groups = rng.integers(low=1, high=10)  # number of distinct stop times
+            n_groups = rng.integers(
+                low=1, high=10
+            )  # number of distinct stop times
             for _ in range(n_groups):
                 # We progressively increase the time:
                 time += rng.integers(low=1, high=10)

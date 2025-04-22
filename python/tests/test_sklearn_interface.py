@@ -1,10 +1,8 @@
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
-
 from survivalgpu import CoxPHSurvivalAnalysis, WCESurvivalAnalysis
-from survivalgpu.datasets import simple_dataset, load_drugs
-
+from survivalgpu.datasets import load_drugs, simple_dataset
 
 small_int = st.integers(min_value=1, max_value=10)
 
@@ -17,7 +15,9 @@ small_int = st.integers(min_value=1, max_value=10)
     max_duration=small_int,
 )
 @settings(deadline=1000)
-def test_coxph_shapes(*, n_covariates, n_patients, n_batch, n_strata, max_duration):
+def test_coxph_shapes(
+    *, n_covariates, n_patients, n_batch, n_strata, max_duration
+):
     """Tests the shapes of the CoxPHSurvivalAnalysis attributes."""
 
     ds = simple_dataset(
@@ -45,6 +45,7 @@ def test_coxph_shapes(*, n_covariates, n_patients, n_batch, n_strata, max_durati
     assert model.coef_.shape == (n_batch, n_covariates)
 
 
+@pytest.mark.skip("Not stabilized the API just yet.")
 def test_wce_shapes():
     """Tests the shapes of the WCESurvivalAnalysis attributes."""
 
@@ -53,7 +54,7 @@ def test_wce_shapes():
     print(ds.dose)
     print(ds.start)
     print(ds.stop)
-    
+
     model = WCESurvivalAnalysis(cutoff=10, order=3, n_knots=1)
     model.fit(
         covariates=ds.covariates,

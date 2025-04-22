@@ -1,6 +1,6 @@
 # 'counting.R' test from survival package
-options(na.action=na.exclude) # preserve missings
-options(contrasts=c('contr.treatment', 'contr.poly')) #ensure constrast type
+options(na.action=na.exclude) # preserve missing
+options(contrasts=c('contr.treatment', 'contr.poly')) #ensure contrast type
 library(survival)
 
 

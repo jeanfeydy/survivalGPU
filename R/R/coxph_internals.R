@@ -428,7 +428,7 @@ parsecovar2 <- function(covar1, statedata, dformula, Terms, transitions, states)
 
   # Remember which hazards had ph
   # tmap2[1,] is the 'intercept' row
-  # If the hazard for colum 6 is proportional to the hazard for column 2,
+  # If the hazard for column 6 is proportional to the hazard for column 2,
   # the tmap2[1,2] = tmap[1,6], and phbaseline[6] =2
   temp <- tmap2[1, ]
   indx <- which(temp > 0)
@@ -601,7 +601,7 @@ stacker <- function(cmap, smap, istate, X, Y, strata, states, dropzero = TRUE) {
   # then add any strata from the users strata() terms
   if (is.matrix(strata)) {
     # this is the most complex case.
-    maxstrat <- apply(strata, 2, max) # max in each colum of strata
+    maxstrat <- apply(strata, 2, max) # max in each column of strata
     mult <- cumprod(c(1, maxstrat))
     temp <- max(mult) * newstrat
     for (i in 1:ncol(strata)) {
@@ -863,7 +863,7 @@ survcheck2 <- function(y, id, istate = NULL, istate0 = "(s0)") {
     cstate2 <- factor(check$cstate, seq(along.with = states), states)
   }
 
-  # create the transtions table
+  # create the transitions table
   # if someone has an intermediate visit, i.e., (0,10, 0)(10,20,1), don't
   #  report the false 'censoring' in the transitions table
   # make it compact by removing any cols that are all 0, and rows of

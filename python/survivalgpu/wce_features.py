@@ -4,14 +4,13 @@ We rely on KeOps to compute convolutions with a collection of B-Spline kernels,
 at arbitrary time sampling locations.
 
 TODO:
-  * Implement a fallback mode that relies on a pure PyTorch implementation 
+  * Implement a fallback mode that relies on a pure PyTorch implementation
     when KeOps is not available.
 """
 
 
 import numpy as np
 import torch
-
 from pykeops.torch import LazyTensor
 
 from .utils import device, float32, int32
@@ -52,10 +51,10 @@ def place_knots(*, cutoff, nknots, order):
     # - [-order, -(order-1), ..., 0] to the left
     # - [cutoff, cutoff+1, ..., cutoff+order] to the right
     ends = np.arange(order + 1)
-    knots = np.concatenate(
+    # (nknots + 2 + 2*order,):
+    return np.concatenate(
         (-ends[::-1], knots, cutoff + ends)
-    )  # (nknots + 2 + 2*order,)
-    return knots
+    )
 
 
 # KeOps computation of the B-Spline covariates ===========================================
@@ -112,7 +111,7 @@ def bspline_conv(
     )
 
     where B_k(x) denotes the k-th B-spline function of order "order"
-    associated to our knots evaluted at x.
+    associated to our knots evaluated at x.
     These correspond to piecewise constant, linear, quadratic and cubic functions
     for order = 0, 1, 2 and 3, respectively.
     We evaluate the B-Spline functions using the recursive De Boor algorithm.

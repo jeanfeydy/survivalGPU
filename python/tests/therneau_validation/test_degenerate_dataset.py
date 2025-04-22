@@ -1,16 +1,15 @@
-import numpy as np
 import functools
 
+import numpy as np
 import pytest
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
-
-np.set_printoptions(precision=4)
-
 from survivalgpu import SUPPORTED_TIES, CoxPHSurvivalAnalysis
 from survivalgpu.datasets import simple_dataset
 
 from .survival_interface import survival_fit
+
+np.set_printoptions(precision=4)
 
 
 @functools.cache
@@ -95,7 +94,7 @@ def test_onlydeath(
     print("----")
 
     # Compare the attributes of the two models:
-    for key in ref_model.keys():
+    for key in ref_model:
         if key in ["iter_", "hessian_"]:
             continue
         # if ref_model["iter_"] == 1:

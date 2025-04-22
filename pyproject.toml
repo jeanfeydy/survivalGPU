@@ -32,7 +32,17 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = ["rpy2"]
+test = [
+  "rpy2",
+  "black",
+  "flake8",
+  "hypothesis",
+  "pre-commit",
+  "pytest",
+  "pytest-cov",
+  "pytest-sphinx",
+]
+
 all = ["survivalgpu[test]"] # https://stackoverflow.com/questions/75490231/pip-pyproject-toml-can-optional-dependency-groups-require-other-optional-depend
 
 
@@ -64,7 +74,9 @@ addopts = [
     "--cov-report=html",
     ]
 xfail_strict = true
-
+filterwarnings = [
+  "error",
+]
 log_cli_level = "info"
 testpaths = [
   "python/tests",
@@ -72,11 +84,13 @@ testpaths = [
 
 [tool.repo-review]
 ignore = [
+    "PY004", # explicit doc/ folder
+    "PY007", # nox or tox
     "PC140", # MyPy
     "PC170", # PyGrep (because no rst files)
     "PC180", # Prettier
     "MY", # MyPy
-    "RTD" # ReadTheDocs
+    "RTD", # ReadTheDocs
     ]
 
 
@@ -116,19 +130,34 @@ ignore = [
   "PYI041",   # Use `float` instead of `int | float
   "RET505",   # Unnecessary `elif`/`else` after `return` statement
   "C408",     # Allow for dict(a=1) instead of {"a": 1}
+  "F722",     # Allow type annotations "a b" in jaxtyping
+  "E741",     # Allow "I" as a variable name
+  "F821",   # TODO: DIRTY WORKAROUND https://github.com/astral-sh/ruff/issues/17386
+  "T201",   # TODO: print statements
 ]
 typing-modules = ["survivalgpu.typecheck"]
 
 [tool.ruff.lint.per-file-ignores]
 # For _init__.py files:
 "**_init__.py**" = ["F401", "F403", "F405"]
-"examples/**" = ["T201"]
 # F401: imported but unused
 # F403: unable to detect undefined names (import *)
 # F405: may be undefined, or defined from star imports
 
 # For examples gallery files:
-"**examples/**" = ["RUF003", "E402"]
+"**examples/**" = [
+  "T201",  # print statements
+  "RUF003",
+  "E402",
+  ]
 # RUF003: Ambiguous no-break spaces
 # E402: module level import not at top of file
 
+
+[tool.codespell]
+# Ignore the following words:
+ignore-words-list = [
+  "calculs",
+  "parm",
+  "constrasts",
+]

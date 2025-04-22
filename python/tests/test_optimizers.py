@@ -1,10 +1,9 @@
-import pytest
 import numpy as np
-from numpy.testing import assert_allclose
+import pytest
 import torch
-
-from survivalgpu.utils import numpy
+from numpy.testing import assert_allclose
 from survivalgpu.optimizers import newton
+from survivalgpu.utils import numpy
 
 
 def test_newton_convex():
@@ -24,11 +23,13 @@ def test_newton_convex():
         verbosity=0,
     )
 
-    assert_allclose(numpy(res.x[0]), np.array([0.31492, 3.1005, -0.35173]), 1e-2)
+    assert_allclose(
+        numpy(res.x[0]), np.array([0.31492, 3.1005, -0.35173]), 1e-2
+    )
 
-    print(f"Three simple problems:")
+    print("Three simple problems:")
     print(f"Newton solutions: {numpy(res.x[0])}")
-    print(f"Should be equal to 0.31492  3.1005  -0.35173")
+    print("Should be equal to 0.31492  3.1005  -0.35173")
     print("")
 
 
@@ -48,8 +49,8 @@ def test_newton_coxph():
     assert numpy(res.x[0]) == pytest.approx(-0.275057, 1e-2)
     assert numpy(res.fun) == pytest.approx(0.97509, 1e-2)
 
-    print(f"Mini-CoxPH problem:")
+    print("Mini-CoxPH problem:")
     print(f"Newton solution: {numpy(res.x[0])}")
     print(f"Value: {numpy(res.fun)}")
-    print(f"Should be equal to -0.275057 and 0.97509")
+    print("Should be equal to -0.275057 and 0.97509")
     print("")

@@ -1,6 +1,6 @@
 library(survival)
-options(na.action=na.exclude) # preserve missings
-options(contrasts=c('contr.treatment', 'contr.poly')) #ensure constrast type
+options(na.action=na.exclude) # preserve missing
+options(contrasts=c('contr.treatment', 'contr.poly')) #ensure contrast type
 
 #
 # Tests from the appendix of Therneau and Grambsch
@@ -111,7 +111,7 @@ aeq(sfit$std.err^2, truth$var)
 aeq(-log(sfit$surv), (cumsum(truth$haz)))
 
 # Reprise the test, with strata
-#  offseting the times ensures that we will get the wrong risk sets
+#  offsetting the times ensures that we will get the wrong risk sets
 #  if strata were not kept separate
 test2b <- rbind(test2, test2, test2)
 test2b$group <- rep(1:3, each= nrow(test2))

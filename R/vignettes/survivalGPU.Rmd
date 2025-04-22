@@ -20,10 +20,10 @@ knitr::opts_chunk$set(
 ```
 
 
-The survivalGPU library allows you to perform survival analyzes using the resources of Graphic Processing Units (GPU) in order to accelerate the speed of calculations. Currently, two models have been implemented :  
+The survivalGPU library allows you to perform survival analyzes using the resources of Graphic Processing Units (GPU) in order to accelerate the speed of calculations. Currently, two models have been implemented :
 
-* Cox[^cox1] [^cox2]  
-* WCE[^wce] (Weighted Cumulative Exposure)  
+* Cox[^cox1] [^cox2]
+* WCE[^wce] (Weighted Cumulative Exposure)
 
 It's also possible to use the library without having Graphics Processing Units (with CPU).
 
@@ -62,7 +62,7 @@ head(drugdata)
 
 `coxphGPU()` is constructed in the same way as `survival::coxph()`, with in the formula an object of class 'Surv' of type 'counting', i.e. with the arguments Start and Stop, and the event variable.
 
-The `summary` of a coxphGPU object is the same as a coxph object, a table with the estimated coefficients for the covariates, standards errors, and a significance test (Pr(>|z|)). 
+The `summary` of a coxphGPU object is the same as a coxph object, a table with the estimated coefficients for the covariates, standards errors, and a significance test (Pr(>|z|)).
 
 ```{r}
 coxphGPU <- coxphGPU(
@@ -86,7 +86,6 @@ coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
 summary(coxphGPU_bootstrap)
 ```
 
-Avec le bootstrap, la fonction effectue autant de modèles que de bootstrap demandé. Pour éviter de saturer la mémoire RAM, la fonction ne calcul pas les linears predictors, wald.test, etc... for all bootstrap (by deafult `all.results = FALSE`), mais donnera toujours tous les coefficients et weights de la fonction de risque (voir pour les matrices de variance covariance)
 
 ## `wceGPU()`
 
@@ -132,6 +131,6 @@ plot(wce_gpu_bootstrap)
 
 ## References
 
-[^cox1]: Andersen, P. and Gill, R. (1982). Cox's regression model for counting processes, a large sample study. Annals of Statistics 10, 1100-1120.  
-[^cox2]: Therneau, T., Grambsch, P., Modeling Survival Data: Extending the Cox Model. Springer-Verlag, 2000.  
-[^wce]: Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov 30;28(27):3437-53.  
+[^cox1]: Andersen, P. and Gill, R. (1982). Cox's regression model for counting processes, a large sample study. Annals of Statistics 10, 1100-1120.
+[^cox2]: Therneau, T., Grambsch, P., Modeling Survival Data: Extending the Cox Model. Springer-Verlag, 2000.
+[^wce]: Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov 30;28(27):3437-53.

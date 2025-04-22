@@ -339,10 +339,10 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     stemp <- untangle.specials(Terms, "strata", 1) # detect strata and index in terms matrix
     if (length(stemp$vars) == 1) {
       strata.keep <- mf[[stemp$vars]]
-    } # if only one stratification, strata.keep worth strat levels
+    } # if only one stratification, strata.keep worth strata levels
     else {
       strata.keep <- strata(mf[, stemp$vars], shortlabel = TRUE)
-    } # if several strat, as many levels as combinations of strat
+    } # if several strata, as many levels as combinations of strata
     istrat <- as.integer(strata.keep)
     # istrat : vector to identify stratification
 
@@ -843,7 +843,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     x <- matrix(as.double(1:nrow(Y)), ncol = 1) # keep the .C call happy
     maxiter <- 0
     nullmodel <- TRUE
-    if (length(init) != 0) stop("Wrong length for inital values")
+    if (length(init) != 0) stop("Wrong length for initial values")
     init <- 0.0 # dummy value to keep a .C call happy (doesn't like 0 length)
   } else {
     nullmodel <- FALSE
@@ -851,7 +851,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
     # In commentary below because Null value for coxph_R
     #if (is.null(init)) init <- rep(0., nvar)
-    #if (length(init) != nvar) stop("Wrong length for inital values")
+    #if (length(init) != nvar) stop("Wrong length for initial values")
   }
 
   # 2021 change: pass in per covariate centering.  This gives
@@ -927,7 +927,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
       nullmodel <- FALSE
       maxiter <- control$iter.max
       if (!missing(init) && length(init)>0) {
-        if (length(init) != nvar) stop("Wrong length for inital values")
+        if (length(init) != nvar) stop("Wrong length for initial values")
       }
       else init <- rep(0,nvar)
     }
@@ -1212,7 +1212,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     if (robust && !is.null(fit$coefficients) && !all(is.na(fit$coefficients))) {
       fit$naive.var <- fit$var # fit$var[[1]]
       # a little sneaky here: by calling resid before adding the
-      #   na.action method, I avoid having missings re-inserted
+      #   na.action method, I avoid having missing re-inserted
       # I also make sure that it doesn't have to reconstruct X and Y
       fit2 <- c(fit, list(x = X, y = Y, weights = weights))
       # fit2$coefficients <- c(utils::head(fit$coefficients,1))
@@ -1286,7 +1286,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
     # Concordance.  Done here so that we can use cluster if it is present
     # The returned value is a subset of the full result, partly because it
-    #  is all we need, but more for backward compatability with survConcordance.fit
+    #  is all we need, but more for backward compatibility with survConcordance.fit
 
     # if (length(cluster)) {
     #   temp <- apply(fit$linear.predictors, 2, concordancefit,
@@ -1355,7 +1355,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     fit$cmap <- cmap
     fit$stratum_map <- stratum_map # why not 'stratamap'?  Confusion with fit$strata
     fit$resid <- rowsum(fit$resid, xstack$rindex)
-    # add a suffix to each coefficent name.  Those that map to multiple transitions
+    # add a suffix to each coefficient name.  Those that map to multiple transitions
     #  get the first transition they map to
     single <- apply(cmap, 1, function(x) all(x %in% c(0, max(x)))) # only 1 coef
     cindx <- col(cmap)[match(1:length(fit$coefficients), cmap)]

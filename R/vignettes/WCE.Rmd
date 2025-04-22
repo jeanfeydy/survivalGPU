@@ -91,4 +91,4 @@ HR(wce_gpu_bootstrap, exposed, unexposed)
 
 ## References
 
-[^wce]: Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov 30;28(27):3437-53.  
+[^wce]: Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov 30;28(27):3437-53.

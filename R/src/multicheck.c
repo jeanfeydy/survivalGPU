@@ -8,7 +8,7 @@
  **               1 the start time for this obs is after the prior end time
  **               0 times match, or the first instance of the observation
  **   3. cstate = current state for this obs, obtained by chaining forward
- **        initial state at entry,  first transtion, second, etc. but ignoring
+ **        initial state at entry,  first transition, second, etc. but ignoring
  **	  censors as a 'change'.
  */
 #include "survS.h"

@@ -18,7 +18,22 @@ If you find this work useful, please cite:
 
 ## Run tests
 
-For the Python `survivalgpu` package, go to the `survivalGPU/python` folder and run `pytest .`
+In this directory, run:
+
+```bash
+pip install -e .[all]
+```
+
+Then, you can run the pre-commit hooks with:
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+And run the tests with:
+```bash
+pytest
+```
 
 For the R `survivalGPU` package, go to the `survivalGPU/R` folder. Then, launch an R interactive session and run:
 

@@ -1,24 +1,26 @@
 # Use NumPy for basic array manipulation:
-import numpy as np
+# Python >= 3.7:
+from contextlib import nullcontext
 
-# We use matplotlib to display the results:
-from matplotlib import pyplot as plt
+import numpy as np
 
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
+# We use matplotlib to display the results:
+from matplotlib import pyplot as plt
+
 from .coxph import CoxPHSurvivalAnalysis
-
-from .utils import numpy, timer
-from .utils import use_cuda, device, float32, int32, int64
-from .wce_features import wce_features_batch, bspline_atoms
-
-from .typecheck import typecheck, Optional, Literal
-from .typecheck import Int, Real, Bool
-from .typecheck import Int64Array, Float64Array
-from .typecheck import Float32Tensor
-from .typecheck import TorchDevice
-
+from .typecheck import (
+    Float64Array,
+    Int,
+    Int64Array,
+    Literal,
+    TorchDevice,
+    typecheck,
+)
+from .utils import device, float32, int32, numpy, timer, use_cuda
+from .wce_features import bspline_atoms, wce_features_batch
 
 # Our main, object-oriented API ==========================================================
 
@@ -31,8 +33,8 @@ class WCESurvivalAnalysis:
         cutoff: Int,
         n_knots: Int = 1,
         order: Int = 3,
-        constrained: Optional[Literal["right", "left"]] = None,
-        survival_model=CoxPHSurvivalAnalysis(),
+        constrained: Literal["right", "left"] | None = None,
+        survival_model=None,
     ):
         """Weighted Cumulative Exposure Model that combines B-spline time-varying features with a CoxPH analysis.
 
@@ -75,18 +77,24 @@ class WCESurvivalAnalysis:
         self.cutoff = cutoff
         self.n_knots = n_knots
         self.constrained = constrained
+
+        if survival_model is None:
+            survival_model = CoxPHSurvivalAnalysis()
         self.survival_model = survival_model
 
     def set_non_negative_int(self, value, name):
         if int(value) != value:
-            raise TypeError(
+            msg = (
                 f"{name} should be an integer. "
                 f"Received {value} of type {type(value)}."
             )
-        elif int(value) < 0:
-            raise ValueError(f"{name} should be >= 0. " f"Received {value}.")
-        else:
-            setattr(self, "_" + name, int(value))
+            raise TypeError(msg)
+
+        if int(value) < 0:
+            msg = f"{name} should be >= 0. " f"Received {value}."
+            raise ValueError(msg)
+
+        setattr(self, "_" + name, int(value))
 
     # The order should be an integer >= 0 --------------------------------
     @property
@@ -124,12 +132,12 @@ class WCESurvivalAnalysis:
     def constrained(self, new_c):
         supported_values = [None, "left", "right"]
         if new_c not in supported_values:
-            raise ValueError(
+            msg = (
                 f"constrained should be one of {supported_values}. "
                 f"Received {new_c}."
             )
-        else:
-            self._constrained = new_c
+            raise ValueError(msg)
+        self._constrained = new_c
 
     # The number of WCE features depends on n_knots, the order and constrained -----------
     @property
@@ -163,10 +171,11 @@ class WCESurvivalAnalysis:
         elif self.constrained is None:
             return features
         else:
-            raise ValueError(
+            msg = (
                 "constrained should be None, 'left' or 'right'. "
                 f"Received {self.constrained}."
             )
+            raise ValueError(msg)
 
     @property
     def atoms(self):
@@ -226,18 +235,18 @@ class WCESurvivalAnalysis:
         start: Int64Array["intervals"],
         event: Int64Array["intervals"],
         patient: Int64Array["intervals"],
-        covariates: Optional[Float64Array["intervals covariates"]] = None,
-        strata: Optional[Int64Array["patients"]] = None,
-        batch: Optional[Int64Array["patients"]] = None,
-        init: Optional[Float64Array["fullcovariates"]] = None,
-        n_bootstraps: Optional[Int] = None,
-        batch_size: Optional[Int] = None,
-        device: Optional[TorchDevice] = None,
+        covariates: Float64Array["intervals covariates"] | None = None,
+        strata: Int64Array["patients"] | None = None,
+        batch: Int64Array["patients"] | None = None,
+        init: Float64Array["fullcovariates"] | None = None,
+        n_bootstraps: Int | None = None,
+        batch_size: Int | None = None,
+        device: TorchDevice | None = None,
     ):
         if not np.all(stop == start + 1):
-            raise NotImplementedError(
-                "Currently, we only support unit length intervals."
-            )
+            msg = "Currently, we only support unit length intervals."
+
+            raise NotImplementedError(msg)
 
         # Step 1: compute the time-dependent features (= exposures)
         exposures, knots = self._wce_features(patient=patient, dose=dose, time=stop)
@@ -351,13 +360,13 @@ def wce_numpy(
     cutoff: Int,
     n_knots: Int = 1,
     order: Int = 3,
-    constrained: Optional[Literal["right", "left"]] = None,
-    strata: Optional[Int64Array["patients"]] = None,
-    batch: Optional[Int64Array["patients"]] = None,
-    init: Optional[Float64Array["fullcovariates"]] = None,
-    n_bootstraps: Optional[Int] = None,
-    batch_size: Optional[Int] = None,
-    device: Optional[TorchDevice] = None,
+    constrained: Literal["right", "left"] | None = None,
+    strata: Int64Array["patients"] | None = None,
+    batch: Int64Array["patients"] | None = None,
+    init: Float64Array["fullcovariates"] | None = None,
+    n_bootstraps: Int | None = None,
+    batch_size: Int | None = None,
+    device: TorchDevice | None = None,
     **kwargs,
 ):
     surv_model = CoxPHSurvivalAnalysis(**kwargs)
@@ -410,9 +419,6 @@ def wce_numpy(
 
     return output
 
-
-# Python >= 3.7:
-from contextlib import nullcontext
 
 
 def wce_R(
@@ -553,8 +559,7 @@ if False:
             )
             # Remove some of the covariates if required:
             exposures = self._constrain(exposures)
-            exposures = exposures.view(Drugs, Patients, Times, self.n_atoms)
-            return exposures
+            return exposures.view(Drugs, Patients, Times, self.n_atoms)
 
         @property
         def drug_total_risks(self):
@@ -616,7 +621,7 @@ if False:
         def display_risk_functions(self, ax=None):
             ax = plt.gca() if ax is None else ax
             ax.title("Estimated risk functions, with 95% CI for the total risk area")
-            for i, (coef, ci) in enumerate(zip(coefs, ci_95)):
+            for i, (coef, ci) in enumerate(zip(coefs, ci_95, strict=False)):
                 ax.plot(numpy(atoms @ coef), label=f"{i}")
                 ax.fill_between(
                     x, numpy(atoms @ (coef - ci)), numpy(atoms @ (coef + ci)), alpha=0.2
@@ -712,7 +717,7 @@ if False:
 
         # If constrained == "Right", we remove the B-Spline atoms that
         # correspond to the end of the observation window.
-        # If constrainted == "Left", we remove the start of the observation window.
+        # If constrained == "Left", we remove the start of the observation window.
         wce_features = constrain(
             features=wce_features, constrained=constrained, order=order
         )
@@ -815,8 +820,7 @@ if False:
         if profile is not None:
             prof.export_chrome_trace(profile)
 
-        result = {k: numpy(v) for k, v in result.items()}
-        return result
+        return {k: numpy(v) for k, v in result.items()}
 
     def wce_R(
         *,
@@ -840,7 +844,7 @@ if False:
         else:
             covariates = None
 
-        res = wce_numpy(
+        return wce_numpy(
             ids=ids,
             covariates=covariates,
             doses=doses,
@@ -848,5 +852,3 @@ if False:
             times=times,
             **kwargs,
         )
-
-        return res

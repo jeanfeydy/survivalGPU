@@ -10,38 +10,39 @@ We provide:
 
 
 # Use NumPy for basic array manipulation:
+# We use functools.partial
+import functools
+
+# Python >= 3.7:
+from contextlib import nullcontext
+
 import numpy as np
 
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
-# We use functools.partial
-import functools
+from .bootstrap import Resampling
 
 # The convex CoxPH objective:
 from .coxph_likelihood import coxph_objective
-from .bootstrap import Resampling
-
+from .datasets import SurvivalDataset
 
 # Convex optimizer for the CoxPH objective:
 from .optimizers import newton
-
-from .utils import numpy
-from .utils import use_cuda, float32, int32, int64
-from .utils import device as default_device
-
-from .typecheck import typecheck, Optional, Literal
-from .typecheck import Int, Real, Bool
-from .typecheck import Int64Array, Float64Array
-from .typecheck import Float32Tensor
-from .typecheck import TorchDevice
-
-from .datasets import SurvivalDataset
 from .torch_datasets import TorchSurvivalDataset
-
-
-def numpy(x):
-    return x.detach().cpu().numpy()
+from .typecheck import (
+    Bool,
+    Float32Tensor,
+    Float64Array,
+    Int,
+    Int64Array,
+    Literal,
+    Real,
+    TorchDevice,
+    typecheck,
+)
+from .utils import device as default_device
+from .utils import float32, numpy, use_cuda
 
 
 class CoxPHSurvivalAnalysis:
@@ -72,7 +73,7 @@ class CoxPHSurvivalAnalysis:
         eps: Real = 1e-5,
         doscale: Bool = False,
         verbosity: Int = 0,
-        mode: Optional[Literal["unit length", "start zero", "any"]] = None,
+        mode: Literal["unit length", "start zero", "any"] | None = None,
     ):
         self.alpha = alpha
         self.ties = ties
@@ -88,15 +89,15 @@ class CoxPHSurvivalAnalysis:
         covariates: Float64Array["intervals covariates"],
         stop: Int64Array["intervals"],
         *,
-        start: Optional[Int64Array["intervals"]] = None,
-        event: Optional[Int64Array["intervals"]] = None,
-        patient: Optional[Int64Array["intervals"]] = None,
-        strata: Optional[Int64Array["patients"]] = None,
-        batch: Optional[Int64Array["patients"]] = None,
-        init: Optional[Float64Array["covariates"]] = None,
-        n_bootstraps: Optional[Int] = None,
-        batch_size: Optional[Int] = None,
-        device: Optional[TorchDevice] = None,
+        start: Int64Array["intervals"] | None = None,
+        event: Int64Array["intervals"] | None = None,
+        patient: Int64Array["intervals"] | None = None,
+        strata: Int64Array["patients"] | None = None,
+        batch: Int64Array["patients"] | None = None,
+        init: Float64Array["covariates"] | None = None,
+        n_bootstraps: Int | None = None,
+        batch_size: Int | None = None,
+        device: TorchDevice | None = None,
     ):
         """Fit the model.
 
@@ -154,9 +155,8 @@ class CoxPHSurvivalAnalysis:
 
             # Case 3: general case )start, stop], we use two cumulative hazards:
             else:
-                raise NotImplementedError(
-                    "Currently, general intervals are not supported."
-                )
+                msg = "Currently, general intervals are not supported."
+                raise NotImplementedError(msg)
                 mode = "any"
 
         else:
@@ -190,7 +190,7 @@ class CoxPHSurvivalAnalysis:
 
         # Run the Newton optimizer: ------------------------------------------------------
 
-        # Vector of inital values of the Newton iteration.
+        # Vector of initial values of the Newton iteration.
         # Zero for all variables by default.
         if init is None:
             init_tensor = torch.zeros(
@@ -240,7 +240,7 @@ class CoxPHSurvivalAnalysis:
             for bootstrap in dataset.bootstraps(
                 n_bootstraps=n_bootstraps, batch_size=batch_size
             ):
-                # Vector of inital values of the Newton iteration.
+                # Vector of initial values of the Newton iteration.
                 # Zero for all variables by default.
                 if init is None:
                     init_tensor = torch.zeros(
@@ -355,7 +355,7 @@ class CoxPHSurvivalAnalysis:
     def _rescale(
         self,
         *,
-        scales: Optional[Float32Tensor["covariates"]],
+        scales: Float32Tensor["covariates"] | None,
         n_covariates: int,
     ):
         """Restores proper scaling for the parameters of the CoxPH model.
@@ -462,10 +462,7 @@ def coxph_numpy(
     )
 
     # Configure 'start' according to survtype ('counting' or 'right')
-    if survtype == "counting":
-        start = times - 1
-    else:
-        start = None
+    start = times - 1 if survtype == "counting" else None
 
     model.fit(
         covariates=x,
@@ -498,9 +495,6 @@ def coxph_numpy(
     return output
 
 
-# Python >= 3.7:
-from contextlib import nullcontext
-
 
 def coxph_R(
     data,
@@ -523,7 +517,7 @@ def coxph_R(
 
         warnings.warn(
             "Efron ties are not yet supported in our new implementation. "
-            "Switching to the 'breslow' approximation."
+            "Switching to the 'breslow' approximation.", stacklevel=2
         )
         ties = "breslow"
 

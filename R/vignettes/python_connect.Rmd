@@ -16,9 +16,9 @@ knitr::opts_chunk$set(
 ```
 
 
-survivalGPU is a package based on a package written in python, dependant on the `reticulate` R package. To use it, it's necessary to have installed some python libraries such as `torch`, `torch-scatter`, and `pykeops` in your python environment.
+survivalGPU is a package based on a package written in python, dependent on the `reticulate` R package. To use it, it's necessary to have installed some python libraries such as `torch`, `torch-scatter`, and `pykeops` in your python environment.
 
-Maybe it's installed in your python default system, but it's better if your create your own virtualenv for your project. Let's make the steps to configure properly a virtual python envrironment to use `survivalGPU` in R.
+Maybe it's installed in your python default system, but it's better if your create your own virtualenv for your project. Let's make the steps to configure properly a virtual python environment to use `survivalGPU` in R.
 
 ```{r}
 library(reticulate)
@@ -48,9 +48,9 @@ py_config()
 ```
 
 
-As you can see, you're connect at your survivalGPU python environment. So now, if you load `survivalGPU` R package after exec `reticulate::use_virtualenv(virtualenv = "survivalGPU")`, the package will use this python environment.  
+As you can see, you're connect at your survivalGPU python environment. So now, if you load `survivalGPU` R package after exec `reticulate::use_virtualenv(virtualenv = "survivalGPU")`, the package will use this python environment.
 
 
-Attention, if you don't have install the `reticluate` R package, install it (with `install.packages("reticulate")`). During installation, R will offer you to install miniconda. If you accept, be careful because your python executable & python home will change for your new miniconda environment. You can change your python environment after starting a new R session.  
+Attention, if you don't have install the `reticluate` R package, install it (with `install.packages("reticulate")`). During installation, R will offer you to install miniconda. If you accept, be careful because your python executable & python home will change for your new miniconda environment. You can change your python environment after starting a new R session.
 
 Check the [`reticulate` R documentation](https://rstudio.github.io/reticulate/articles/versions.html) to see other options to manage your python configuration.

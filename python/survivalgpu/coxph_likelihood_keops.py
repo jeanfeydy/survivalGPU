@@ -58,7 +58,6 @@ def coxph_objective_keops(
     tied_deaths,
     tied_dead_weights,
     cluster_indices,
-    backend="keops",
 ):
     """Please look at coxph_scatter.coxph_objective_torch for documentation."""
 
@@ -72,7 +71,7 @@ def coxph_objective_keops(
         offsets = []
         offsets_id = []
         weight_factors = []
-        for i, (tt, dw) in enumerate(zip(tied_deaths, tied_dead_weights.T)):
+        for i, (tt, dw) in enumerate(zip(tied_deaths, tied_dead_weights.T, strict=False)):
             t = max(1, tt)
             offsets += [np.log(k) - np.log(t) for k in range(1, t + 1)]
             offsets_id += [i] * t
@@ -88,9 +87,8 @@ def coxph_objective_keops(
         #  [.5, .5, 1, 1]]
 
     else:
-        raise ValueError(
-            f"Incorrect value for ties ('{ties}'), should be either 'breslow' or 'efron'."
-        )
+        msg = f"Incorrect value for ties ('{ties}'), should be either 'breslow' or 'efron'."
+        raise ValueError(msg)
 
     # Number of log-sum-exp reductions that we have to compute:
     Tties = len(offsets)  # = T for Breslow, sum(nties) for Efron

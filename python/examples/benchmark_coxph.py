@@ -1,12 +1,11 @@
-import torch
-import time
-from survivalgpu import CoxPHSurvivalAnalysis
-from survivalgpu.datasets import simple_dataset
 import functools
+import time
 
 # torch.use_deterministic_algorithms(False)
-
 import numpy as np
+import torch
+from survivalgpu import CoxPHSurvivalAnalysis
+from survivalgpu.datasets import simple_dataset
 
 # Set numpy print options to 4 digits
 np.set_printoptions(precision=4)
@@ -90,7 +89,7 @@ for backend in ["torch"]:
         )
 
     if True:
-        from torch.profiler import profile, ProfilerActivity
+        from torch.profiler import ProfilerActivity, profile
 
         activities = [ProfilerActivity.CPU]
         if torch.cuda.is_available():
@@ -111,11 +110,12 @@ for backend in ["torch"]:
                 maxiter=3,
             )
 
-        # Create an "output/" foler if it doesn't exist
-        import os
+        # Create an "output/" folder if it doesn't exist
+        from pathlib import Path
+        output_dir = Path("output")
 
-        if not os.path.exists("output"):
-            os.makedirs("output")
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True)
 
         # Export to chrome://tracing
         prof.export_chrome_trace(f"output/trace_{backend}_{n_patients}_{n_covar}.json")

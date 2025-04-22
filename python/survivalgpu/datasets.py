@@ -5,7 +5,7 @@ We provide:
 - SurvivalDataset, a class that encapsulates observation intervals, covariates and doses.
   It performs minor checks (e.g. that observation intervals for a patient do not overlap)
   and provides a display routine. All expensive computations are performed once the
-  dataset has been sent to the GPU and turned into a TorchSurvivalDataset object 
+  dataset has been sent to the GPU and turned into a TorchSurvivalDataset object
   with the .to_torch() method.
 
 - load_drugs(), a method that generates synthetic data that we use in our tutorials
@@ -15,23 +15,25 @@ We provide:
 
 import numpy as np
 import torch
-
 from matplotlib import pyplot as plt
-from .typecheck import typecheck, Optional, Callable, Union
-from .typecheck import Int, Real
-from .typecheck import UInt8Array, Int64Array, Float64Array
-from .typecheck import TorchDevice
 
 from .torch_datasets import TorchSurvivalDataset
+from .typecheck import (
+    Callable,
+    Float64Array,
+    Int,
+    Int64Array,
+    Real,
+    TorchDevice,
+    UInt8Array,
+    typecheck,
+)
 
 
 def contains_duplicates(X):
     seen = set()
     seen_add = seen.add
-    for x in X:
-        if x in seen or seen_add(x):
-            return True
-    return False
+    return any(x in seen or seen_add(x) for x in X)
 
 
 class SurvivalDataset:
@@ -85,28 +87,27 @@ class SurvivalDataset:
         self,
         *,
         stop: Int64Array["intervals"],
-        start: Optional[Int64Array["intervals"]] = None,
-        event: Optional[Int64Array["intervals"]] = None,
-        patient: Optional[Int64Array["intervals"]] = None,
-        strata: Optional[Int64Array["patients"]] = None,
-        batch: Optional[Int64Array["patients"]] = None,
-        covariates: Optional[Float64Array["intervals covariates"]] = None,
-        dose: Optional[Float64Array["doses"]] = None,
-        dose_time: Optional[Int64Array["doses"]] = None,
-        dose_patient: Optional[Int64Array["doses"]] = None,
-        dose_drug: Optional[Int64Array["doses"]] = None,
+        start: Int64Array["intervals"] | None = None,
+        event: Int64Array["intervals"] | None = None,
+        patient: Int64Array["intervals"] | None = None,
+        strata: Int64Array["patients"] | None = None,
+        batch: Int64Array["patients"] | None = None,
+        covariates: Float64Array["intervals covariates"] | None = None,
+        dose: Float64Array["doses"] | None = None,
+        dose_time: Int64Array["doses"] | None = None,
+        dose_patient: Int64Array["doses"] | None = None,
+        dose_drug: Int64Array["doses"] | None = None,
     ):
         if covariates is None and dose is None:
-            raise ValueError(
-                "At least one of `covariates` and `dose` must be provided."
-            )
+            msg = "At least one of `covariates` and `dose` must be provided."
+            raise ValueError(msg)
 
-        if any(x is not None for x in (dose, dose_time, dose_patient, dose_drug)):
-            if not all(x is not None for x in (dose, dose_time, dose_patient)):
-                raise ValueError(
-                    "If any of `dose`, `dose_time`, `dose_patient` or `dose_drug` "
-                    "is provided, then `dose`, `dose_time` and `dose_patient` must all be provided."
-                )
+        if any(x is not None for x in (dose, dose_time, dose_patient, dose_drug)) and not all(x is not None for x in (dose, dose_time, dose_patient)):
+            msg = (
+                "If any of `dose`, `dose_time`, `dose_patient` or `dose_drug` "
+                "is provided, then `dose`, `dose_time` and `dose_patient` must all be provided."
+            )
+            raise ValueError(msg)
 
         # Checks for start ---------------------------------------------------------------
         # Default value for start is 0: all intervals start at time 0.
@@ -115,14 +116,16 @@ class SurvivalDataset:
 
         # Check that the intervals are )start < stop].
         if np.any(start >= stop):
-            raise ValueError("Start times must be < stop times.")
+            msg = "Start times must be < stop times."
+            raise ValueError(msg)
 
         # Checks for event ---------------------------------------------------------------
         # Default value for event is 1: all intervals correspond to death, without censoring.
         if event is None:
             event = np.ones_like(stop)
         if np.any((event != 0) & (event != 1)):
-            raise ValueError("Event values must be 0 (survival) or 1 (death).")
+            msg = "Event values must be 0 (survival) or 1 (death)."
+            raise ValueError(msg)
 
         # Checks for patient -------------------------------------------------------------
         # Default value for patient is [0, 1, 2, ...]: we observe one interval per patient.
@@ -158,7 +161,8 @@ class SurvivalDataset:
             same_patient = sorted_patient[1:] == sorted_patient[:-1]
             # In our example: [False, False, True] -> we raise an error.
             if np.any(overlap & same_patient):
-                raise ValueError("Overlapping intervals for the same patient.")
+                msg = "Overlapping intervals for the same patient."
+                raise ValueError(msg)
 
             # We must also check that there is at most one event per patient,
             # and that the event is the last interval for that patient.
@@ -170,9 +174,8 @@ class SurvivalDataset:
             last_per_patient = np.concatenate((last_per_patient, [True]))
 
             if np.any(sorted_event & ~last_per_patient):
-                raise ValueError(
-                    "Events can only occur for the last interval of a patient."
-                )
+                msg = "Events can only occur for the last interval of a patient."
+                raise ValueError(msg)
 
         # TODO: decide what to do with missing values in the covariates.
 
@@ -196,10 +199,11 @@ class SurvivalDataset:
             strata = np.zeros((self.n_patients,), dtype=np.int64)
 
         if strata.shape != (self.n_patients,):
-            raise ValueError(
+            msg = (
                 "Strata must be a vector of length n_patients = max(patient) + 1. "
                 f"Got {strata.shape} instead of {self.n_patients}."
             )
+            raise ValueError(msg)
 
         # Checks for batch --------------------------------------------------------------
         # Default value for batch is [0, 0, 0, ...]: all patients belong to the same batch.
@@ -207,10 +211,11 @@ class SurvivalDataset:
             batch = np.zeros((self.n_patients,), dtype=np.int64)
 
         if batch.shape != (self.n_patients,):
-            raise ValueError(
+            msg = (
                 "Batch must be a vector of length n_patients = max(patient) + 1. "
                 f"Got {batch.shape} instead of {self.n_patients}."
             )
+            raise ValueError(msg)
 
         self.strata = strata
         self.batch = batch
@@ -261,9 +266,7 @@ class SurvivalDataset:
     @typecheck
     def n_drugs(self) -> int:
         """Number of drugs that are referenced in the dataset."""
-        if self.dose_drug is None:
-            return 0
-        elif len(self.dose_drug) == 0:
+        if self.dose_drug is None or len(self.dose_drug) == 0:
             return 0
         else:
             return int(np.max(self.dose_drug) + 1)
@@ -396,11 +399,11 @@ def consecutive_doses(
     *,
     start: Int,
     stop: Int,
-    covariates: Optional[Float64Array["covariates"]],
-    dose: Optional[Float64Array["doses"]],
-    dose_time: Optional[Int64Array["doses"]],
-    dose_drug: Optional[Int64Array["doses"]],
-    poison_covariates: Union[Real, Float64Array["covariates"]] = 0.5,
+    covariates: Float64Array["covariates"] | None,
+    dose: Float64Array["doses"] | None,
+    dose_time: Int64Array["doses"] | None,
+    dose_drug: Int64Array["doses"] | None,
+    poison_covariates: Real | Float64Array["covariates"] = 0.5,
     poison_dose: Real = 0.5,
     poison_time: Int = 1,
 ):
@@ -417,14 +420,12 @@ def consecutive_doses(
       interval `[t - poison_time, t)`.
     """
     # Condition for death: either no covariate, or all covariates >= covariates_threshold.
-    if covariates is None:
-        at_risk = True
-    else:
-        at_risk = np.all(covariates >= poison_covariates)
+    at_risk = True if covariates is None else np.all(covariates >= poison_covariates)
 
     if dose is None:
         if covariates is None:
-            raise ValueError("Either dose or covariates must be provided.")
+            msg = "Either dose or covariates must be provided."
+            raise ValueError(msg)
         return at_risk, stop
 
     if not at_risk:
@@ -464,7 +465,7 @@ def load_drugs(
     n_patients: int = 1,
     max_duration: int = 1,
     max_offset: int = 0,
-    seed: Optional[int] = None,
+    seed: int | None = None,
     risk_model: Callable = consecutive_doses,
 ) -> SurvivalDataset:
     """Create a virtual dataset for testing using a simple risk model.
@@ -556,10 +557,7 @@ def load_drugs(
 
     # Use an arbitrary risk model to decide if and when the patient dies:
     for p in range(n_patients):
-        if covariates is None:
-            covariates_p = None
-        else:
-            covariates_p = covariates[p]
+        covariates_p = None if covariates is None else covariates[p]
 
         if dose is None:
             dose_p = None
@@ -630,12 +628,9 @@ def simple_dataset(
     if ensure_one_death:
         event[-1] = 1
 
-    if unit_length_intervals:
-        start = stop - 1
-    else:
-        start = None
+    start = stop - 1 if unit_length_intervals else None
 
-    dataset = SurvivalDataset(
+    return SurvivalDataset(
         start=start,
         stop=stop,
         event=event,
@@ -643,11 +638,11 @@ def simple_dataset(
         strata=strata,
         covariates=covariates,
     )
-    return dataset
 
 
 if __name__ == "__main__":
     import time
+
     import imageio
 
     ds = load_drugs(

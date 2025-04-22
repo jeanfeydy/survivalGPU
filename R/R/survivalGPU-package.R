@@ -36,7 +36,7 @@ use_survivalGPU <- function() {
 #' CUDA utilisation
 #'
 #' @description
-#' Specifies wether you are using GPUs or not. If TRUE, CUDA drivers are
+#' Specifies whether you are using GPUs or not. If TRUE, CUDA drivers are
 #' detected, and you are using GPU.
 #'
 #' @export

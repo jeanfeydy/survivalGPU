@@ -1,13 +1,9 @@
-import pytest
 import numpy as np
-from numpy.testing import assert_allclose
-
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
-
-from survivalgpu import coxph_R, CoxPHSurvivalAnalysis
-from survivalgpu.utils import numpy
-from survivalgpu.optimizers import newton
+from numpy.testing import assert_allclose
+from survivalgpu import CoxPHSurvivalAnalysis, coxph_R
 
 np.set_printoptions(precision=4)
 
@@ -74,7 +70,9 @@ def test_doscale_identity(*, ties, alpha, mode, example):
     for attr in dir(models[0]):
         if attr.endswith("_") and not attr.endswith("__"):
             for m in models[1:]:
-                if attr in ["score_"]:  # "coef_", "imat_", "std_", "hessian_"]:
+                if attr in [
+                    "score_"
+                ]:  # "coef_", "imat_", "std_", "hessian_"]:
                     continue
                 print(attr)
                 assert_allclose(
@@ -119,19 +117,22 @@ def test_modes_equality(
 ):
     """Checks that all implementations of the CoxPH likelihood coincide when start=0, stop=1."""
     models = [
-        CoxPHSurvivalAnalysis(ties=ties, alpha=alpha, mode=mode, doscale=doscale)
+        CoxPHSurvivalAnalysis(
+            ties=ties, alpha=alpha, mode=mode, doscale=doscale
+        )
         for mode in SUPPORTED_MODES
     ]
     # We need at least two patients per batch to ensure identifiability
     # and thus test equality:
     n_patients = max(n_patients, 2 * n_batch)
 
-    covariates = np.random.randn(n_patients, n_covariates)
+    rng = np.random.default_rng()
+    covariates = rng.standard_normal(size=(n_patients, n_covariates))
     start = np.zeros(n_patients, dtype=np.int64)
     stop = np.ones(n_patients, dtype=np.int64)
-    event = np.random.randint(0, 2, size=n_patients, dtype=np.int64)
-    batch = np.random.randint(0, n_batch, size=n_patients, dtype=np.int64)
-    strata = np.random.randint(0, n_strata, size=n_patients, dtype=np.int64)
+    event = rng.integers(0, 2, size=n_patients, dtype=np.int64)
+    batch = rng.integers(0, n_batch, size=n_patients, dtype=np.int64)
+    strata = rng.integers(0, n_strata, size=n_patients, dtype=np.int64)
 
     # Ensure that the problem is not degenerate:
     for k in range(n_batch):

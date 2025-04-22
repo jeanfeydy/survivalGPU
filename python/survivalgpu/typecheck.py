@@ -1,10 +1,15 @@
-from beartype import beartype as typechecker
 import jaxtyping as jxt
-from beartype.typing import Optional, Callable, Union, List, Tuple, Literal
-
-
-import torch
 import numpy as np
+import torch
+from beartype import beartype as typechecker
+from beartype.typing import (  # noqa: F401
+    Callable,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+)
 
 
 def typecheck(func):

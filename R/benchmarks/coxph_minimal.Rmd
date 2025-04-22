@@ -20,8 +20,8 @@ library(ggplot2)
 ```
 
 
-Bootstrap with :  
-- survival::coxph  
+Bootstrap with :
+- survival::coxph
 - survival.GPU.R::coxphGPU
 
 

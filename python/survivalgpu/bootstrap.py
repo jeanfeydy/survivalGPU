@@ -1,6 +1,7 @@
 import torch
-from .typecheck import typecheck, Float32Tensor, Int64Tensor
+
 from .group_reduction import group_reduce
+from .typecheck import Int64Tensor, typecheck
 
 
 def stable_log(x, eps=1e-8):

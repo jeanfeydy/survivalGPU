@@ -17,18 +17,18 @@ operator, and the terms on the right. The response must be a survival
 object as returned by the Surv function.}
 
 \item{data}{
-    a data.frame in which to interpret the variables named in 
+    a data.frame in which to interpret the variables named in
     the \code{formula}, or in the \code{subset} and the \code{weights}
-    argument. 
+    argument.
   }
 
 \item{ties}{
-    a character string specifying the method for tie handling.  If there  
+    a character string specifying the method for tie handling.  If there
     are no tied death times all the methods are equivalent.
-    The Efron approximation is used as the default, it is more 
-    accurate when dealing with tied death times, and is as efficient 
+    The Efron approximation is used as the default, it is more
+    accurate when dealing with tied death times, and is as efficient
     computationally. (But see below for multi-state models.)
-    The ``exact partial likelihood'' is 
+    The ``exact partial likelihood'' is
     equivalent to a conditional logistic model, and is appropriate when
     the times are a small set of discrete values.
   }
@@ -40,8 +40,8 @@ Defaults to 0, which means that we handle all copies at once. If you run
 into out of memory errors, please consider using batchsize=100, 10 or 1.}
 
 \item{init}{
-    vector of initial values of the iteration.  Default initial 
-    value is zero for all variables. 
+    vector of initial values of the iteration.  Default initial
+    value is zero for all variables.
   }
 
 \item{all.results}{Post-processing calculations. If TRUE, coxphGPU returns
@@ -54,28 +54,28 @@ FALSE if bootstraps.}
   }
 
 \item{singular.ok}{
-    logical value indicating how to handle collinearity in the model matrix. 
-    If \code{TRUE}, the program will automatically skip over columns of the X 
-    matrix that are linear combinations of earlier columns.  In this case the 
-    coefficients for such columns will be NA, and the variance matrix will 
+    logical value indicating how to handle collinearity in the model matrix.
+    If \code{TRUE}, the program will automatically skip over columns of the X
+    matrix that are linear combinations of earlier columns.  In this case the
+    coefficients for such columns will be NA, and the variance matrix will
     contain zeros. For ancillary calculations, such as the linear
-    predictor, 
-    the missing coefficients are treated as zeros. 
+    predictor,
+    the missing coefficients are treated as zeros.
   }
 
 \item{model}{
     logical value: if \code{TRUE}, the model frame is returned in component
-    \code{model}. 
+    \code{model}.
   }
 
 \item{x}{
     logical value: if \code{TRUE}, the x matrix is returned in
-    component \code{x}. 
+    component \code{x}.
   }
 
 \item{y}{
     logical value: if \code{TRUE}, the response vector is returned in
-    component \code{y}. 
+    component \code{y}.
   }
 
 \item{...}{Other arguments for methods.}
@@ -83,14 +83,14 @@ FALSE if bootstraps.}
 \item{object}{a coxphGPU object}
 
 \item{conf.int}{
-    level for computation of the confidence intervals. 
-    If set to FALSE no confidence intervals are printed 
+    level for computation of the confidence intervals.
+    If set to FALSE no confidence intervals are printed
   }
 
 \item{scale}{
-    vector of scale factors for the coefficients, defaults to 1. 
+    vector of scale factors for the coefficients, defaults to 1.
     The printed coefficients, se, and confidence intervals will be
-    associated with one scale unit. 
+    associated with one scale unit.
   }
 }
 \value{

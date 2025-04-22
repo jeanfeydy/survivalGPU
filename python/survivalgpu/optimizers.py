@@ -8,11 +8,8 @@ import torch
 
 # Wrapper to compute the gradient and Hessian of our objective:
 from .autodiff import derivatives_012
-
-from .utils import numpy, int64
-
-from .typecheck import typecheck, Optional, Literal
-from .typecheck import Float32Tensor
+from .typecheck import Float32Tensor, typecheck
+from .utils import numpy
 
 
 class NewtonResult:
@@ -46,7 +43,7 @@ class NewtonResult:
         self.std = self.imat.diagonal(dim1=-2, dim2=-1).sqrt()
 
 
-def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):
+def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
     """Estimates optimal parameters by minimizing a convex objective function.
 
     Args:
@@ -77,18 +74,17 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):
     # Step size "dampener" - once again, B values in parallel:
     rejections = torch.zeros(B, device=candidates.device)  # (B,)
     # Break - (B,) vector of bool:
-    break_loop = best_values == rejections  # = (False, False, ..., False)
+    # break_loop = best_values == rejections  # = (False, False, ..., False)
 
     # Monitoring information:
     # Actual number of iterations used:
-    iters = torch.zeros(B, dtype=int64, device=candidates.device)
+    # iters = torch.zeros(B, dtype=int64, device=candidates.device)
     # Are we running into infinite or NaN values?
-    notfinites = torch.zeros(B, dtype=int64, device=candidates.device)
+    # notfinites = torch.zeros(B, dtype=int64, device=candidates.device)
 
     if maxiter < 0:
-        raise ValueError(
-            f"The Newton solver expects at least 0 iteration but received {maxiter}."
-        )
+        msg = f"The Newton solver expects at least 0 iteration but received {maxiter}."
+        raise ValueError(msg)
 
     for it in range(maxiter + 1):
         # Compute the value of the convex objective, its gradient and its Hessian:

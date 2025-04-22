@@ -1,16 +1,14 @@
 import numpy as np
 import torch
-
-from survivalgpu import coxph_torch, use_cuda, float32, int32
-from survivalgpu.utils import timer, numpy
-
+from survivalgpu import coxph_torch, float32, int32, use_cuda
+from survivalgpu.utils import numpy, timer
 
 np.set_printoptions(precision=4)
 
 
 def benchmark(data, bootstrap=1, alpha=0.0):
     backends = ["torch"]
-    
+
     for backend in backends:
         print(f"Backend: {backend} **************")
 
@@ -40,7 +38,7 @@ def benchmark(data, bootstrap=1, alpha=0.0):
             end = timer()
 
             print(
-                f"GPU={str(use_gpu):5}, parameter: {numpy(out['coef'])[0]}, "
+                f"GPU={use_gpu!s:5}, parameter: {numpy(out['coef'])[0]}, "
                 f"value: {numpy(out['loglik'])[0]}, "
                 f"{end - start:.3f}s"
             )
@@ -72,9 +70,11 @@ n_features = 5
 death_ratio = 0.1
 n_bootstraps = 100
 
-data_times = np.random.randint(n_times, size=(n_points, 1)) * 1.0
-data_deaths = (np.random.uniform(size=(n_points, 1)) < death_ratio) * 1.0
-data_covars = np.random.randn(n_points, n_features)
+rng = np.random.default_rng()
+
+data_times = rng.integers(n_times, size=(n_points, 1)) * 1.0
+data_deaths = (rng.uniform(size=(n_points, 1)) < death_ratio) * 1.0
+data_covars = rng.standard_normal(size=(n_points, n_features))
 
 data_2 = np.concatenate((data_times, data_deaths, data_covars), axis=1)
 print(

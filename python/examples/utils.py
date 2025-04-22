@@ -1,10 +1,7 @@
-import torch
 import numpy as np
 
 # Functions that we are trying to extend:
 from survivalgpu import coxph_torch
-from survivalgpu.wce import constrain
-from survivalgpu.wce_features import wce_features_batch, bspline_atoms
 
 
 def numpy(x):
