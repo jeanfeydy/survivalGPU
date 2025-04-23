@@ -49,6 +49,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e .[test]
+          export LD_LIBRARY_PATH=$(python -m rpy2.situation LD_LIBRARY_PATH):${LD_LIBRARY_PATH}
 
       - name: Test
         run: |
