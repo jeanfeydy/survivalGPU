@@ -45,6 +45,6 @@ jobs:
         run: python -c "import sys; print(sys.version)"
       - name: Test with pytest
         run: |
-          pytest . --cov=survivalgpu --cov-report=xml --cov-report=html --color=yes
+          pytest
       - name: Upload coverage reports to Codecov with GitHub Action
         uses: codecov/codecov-action@v3
