@@ -1,6 +1,6 @@
 # Install survivalGPU from source, run the tests and upload the coverage to Codecov
 # this workflow is triggered on pull request  and push to main branch
-name: Tests
+name: Python tests
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,6 +29,21 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
+
+      # R is needed to install rpy2 and run the tests against
+      # the reference R package survival
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+
+      - name: Install R dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+          working-directory: "R/"
 
       - name: Install package (with dependencies for tests)
         run: |

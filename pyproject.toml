@@ -72,6 +72,8 @@ addopts = [
     "--doctest-modules",
     "--cov-report=term-missing",
     "--cov-report=html",
+    "--cov-report=xml",
+    "--color=yes",
     ]
 xfail_strict = true
 filterwarnings = [
@@ -85,6 +87,7 @@ testpaths = [
 [tool.repo-review]
 ignore = [
     "PY004", # explicit doc/ folder
+    "PY005", # explicit test/ folder
     "PY007", # nox or tox
     "PC140", # MyPy
     "PC170", # PyGrep (because no rst files)
