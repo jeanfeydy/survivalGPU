@@ -46,30 +46,38 @@ class WCESurvivalAnalysis:
             n_knots + order + 1 if constrained is None,
             n_knots + 2         if constrained is "left" or "right".
 
-        Args:
-            cutoff (int): size of the time window for the risk function.
-            n_knots (int): number of knots for the B-splines.
-            order (int): order of the B-splines used to model the risk function.
-                order = 0 corresponds to a piecewise constant risk function,
-                order = 1 corresponds to a piecewise linear risk function,
-                order = 3 corresponds to a piecewise cubic risk function.
-            constrained (str, optional): whether the B-splines should be constrained.
-                Defaults to None (i.e. no constrain).
-                Other options are:
-                - "Left" or "L": the drug has no immediate effect on the risk.
-                  We remove features that correspond to basis functions that have
-                  a non-zero value or derivative on the "left" of the domain,
-                  i.e. around the exposure time.
-                  This is useful to model a risk function that has no "immediate" impact.
+        Parameters
+    ----------
+        cutoff
+            Size of the time window for the risk function.
+        n_knots
+            Number of knots for the B-splines.
+        order
+            Order of the B-splines used to model the risk function.
+            `order == 0` corresponds to a piecewise constant risk function,
+            `order == 1` corresponds to a piecewise linear risk function,
+            `order == 3` corresponds to a piecewise cubic risk function.
+        constrained
+            Whether the B-splines should be constrained.
+            Defaults to None (i.e. no constraint).
 
-                - "Right" or "R": the drug has no effect on the risk around the cutoff time.
-                  We remove features that correspond to basis functions that have
-                  a non-zero value or derivative on the "right" of the domain,
-                  i.e. around the "exposure+cutoff" time.
-                  This is useful to model a risk function that vanishes "at infinity".
-            survival_model (Estimator, optional): estimator that will be used to
-                perform a risk analysis from the WCE covariates.
-                For now, we only support the CoxPHSurvivalAnalysis model.
+            Other options are:
+
+            - "Left" or "L": the drug has no immediate effect on the risk.
+                We remove features that correspond to basis functions that have
+                a non-zero value or derivative on the "left" of the domain,
+                i.e. around the exposure time.
+                This is useful to model a risk function that has no "immediate" impact.
+
+            - "Right" or "R": the drug has no effect on the risk around the cutoff time.
+                We remove features that correspond to basis functions that have
+                a non-zero value or derivative on the "right" of the domain,
+                i.e. around the "exposure+cutoff" time.
+                This is useful to model a risk function that vanishes "at infinity".
+        survival_model
+            Estimator that will be used to
+            perform a risk analysis from the WCE covariates.
+            For now, we only support the CoxPHSurvivalAnalysis model.
         """
         # Let the model remember the parameters of the analysis.
         # Note that all type and value checks are performed in the attribute setters:
