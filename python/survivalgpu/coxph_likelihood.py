@@ -6,7 +6,6 @@
 # - Vanilla PyTorch - but please note that as of PyTorch 1.11, this code is
 #   not GPU-compatible (https://github.com/pytorch/pytorch/issues/74770).
 #   This will be fixed with PyTorch 1.12.
-# - The PyTorch-Scatter package (https://github.com/rusty1s/pytorch_scatter)
 #   for PyTorch-Geometric (https://pytorch-geometric.readthedocs.io/).
 #   This implementation is probably the fastest one right now,
 #   since it can rely on a CSR/"ranges" representation of the summation indices
@@ -19,9 +18,7 @@ import numpy as np
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
-# Use torch_scatter (https://github.com/rusty1s/pytorch_scatter)
 # from the PyTorch Geometric project for fast heterogeneous summations:
-import torch_scatter
 
 
 class SlicedSummation(torch.autograd.Function):
@@ -53,115 +50,48 @@ class SlicedSummation(torch.autograd.Function):
             grad_output,
             *tuple(grad_output[slice_start:] for slice_start in slice_indices),
         )
+    
+def make_2d(g):
+    if len(g.shape) == 1:
+        return g.view(1, -1)
+    elif len(g.shape) == 2:
+        return g
+    else:
+        raise ValueError("Invalid shape for groups")
 
 
-# Handcrafted fix for a bug in torch_scatter,
-# https://github.com/rusty1s/pytorch_scatter/issues/299
-class SumCSR(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, values, groups):
-        ctx.save_for_backward(groups)
-        return torch_scatter.segment_csr(values, groups, reduce="sum")
 
-    @staticmethod
-    def backward(ctx, grad_output):
-        (groups,) = ctx.saved_tensors
-        return GatherCSR.apply(grad_output, groups), None
-
-
-class GatherCSR(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, values, groups):
-        ctx.save_for_backward(groups)
-        return torch_scatter.gather_csr(values, groups)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (groups,) = ctx.saved_tensors
-        return SumCSR.apply(grad_output, groups), None
-
-
-class SumCOO(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, values, groups, dim_size):
-        ctx.save_for_backward(groups)
-        ctx.dim_size = dim_size
-        return torch_scatter.segment_coo(
-            values, groups, dim_size=dim_size, reduce="sum"
-        )
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (groups,) = ctx.saved_tensors
-        return GatherCOO.apply(grad_output, groups, ctx.dim_size), None, None
-
-
-class GatherCOO(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, values, groups, dim_size):
-        ctx.save_for_backward(groups)
-        ctx.dim_size = dim_size
-        return torch_scatter.gather_coo(values, groups)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (groups,) = ctx.saved_tensors
-        return SumCOO.apply(grad_output, groups, ctx.dim_size), None, None
-
-
-def group_reduce(*, values, groups, reduction, output_size, backend):
-
+def group_reduce(values, groups, reduction, output_size, backend):
     if backend == "torch":
-        # Compatibility switch for PyTorch.scatter_reduce:
+        # Compatibility switch for PyTorch.scatter_reduce
         if reduction == "max":
             reduction = "amax"
-        return torch.scatter_reduce(
-            values, 1, groups, reduction, output_size=output_size
+        return torch.zeros(
+            (values.shape[0], output_size), dtype=values.dtype, device=values.device
+        ).scatter_reduce_(
+            dim=1,
+            index=make_2d(groups),
+            src=values,
+            reduce=reduction,
+            include_self=False,
         )
-    elif backend == "pyg":
-        return torch_scatter.scatter(
-            values, groups, dim=1, dim_size=output_size, reduce=reduction
-        )
-
-    elif False:  # backend == "coo":
-        return torch_scatter.segment_coo(
-            values, groups, dim_size=output_size, reduce=reduction
-        )
-    elif backend == "coo":  # backend == "my_coo":
-        if reduction == "sum":
-            return SumCOO.apply(values, groups, output_size)
-        else:
-            return torch_scatter.segment_coo(
-                values, groups, dim_size=output_size, reduce=reduction
-            )
-
-    elif False:  # backend == "csr":
-        return torch_scatter.segment_csr(values, groups, reduce=reduction)
-    elif backend == "csr":  # backend == "my_csr":
-        if reduction == "sum":
-            return SumCSR.apply(values, groups)
-        else:
-            return torch_scatter.segment_csr(values, groups, reduce=reduction)
     else:
         raise ValueError(
             f"Invalid value for the scatter backend ({backend}), "
-            "should be one of 'torch', 'pyg', 'coo' or 'csr'."
+            "should be one of 'torch'."
         )
 
 
-def group_expand(*, values, groups, output_size, backend):
 
-    if backend in ["torch", "pyg"]:
+def group_expand(values, groups, output_size, backend):
+    if backend in ["torch"]:
         return torch.gather(values, 1, groups)
-    elif backend == "coo":
-        return GatherCOO.apply(values, groups, output_size)
-    elif backend == "csr":
-        return GatherCSR.apply(values, groups)
     else:
         raise ValueError(
             f"Invalid value for the scatter backend ({backend}), "
-            "should be one of 'torch', 'pyg', 'coo' or 'csr'."
+            "should be one of 'torch'."
         )
+
 
 
 def group_logsumexp(*, values, groups, output_size, backend):

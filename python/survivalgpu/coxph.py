@@ -34,7 +34,7 @@ def coxph_torch(
     bootstrap=1,
     batchsize=0,
     ties="efron",
-    backend="csr",
+    backend="torch",
     maxiter=20,
     init=None,
     eps=1e-9,
@@ -190,7 +190,7 @@ def coxph_torch(
             groups=bootstrap_indices,
             reduction="sum",
             output_size=N,
-            backend="pyg",
+            backend="torch",
         )
         weights = weights.to(device=device, dtype=float32)
         # Equivalent to:
@@ -224,7 +224,7 @@ def coxph_torch(
             groups=dead_cluster_indices.long(),
             reduction="sum",
             output_size=T,
-            backend="pyg",
+            backend="torch",
         )
         # Equivalent to:
         # tied_dead_weights = torch.bincount(cluster_indices[deaths == 1],
@@ -436,7 +436,7 @@ def coxph_R(
             times=times,
             deaths=deaths,
             ties=ties,
-            backend="csr",
+            backend="torch",
             bootstrap=int(bootstrap),
             batchsize=int(batchsize),
             maxiter=int(maxiter) if profile is None else 1,
