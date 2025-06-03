@@ -393,6 +393,7 @@ max_time = 365
 scenario_name = "exponential_scenario"
 HR_target = 4
 cutoff = 180
+n_experiment = 100
 
 
 # df = launch_experiment(
@@ -433,7 +434,7 @@ colnames(df) <- columns
 
 for (scenario in scenario_list){
     scenario_df = launch_experiment(
-        n_experiment = 10,
+        n_experiment = n_experiment,
         n_patients = n_patients,
         max_time = max_time,
         scenario_name = scenario,
