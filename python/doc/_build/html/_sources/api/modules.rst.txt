@@ -1,7 +1,0 @@
-survivalgpu
-===========
-
-.. toctree::
-   :maxdepth: 4
-
-   survivalgpu

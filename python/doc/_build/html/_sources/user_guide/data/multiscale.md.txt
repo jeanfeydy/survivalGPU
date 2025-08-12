@@ -1,8 +1,0 @@
-Multiscale
-==========
-
-Presentation
-------------
-
-Usage
------
