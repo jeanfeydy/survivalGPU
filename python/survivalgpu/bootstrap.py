@@ -99,6 +99,7 @@ class Resampling:
             device=indices.device,
             dtype=torch.float32,
         )
+        assert self.patient_weights.shape == (B, P)
         # Equivalent to:
         # self.patient_weights
         # = torch.stack([torch.bincount(b_ind, minlength=P) for b_ind in indices])
@@ -111,11 +112,10 @@ class Resampling:
         # TODO: We are currently adding a small value to prevent NaN.
         #       This is not very clean...
         self.patient_log_weights = stable_log(self.patient_weights)  # (B,P), e.g.
+        assert self.patient_log_weights.shape == (B, P)
         # [[ 0, 0, 0,  0,   0,   0, 0,    0,  0, 0],
         #  [.7, 0, 0, .7,-inf,-inf, 0, -inf, .7, 0]]
 
-        assert self.patient_weights.shape == (B, P)
-        assert self.patient_log_weights.shape == (B, P)
 
         # Step 2: compute the interval weights -------------------------------------------
         self.interval_weights = self.patient_weights[:, patient]

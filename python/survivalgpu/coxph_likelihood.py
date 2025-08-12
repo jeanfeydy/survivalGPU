@@ -71,14 +71,10 @@ on the weighted scores:
 # ==================== CoxPH log-likelihood, PyTorch implementation ====================
 # ======================================================================================
 #
-# First implementation of the convex CoxPH objective, using either:
-# - Vanilla PyTorch.
-# - The PyTorch-Scatter package (https://github.com/rusty1s/pytorch_scatter)
-#   for PyTorch-Geometric (https://pytorch-geometric.readthedocs.io/).
-#   This implementation is probably the fastest one right now,
-#   since it can rely on a CSR/"ranges" representation of the summation indices
-#   while being more specialized than KeOps LazyTensors (which are sub-optimal
-#   for the very "thin" block-sparsity masks that appear in the CoxPH log-likelihood).
+# Our main implementation of the convex CoxPH objective, using vanilla PyTorch.
+# The PyTorch-Scatter package (https://github.com/rusty1s/pytorch_scatter)
+# for PyTorch-Geometric (https://pytorch-geometric.readthedocs.io/)
+# was considered for a long time, but eventually dropped to keep dependencies minimal.
 
 # Import numpy to compute logarithms
 import numpy as np
@@ -126,6 +122,9 @@ def coxph_objective(
     which is identified with len(bootstrap) vectors of length data.n_batch,
     concatenated with each other.
     """
+    B = len(bootstrap)  # Number of bootstraps to process in parallel
+    I = dataset.n_intervals  # Number of intervals in the dataset
+    E = dataset.n_event_intervals  # Number of event intervals in the dataset
 
     # Pre-processing ---------------------------------------------------------------------
     # For each bootstrap and value of (batch, strata), aggregate the
@@ -134,16 +133,22 @@ def coxph_objective(
 
     # Recall that bootstrap.interval_weights is a (n_bootstraps, n_intervals)
     # Tensor of int64 that records the number of occurrences of each interval.
+    assert bootstrap.interval_weights.shape == (B, I)
 
     # Compute the total weight of dead samples for every event time:
     dead_weights = bootstrap.interval_weights[:, dataset.event == 1]
-    # dead_weights is (n_bootstraps, n_death_intervals), e.g.
+    assert dead_weights.shape == (B, E)
+    # dead_weights is (n_bootstraps, n_event_intervals), e.g.
     # [[1, 1, 1, 1],
     #  [2, 0, 1, 1]]
 
     # Recall that dataset.group is a (n_intervals,) Tensor of int64 that records
     # the T unique values of (batch, strata, stop):
+    assert dataset.group.shape == (I,)
+
+    # Select the indices of the "death" intervals
     dead_cluster_indices = dataset.group[dataset.event == 1].long()
+    assert dead_cluster_indices.shape == (E,)
     # dead_cluster_indices is (n_death_intervals,), e.g.
     # [0, 0, 1, 2]
 
@@ -161,7 +166,7 @@ def coxph_objective(
     # tied_dead_weights is (n_bootstraps,n_times), e.g.
     # [[2, 1, 1],
     #  [2, 1, 1]]
-    assert tied_dead_weights.shape == (len(bootstrap), dataset.n_groups)
+    assert tied_dead_weights.shape == (B, dataset.n_groups)
 
     # Create the summation groups --------------------------------------------------------
     if ties == "breslow":
@@ -195,7 +200,7 @@ def coxph_objective(
         # -> there is no need to define a weight_factor variable.
 
     # Format the "group" vector for group-wise summations:
-    assert group.shape == (dataset.n_intervals,)
+    assert group.shape == (I,)
     # group is (n_intervals,),
     # and indicates the summation group that is associated to each interval e.g.
     # [0, 0, 0, 0, 0, 1, 1, 1, 2, 2]
@@ -214,22 +219,21 @@ def coxph_objective(
         scores = beta @ x.T, (B,D) @ (D,I) = (B,I)
 
         """
-        if scores.shape[0] != len(bootstrap):
+        if scores.shape[0] != B:
             msg = (
                 f"The number of rows {scores.shape[0]} of the `scores` Tensor "
-                f"should be equal to the number of bootstrap samples {len(bootstrap)}."
+                f"should be equal to the number of bootstrap samples {B}."
             )
             raise ValueError(msg)
 
-        if scores.shape[1] != dataset.n_intervals:
+        if scores.shape[1] != I:
             msg = (
                 f"The number of columns {scores.shape[1]} of the `scores` Tensor "
-                f"should be equal to the number of intervals {dataset.n_intervals} "
+                f"should be equal to the number of intervals {I} "
                 "that are referenced in `dataset.stop`."
             )
             raise ValueError(msg)
 
-        B, I = len(bootstrap), dataset.n_intervals
 
         # The linear term in the CoxPH objective - (n_bootstraps,n_batch) ==============
         # This is the term:
@@ -244,6 +248,7 @@ def coxph_objective(
         # Note that the strata does not matter here, because we sum all contributions
         # identically:
         # Sum_{strata s} Sum_{all samples in strata s} ... = Sum_{all samples} ...
+        assert torch.all((dataset.event == 0) | (dataset.event == 1))
         lin = (
             bootstrap.interval_weights.view(B, I)
             * scores.view(B, I)
@@ -260,9 +265,30 @@ def coxph_objective(
         # The log-sum-exp term in the CoxPH log-likelihood - (n_bootstrap, n_batch) ====
 
         # We add the logarithms of the weights to the scores, so that
-        # exp(weighted_scores[i,j]) = w[i,j] * exp(beta[i] . x[j]) = r[i,j]:
+        # exp(weighted_scores[b,i]) = w[b,i] * exp(beta[b] . x[i]) = r[b,i]:
+        assert bootstrap.interval_log_weights.shape == (B, I)
         weighted_scores = scores + bootstrap.interval_log_weights  # (B,I)
         assert weighted_scores.shape == (B, I)
+
+
+        # At this stage:
+        #
+        # - weighted_scores[b,i] = log(r[b,i])
+        #   corresponds to the log-risk
+        #   for the b-th bootstrap (and therefore, the b-th parameter estimate)
+        #   and the i-th interval.
+        assert weighted_scores.shape == (B, I)
+
+        # - group[i]
+        #   corresponds to the summation group id for the i-th interval.
+        #   With "breslow", this is a unique id for (batch, strata, stop).
+        #   With "efron", this is a unique id (batch, strata, stop, event).
+        assert group.shape == (I,)
+
+        # - dataset.unique_groups[:, t]
+        #   is a vector of (batch, strata, stop) values for the t-th group id.
+        assert dataset.unique_groups.shape == (3, dataset.n_groups)
+
 
         if ties == "breslow":
             # This is the term:
@@ -289,6 +315,12 @@ def coxph_objective(
             )
             assert weight_factor.shape == (B, n_groups)
             assert group_scores.shape == (B, n_groups)
+
+            # If mode == "unit length", risks sets exactly correspond to our summation
+            # groups so we can move on to the next step.
+            # However, if mode == "start zero" or "any", risks sets correspond to
+            # unions of these summation groups so we need to aggregate the group scores
+            # to compute the true "risk set scores".
 
             if mode == "start zero":
                 # At this point, suppose e.g. that data.unique_groups

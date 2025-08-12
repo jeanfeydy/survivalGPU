@@ -111,6 +111,13 @@ class TorchSurvivalDataset:
 
     @property
     @typecheck
+    def n_event_intervals(self) -> int:
+        """Number of event intervals that are referenced in the dataset."""
+        assert torch.all((self.event == 0) | (self.event == 1))
+        return int(self.event.sum())
+
+    @property
+    @typecheck
     def n_batch(self) -> int:
         """Number of batches that are referenced in the dataset."""
         return int(self.batch.max() + 1)
