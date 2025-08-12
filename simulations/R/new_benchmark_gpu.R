@@ -6,6 +6,7 @@ library(dplyr)
 
 # options(scipen = 999)
 
+#devtools::load_all("../../../survivalGPU/R")
 devtools::load_all("../../../survivalGPU/R")
 
 library(survivalGPU)
@@ -101,7 +102,10 @@ results_df <- data.frame(
 
 
 
-write.csv(results_df, "benchmark_survivalgpu_gpu.csv", row.names = FALSE)
+
+
+
+time_list = c()rite.csv(results_df, "benchmark_survivalgpu_gpu.csv", row.names = FALSE)
 
 
 
@@ -109,3 +113,4 @@ write.csv(results_df, "benchmark_survivalgpu_gpu.csv", row.names = FALSE)
 
 
 
+# [1]  5.4241710  0.4261839  0.7527981  3.5013433  6.8908169 37.0276775

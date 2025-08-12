@@ -55,7 +55,7 @@ for (n_patients in c(
 )){
 
 
-    dataset_path =paste0("../benchmark_datasets/", n_patients, ".csv")
+    dataset_path =paste0("/benchmark_datasets/", n_patients, ".csv")
 
 
     dataset = read.csv(dataset_path)

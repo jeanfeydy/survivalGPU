@@ -91,6 +91,15 @@ simulation_iteration <- function(
 # )
 
 
+model_analysis <- function(model){
+    beta = model$coefficients
+    biais_beta = (beta - log(4))/log(4) * 100
+    BIC = model$BIC
+
+    return(list(beta = beta, biais_beta = biais_beta, BIC = BIC))
+}
+
+
 
 
 multiple_simulation <- function(
@@ -107,7 +116,16 @@ multiple_simulation <- function(
 
     cutoff = 180
 
-    columns = c("iteration","library",paste0("t", 1:cutoff))
+    columns = c("iteration",
+                "library",
+                "scenario_name", 
+                "HR_target",
+                "computation_time",
+                "simulated_HR",
+                "beta",
+                "biais_beta",
+                "BIC",
+                paste0("t", 1:cutoff))
     wce_df <- data.frame(matrix(ncol = length(columns), nrow = 0))
     colnames(wce_df) <- columns
 
@@ -168,13 +186,6 @@ result_analysis <- function(result_list, HR_target){
         sd_beta = sd_beta, 
         biais = biais))
 }
-
-
-
-
-
-
-
 
 
 # multiple_simulation(n_simualtions = 5,
@@ -242,7 +253,6 @@ results_df <- do.call(rbind, lapply(names(results), function(scenario) {
 }))
 
 write.csv(results_df, "simulation_results_500.csv", row.names = FALSE)
-
 
 
 

@@ -837,24 +837,6 @@ def WCE_permalgo(n_patients,
     print(list_covariates)
 
 
-    # dataset = simulate_dataset(max_time = max_time,
-    #                              n_patients = n_patients,
-    #                              list_covariates = [wce_covariate, cox_covariate])
-
-    
-
-            
-
-        
-    
-    
-
-    # permalgorithm(numSubjects, maxTime, Xmat, XmatNames = NULL,
-    #     eventRandom = NULL, censorRandom = NULL, betas, groupByD = FALSE)
-
-
-    
-
     WCE_covariate = WCECovariate(name = wce_covariate_name)
     
     
@@ -868,6 +850,30 @@ def WCE_permalgo(n_patients,
 
 
     return dataset
+
+
+# def cox_benchmark_simualtion(n_patients, n_intervals, max_time,):
+#     dataset = []
+
+#     wce_covariate = WCECovariate(
+#         name = "dose", 
+#         values = [1,1.5,2,2.5,3], 
+#         scenario_name = scenario_name, 
+#         HR_target = HR_target)
+    
+
+
+
+
+#     dataset = simulate_dataset(
+#         max_time = max_time, 
+#         n_patients = n_patients, 
+#         list_covariates = [wce_covariate])
+    
+
+#     print(type(wce_covariate))
+
+#     return dataset
 
 #### 
 def exponential_scenario(u_t, name = False):

@@ -160,7 +160,7 @@ def coxph_torch(
     results = []  # We store one output per batch
     
     # Vector of inital values of the Newton iteration. Zero for all
-    # variables by default.
+    # variables by default.home/survivalGPU/python
     if init is None:
         init = torch.zeros(B * C, D, dtype=float32, device=device)
     else:

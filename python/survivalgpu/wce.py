@@ -10,6 +10,8 @@ from .utils import numpy, timer
 from .utils import use_cuda, device, float32, int32, int64
 from .wce_features import wce_features_batch, bspline_atoms
 
+import time
+
 
 def constrain(*, features, constrained, order):
     """Enforces a boundary condition on the B-Spline by discarding some basis functions.
@@ -56,6 +58,8 @@ def wce_torch(
     batchsize=0,
     verbosity=1,
 ):
+    
+    time_total_start = time.time()
 
     # Just in case the user provided float numbers (super easy with R...):
     nknots = int(nknots)
@@ -68,6 +72,9 @@ def wce_torch(
         tstart = timer()
         print("Step 1 : Computing the WCE features... ", end="", flush=True)
 
+    time_feature_start = time.time()
+
+
     wce_features, knots = wce_features_batch(
         ids=ids,
         times=times,
@@ -76,6 +83,9 @@ def wce_torch(
         cutoff=cutoff,
         order=order,
     )
+
+    time_feature_end = time.time()
+    time_feature = time_feature_end - time_feature_start
 
     # If constrained == "Right", we remove the B-Spline atoms that
     # correspond to the end of the observation window.
@@ -99,6 +109,8 @@ def wce_torch(
         ncovariates = covariates.shape[-1]
         covariates = torch.cat((covariates, wce_features), dim=-1)
 
+    time_cox_start = time.time()
+
     result = coxph_torch(
         x=covariates,
         times=times,
@@ -107,6 +119,10 @@ def wce_torch(
         batchsize=batchsize,
         verbosity=verbosity,
     )
+
+    time_cox_end = time.time()
+
+    time_cox = time_cox_end - time_cox_start
 
     # Step 3: save the results in the expected format ==========================
     if verbosity > 0:
@@ -143,7 +159,19 @@ def wce_torch(
     if verbosity > 0:
         print(f"Done in {timer() - tstart:.3f}s.\n")
 
-    return result
+
+    time_total_end = time.time()
+    time_total = time_total_end - time_total_start
+
+    result_time = {
+        "time_total": time_total,
+        "time_feature": time_feature,
+        "time_cox": time_cox,
+    }
+
+
+
+    return result, result_time
 
 
 # Python >= 3.7:
@@ -171,7 +199,7 @@ def wce_numpy(
         times = torch.tensor(times, dtype=int32, device=device)
         events = torch.tensor(events, dtype=int32, device=device)
 
-        result = wce_torch(
+        result, result_time = wce_torch(
             ids=ids,
             covariates=covariates,
             doses=doses,
@@ -184,7 +212,7 @@ def wce_numpy(
         prof.export_chrome_trace(profile)
 
     result = {k: numpy(v) for k, v in result.items()}
-    return result
+    return result, result_time
 
 
 def wce_R(
@@ -204,13 +232,14 @@ def wce_R(
     events = np.array(data[events])
     N = len(times)
 
+
     if covars is not None and len(covars) > 0:
         cov = [data[covar] for covar in covars]
         covariates = np.array(cov).reshape([len(cov), N]).T.reshape([N, len(cov)])
     else:
         covariates = None
 
-    res = wce_numpy(
+    res, result_time = wce_numpy(
         ids=ids,
         covariates=covariates,
         doses=doses,
@@ -219,4 +248,4 @@ def wce_R(
         **kwargs,
     )
 
-    return res
+    return res, result_time
