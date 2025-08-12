@@ -153,6 +153,7 @@ class WCESurvivalAnalysis:
         if self.constrained is None:
             return self.n_knots + self.order + 1
         else:
+            # TODO: fix when self.order != 3
             return self.n_knots + 2
 
     # Functions related to the B-Spline atoms --------------------------------------------
@@ -169,6 +170,8 @@ class WCESurvivalAnalysis:
         """
         assert len(features.shape) == 2
         assert features.shape[1] == self.n_knots + self.order + 1
+
+        # TODO: fix when self.order != 3
 
         if self.constrained == "right":
             return features[:, : -(self.order - 1)]

@@ -3,12 +3,37 @@ import torch
 from matplotlib import pyplot as plt
 from survivalgpu import device, float32, int32
 from survivalgpu.utils import numpy
-from survivalgpu.wce_features import wce_features_batch
+from survivalgpu.wce_features import bspline_atoms, wce_features_batch
 
 if False:
     import pykeops
 
     pykeops.clean_pykeops()
+
+
+# Sanity check 1: display the BSpline atoms
+
+order = 3  # 3 -> cubic splines
+nknots = 1
+cutoff = 20
+
+atoms, knots = bspline_atoms(nknots=nknots, cutoff=cutoff, order=order)
+print("Knots:", knots)
+print(atoms)
+
+plt.figure(figsize=(16, 10))
+for i, atom in enumerate(atoms.T):
+    plt.plot(atom, label=f"BSpline {i}")
+
+plt.plot(torch.sum(atoms, axis=1), label="Sum")
+plt.xlabel("Time")
+plt.title(
+    f"B-Spline atoms for cutoff={cutoff}, order={order}, nknots={nknots}"
+)
+plt.legend()
+
+plt.savefig("output_atoms.png")
+
 
 # Parameters of our BSpline window:
 order = 3  # 3 -> cubic splines
