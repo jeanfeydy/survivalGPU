@@ -126,6 +126,10 @@ def coxph_objective(
     I = dataset.n_intervals  # Number of intervals in the dataset
     E = dataset.n_event_intervals  # Number of event intervals in the dataset
 
+    if I == 0:
+        msg = "The dataset is empty (dataset.n_intervals == 0)."
+        raise ValueError(msg)
+
     # Pre-processing ---------------------------------------------------------------------
     # For each bootstrap and value of (batch, strata), aggregate the
     # "total weights for dead samples" at each time point.
@@ -289,6 +293,11 @@ def coxph_objective(
         #   is a vector of (batch, strata, stop) values for the t-th group id.
         assert dataset.unique_groups.shape == (3, dataset.n_groups)
 
+        # - (batch > strata > stop > event) is lexicographically sorted:
+        assert (
+            dataset.is_sorted
+        ), "The dataset must be sorted before computing a log-likelihood."
+
 
         if ties == "breslow":
             # This is the term:
@@ -342,6 +351,8 @@ def coxph_objective(
                 # - Group 5: m
                 #
                 # We implement this using a cumulative logsumexp.
+                # Note that risks sets shrink over time (at patients die),
+                # so we need to compute cumsums in "reverse order".
 
                 # 1) Compute the (log)cumsum(exp)
                 # [a+b+c+d+..., b+c+d+..., ..., k+l+m, l+m, m]
@@ -359,10 +370,6 @@ def coxph_objective(
                 #   "first" (reading from left to right) indices of a new group.
                 #   We do not care about the very first value, (a+b+c)+...
 
-                # Make sure that (batch > strata > stop > event) is lexicographically sorted:
-                assert (
-                    dataset.is_sorted
-                ), "The dataset must be sorted before computing a log-likelihood."
                 assert dataset.unique_groups.shape == (3, n_groups)
 
                 # batch_strata_group looks like:
@@ -373,6 +380,10 @@ def coxph_objective(
                     dim=-1,
                 )
                 assert batch_strata_group.shape == (n_groups,)
+                # Recall that batch_strata_group is of length n_groups,
+                # not n_intervals.
+
+                assert n_groups > 0, "With a non-empty dataset, we always have n_groups >= 1."
 
                 # Identify the indices of the first (batch, strata, stop) group
                 # for each value of (batch, strata):
