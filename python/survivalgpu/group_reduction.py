@@ -12,36 +12,6 @@ def make_2d(g):
         raise ValueError(msg)
 
 
-class SlicedSummation(torch.autograd.Function):
-    """Adds a list of vectors as "suffixes".
-
-    The PyTorch autograd engine does not support in-place operation,
-    so we have to use a custom operator to implement in a differentiable way
-    the update:
-
-        output[slice_start[i]:] += slices[i]
-
-    that is required for the efficient implementation of the Efron approximation.
-    """
-
-    @staticmethod
-    def forward(ctx, slice_indices, *slices):
-        ctx.save_for_backward(slice_indices)
-        full_sum = slices[0].clone()
-        for slice_start, current_slice in zip(slice_indices, slices[1:], strict=False):
-            full_sum[slice_start:] += current_slice
-        return full_sum
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (slice_indices,) = ctx.saved_tensors
-        # No gradient for slice_indices, but backprop the gradient on all the slices:
-        return (
-            None,
-            grad_output,
-            *tuple(grad_output[slice_start:] for slice_start in slice_indices),
-        )
-
 
 # Trying to work around a huge bottleneck in the backward pass
 # because of the use of a deterministic algorithm in

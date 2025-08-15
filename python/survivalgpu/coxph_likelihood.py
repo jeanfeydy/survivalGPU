@@ -83,7 +83,7 @@ import numpy as np
 import torch
 
 from .bootstrap import Resampling
-from .group_reduction import SlicedSummation, group_logsumexp, group_reduce
+from .group_reduction import group_logsumexp, group_reduce
 from .typecheck import Callable, Float32Tensor, Literal, typecheck
 
 
@@ -121,6 +121,17 @@ def coxph_objective(
     and returns a vector of length `batch_size == len(bootstrap) * dataset.n_batch`
     which is identified with len(bootstrap) vectors of length data.n_batch,
     concatenated with each other.
+
+    .. testcode::
+
+        import survivalgpu
+
+        print(1 + 1)
+
+    .. testoutput::
+
+        2
+
     """
     B = len(bootstrap)  # Number of bootstraps to process in parallel
     I = dataset.n_intervals  # Number of intervals in the dataset

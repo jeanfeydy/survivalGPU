@@ -82,6 +82,7 @@ filterwarnings = [
 log_cli_level = "info"
 testpaths = [
   "python/tests",
+  "python/survivalgpu",
 ]
 
 [tool.repo-review]
