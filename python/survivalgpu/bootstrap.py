@@ -1,6 +1,6 @@
 import torch
 
-from .group_reduction import group_reduce
+from .group_reduction import group_sum
 from .typecheck import Int64Tensor, typecheck
 
 
@@ -79,7 +79,7 @@ class Resampling:
         - patient, a (I,) int64 Tensor that indicates the patient for each interval.
         """
         B, S = indices.shape
-        P = patient.max() + 1
+        P = int(patient.max() + 1)
         I = patient.shape[0]
 
         # Step 1: compute the patient weights --------------------------------------------
@@ -90,10 +90,9 @@ class Resampling:
         # sample_weights is (B, S),
         # indices is (B, S) with values in [0, P-1]
         # -> patient weights is (B, P)
-        self.patient_weights = group_reduce(
+        self.patient_weights = group_sum(
             values=sample_weights,
             groups=indices,
-            reduction="sum",
             output_size=P,
         ).to(
             device=indices.device,

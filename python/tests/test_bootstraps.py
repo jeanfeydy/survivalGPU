@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from survivalgpu.bootstrap import Resampling
 from survivalgpu.datasets import SurvivalDataset
-from survivalgpu.group_reduction import group_reduce
+from survivalgpu.group_reduction import group_sum
 
 small_int = st.integers(min_value=1, max_value=10)
 
@@ -238,10 +238,9 @@ def test_bootstraps_stratification_1(
     )
 
     # Compute the total weight per strata:
-    new_weight_per_strata = group_reduce(
+    new_weight_per_strata = group_sum(
         values=boots.patient_weights,
         groups=batch.view(1, -1).tile((n_bootstraps, 1)),
-        reduction="sum",
         output_size=n_groups,
     )
 

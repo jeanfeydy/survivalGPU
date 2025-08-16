@@ -83,8 +83,278 @@ import numpy as np
 import torch
 
 from .bootstrap import Resampling
-from .group_reduction import group_logsumexp, group_reduce
-from .typecheck import Callable, Float32Tensor, Literal, typecheck
+from .group_reduction import group_logsumexp, group_sum
+from .typecheck import Callable, Float32Tensor, Int64Tensor, Literal, typecheck
+
+
+@typecheck
+def _compute_unique_batch_strata_time(
+    *,
+    batch: Int64Tensor["intervals"],
+    strata: Int64Tensor["intervals"],
+    start: Int64Tensor["intervals"],
+    stop: Int64Tensor["intervals"],
+) -> tuple[Int64Tensor["3 times"], Int64Tensor["intervals"], Int64Tensor["intervals"]]:
+    """Collapses the intervals of the dataset into unique (batch, strata, time) values.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.coxph_likelihood import _compute_unique_batch_strata_time
+
+        batch = torch.tensor([0, 0, 0, 0, 0, 0, 1, 1, 1])
+        strata = torch.tensor([0, 0, 0, 1, 1, 1, 0, 0, 0])
+        start = torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0])
+        stop = torch.tensor([1, 2, 3, 1, 2, 3, 1, 2, 3])
+
+        unique_batch_strata_time, index_start, index_stop = _compute_unique_batch_strata_time(
+            batch=batch,
+            strata=strata,
+            start=start,
+            stop=stop,
+        )
+        print(unique_batch_strata_time)
+
+    .. testoutput::
+
+        tensor([[0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+                [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+                [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]])
+
+    .. testcode::
+
+        print(index_start)
+
+    .. testoutput::
+
+        tensor([0, 0, 0, 4, 4, 4, 8, 8, 8])
+
+    .. testcode::
+
+        print(index_stop)
+
+    .. testoutput::
+
+        tensor([ 1,  2,  3,  5,  6,  7,  9, 10, 11])
+
+    """
+
+    I = batch.shape[0]
+
+    # batch and strata define independent groups,
+    # while start and stop refer to time values.
+    # Working in parallel over (batch, strata) groups,
+    # we need to sort by time (handling both start and stop)
+    # and find the number of unique (batch, strata, time) values.
+    batch_strata_start = torch.stack((batch, strata, start), dim=0)
+    batch_strata_stop = torch.stack((batch, strata, stop), dim=0)
+    assert batch_strata_start.shape == (3, I)
+    assert batch_strata_stop.shape == (3, I)
+
+    batch_strata_start_stop = torch.cat(
+        (batch_strata_start, batch_strata_stop), dim=1
+    )
+    assert batch_strata_start_stop.shape == (3, 2 * I)
+
+    # Find the unique (batch, strata, time) values
+    unique_batch_strata_time, inverse_indices = torch.unique(
+        batch_strata_start_stop, sorted=True, return_inverse=True, dim=1
+    )
+    T = unique_batch_strata_time.shape[1]
+    assert unique_batch_strata_time.shape == (3, T)
+    assert T <= 2 * I
+
+    assert inverse_indices.shape == (2 * I,)
+    assert unique_batch_strata_time.shape[1] <= 2 * I
+
+    index_start = inverse_indices[:I]
+    index_stop = inverse_indices[I:]
+
+    return unique_batch_strata_time, index_start, index_stop
+
+
+@typecheck
+def _compute_time_data(
+    *,
+    interval_counts: Int64Tensor["bootstraps intervals"],
+    interval_weights: Float32Tensor["bootstraps intervals"],
+    interval_weighted_scores: Float32Tensor["bootstraps intervals"],
+    index_start: Int64Tensor["intervals"],
+    index_stop: Int64Tensor["intervals"],
+    event: Int64Tensor["intervals"],
+    T: int,
+) -> tuple[
+    Int64Tensor["bootstraps times 2 2"],
+    Float32Tensor["bootstraps times 2 2"],
+    Float32Tensor["bootstraps times 2 2"]
+]:
+    """Aggregates the interval data ("bootstrap" counts, weights, scores) into time data.
+
+    Recall that for each interval (start, stop], we have:
+
+     - an integer count of "bootstrap" occurrences,
+     - a float weight >= 0,
+     - a weighted score that corresponds to log(risk) = log(weight) + dot(beta, x).
+
+    We aggregate these values into a "time-indexed" data table:
+    for every bootstrap b, data for interval (start, stop] is aggregated at locations
+    [b, stop, 0, event] and [b, start, 1, event],
+    where event == 0 if the interval is "censored" and event == 1 if it ends with an event.
+
+    The reduction for counts and weights is a sum,
+    while the reduction for weighted scores is a log-sum-exp.
+
+    For each one of our three "tables" (counts, weights, weighted scores),
+    bootstrap index b and time t, the table values correspond to the following aggregations:
+
+    - table[b, t, 0, 0]: intervals that stop at time t, without an event.
+    - table[b, t, 0, 1]: intervals that stop at time t, with an event.
+    - table[b, t, 1, 0]: intervals that start at time t, without an event.
+    - table[b, t, 1, 1]: intervals that start at time t, with an event.
+
+
+    .. warning::
+
+        With our (start, stop] convention,
+        data for the "stop" time actually happens at time "stop",
+        whereas data for the "start" time actually happens at time "start + epsilon".
+
+        Along the 3rd dimension of the time data table, we thus make sure that
+        the "stop" index is 0 and the "start" index is 1,
+        not the other way around.
+
+        This convention ensures that once we flatten the table as
+        a (B, T * 4) tensor (for a cumsum in the Breslow/Efron implementations),
+        time data is ordered properly.
+
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.coxph_likelihood import _compute_time_data
+
+        interval_counts = torch.tensor([[1, 2, 3], [2, 3, 4]])
+        interval_weights = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        interval_weighted_scores = torch.tensor([[0.01, 0.02, 0.03], [0.04, 0.05, 0.06]])
+        index_start = torch.tensor([0, 1, 2])
+        index_stop = torch.tensor([1, 3, 3])
+        event = torch.tensor([0, 1, 1])
+        T = 4  # Number of unique time points
+
+        time_counts, time_weights, time_weighted_scores = _compute_time_data(
+            interval_counts=interval_counts,
+            interval_weights=interval_weights,
+            interval_weighted_scores=interval_weighted_scores,
+            index_start=index_start,
+            index_stop=index_stop,
+            event=event,
+            T=T,
+        )
+
+        print(time_counts.view(2, -1))
+
+    .. testoutput::
+
+        tensor([[0, 0, 1, 0, 1, 0, 0, 2, 0, 0, 0, 3, 0, 5, 0, 0],
+                [0, 0, 2, 0, 2, 0, 0, 3, 0, 0, 0, 4, 0, 7, 0, 0]])
+
+
+    """
+    B, I = interval_counts.shape
+
+    # index_start and index_stop have values in [0, T-1]
+    assert ((index_start >= 0) & (index_start < T)).all()
+    assert ((index_stop >= 0) & (index_stop < T)).all()
+    assert max(index_start.max(), index_stop.max()) == T - 1
+
+    full_index = torch.cat(
+        (
+            (4 * index_stop + event),
+            (4 * index_start + 2 + event),
+        ),
+        dim=0,
+    )
+    assert full_index.shape == (2 * I,)
+
+    time_counts = group_sum(
+        values=torch.cat((interval_counts,) * 2, dim=1),
+        groups=full_index,
+        output_size=T * 4,
+    ).view(B, T, 2, 2)
+
+    time_weights = group_sum(
+        values=torch.cat((interval_weights,) * 2, dim=1),
+        groups=full_index,
+        output_size=T * 4,
+    ).view(B, T, 2, 2)
+
+    time_weighted_scores = group_logsumexp(
+        values=torch.cat((interval_weighted_scores,) * 2, dim=1),
+        groups=full_index,
+        output_size=T * 4,
+    ).view(B, T, 2, 2)
+
+    return time_counts, time_weights, time_weighted_scores
+
+
+
+
+@typecheck
+def intervals_to_time_data(
+    *,
+    scores: Float32Tensor["bootstraps intervals"],
+    interval_counts: Int64Tensor["bootstraps intervals"],
+    interval_weights: Float32Tensor["bootstraps intervals"],
+    interval_log_weights: Float32Tensor["bootstraps intervals"],
+    batch: Int64Tensor["intervals"],
+    strata: Int64Tensor["intervals"],
+    start: Int64Tensor["intervals"],
+    stop: Int64Tensor["intervals"],
+    event: Int64Tensor["intervals"],
+) -> tuple[
+    Float32Tensor["bootstraps times 2 2"],
+    Int64Tensor["3 times"]
+]:
+    B, I = scores.shape
+
+    unique_batch_strata_time, index_start, index_stop = _compute_unique_batch_strata_time(
+        batch=batch,
+        strata=strata,
+        start=start,
+        stop=stop,
+    )
+    T = unique_batch_strata_time.shape[1]
+    assert unique_batch_strata_time.shape == (3, T)
+    assert index_start.shape == (I,)
+    assert index_stop.shape == (I,)
+
+    # log(r[b,i]) = log(w[b,i]) + dot(beta[b], x[i])
+    interval_weighted_scores = interval_log_weights + scores
+    assert interval_weighted_scores.shape == (B, I)
+
+    time_counts, time_weights, time_weighted_scores = _compute_time_data(
+        interval_counts=interval_counts,
+        interval_weights=interval_weights,
+        interval_weighted_scores=interval_weighted_scores,
+        index_start=index_start,
+        index_stop=index_stop,
+        event=event,
+        T=T,
+    )
+
+    assert time_counts.shape == (B, T, 2, 2)
+    assert time_counts.dtype == torch.int64
+    assert time_weights.shape == (B, T, 2, 2)
+    assert time_weights.dtype == torch.float32
+    assert time_weighted_scores.shape == (B, T, 2, 2)
+    assert time_weighted_scores.dtype == torch.float32
+
+
+
+
+
+
+
 
 
 @typecheck
@@ -167,10 +437,9 @@ def coxph_objective(
     # dead_cluster_indices is (n_death_intervals,), e.g.
     # [0, 0, 1, 2]
 
-    tied_dead_weights = group_reduce(
+    tied_dead_weights = group_sum(
         values=dead_weights,
         groups=dead_cluster_indices,
-        reduction="sum",
         output_size=dataset.n_groups,
     )
     # Equivalent to:
@@ -269,10 +538,9 @@ def coxph_objective(
             * scores.view(B, I)
             * dataset.event.view(1, I)
         )
-        lin = group_reduce(
+        lin = group_sum(
             values=lin,
             groups=dataset.batch_intervals,
-            reduction="sum",
             output_size=dataset.n_batch,
         )
         assert lin.shape == (B, dataset.n_batch)
@@ -480,11 +748,10 @@ def coxph_objective(
 
             # (***) Sum over strata and the death time stop, -----------------------------
             # in parallel for bootstraps and batches:
-            lse = group_reduce(
+            lse = group_sum(
                 values=lse,
                 # "batch" value for each unique (batch, strata, stop) triplet
                 groups=dataset.unique_groups[0],
-                reduction="sum",
                 output_size=dataset.n_batch,
             )
 
