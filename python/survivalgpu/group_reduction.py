@@ -22,37 +22,45 @@ def make_2d(
     return groups
 
 
-# Trying to work around a huge bottleneck in the backward pass
-# because of the use of a deterministic algorithm in
-# the indexing_backward_kernel
-# https://github.com/pytorch/pytorch/issues/41162
-# https://github.com/dmlc/dgl/issues/3729
-#
-# Instead of indexing, we should use the (much faster) operation
-# index_select.
 class SumTorch(torch.autograd.Function):
+    """Custom autograd function to compute the group-wise sum reduction.
+
+    This works around a huge bottleneck in the backward pass because of the use of
+    a deterministic algorithm in the indexing_backward_kernel:
+    https://github.com/pytorch/pytorch/issues/41162
+    https://github.com/dmlc/dgl/issues/3729
+
+    Instead of indexing, we use the (much faster) operation index_select.
+    """
+
     @staticmethod
-    def forward(ctx, values, groups, output_size):
+    @typecheck
+    def forward(
+            ctx,
+            values: Int64Tensor["bootstraps values"] | Float32Tensor["bootstraps values"],
+            groups: Int64Tensor["values"] | Int64Tensor["bootstraps values"],
+            output_size: int,
+        ) -> Int64Tensor["bootstraps output_size"] | Float32Tensor["bootstraps output_size"]:
+        """Forward pass for the group-wise sum reduction."""
+
         ctx.save_for_backward(groups)
         ctx.output_size = output_size
-
-        B, _ = values.shape
-
-        reduced = torch.zeros(
-            values.shape[0], output_size, dtype=values.dtype, device=values.device
-        ).scatter_reduce_(
-            dim=1,
-            index=make_2d(groups=groups, values=values),
-            src=values,
-            reduce="sum",
-            include_self=False,
+        return group_reduce(
+            values=values,
+            groups=groups,
+            reduction="sum_forward_pass",
+            output_size=output_size,
         )
-        assert reduced.shape == (B, output_size)
-        assert reduced.dtype == values.dtype
-        return reduced
+
 
     @staticmethod
-    def backward(ctx, grad_output):
+    @typecheck
+    def backward(
+            ctx,
+            grad_output: Int64Tensor["bootstraps output_size"] | Float32Tensor["bootstraps output_size"],
+        ):
+        """Fast but non-deterministic backward pass for the group-wise sum reduction."""
+
         (groups,) = ctx.saved_tensors
         assert len(groups.shape) == 1, "Backward pass only supports 1D groups."
 
@@ -65,19 +73,44 @@ def group_reduce(
         *,
         values: Int64Tensor["bootstraps values"] | Float32Tensor["bootstraps values"],
         groups: Int64Tensor["values"] | Int64Tensor["bootstraps values"],
-        reduction: Literal["sum", "max"],
+        reduction: Literal["max", "sum", "sum_forward_pass"],
         output_size: int,
     ):
+    """Group-wise reduction of the values tensor.
 
-    B, _ = values.shape
+    This is a wrapper around the torch.scatter_reduce_ function.
+    Cells of the output tensor that do not correspond to a group
+    are set to 0.
 
-    # Compatibility switch for PyTorch.scatter_reduce:
-    if reduction == "max":
-        reduction = "amax"
+    .. testcode::
+
+        import torch
+        from survivalgpu.group_reduction import group_reduce
+
+        reduced = group_reduce(
+            values=torch.tensor([[1, 2, 3], [2, 3, 4]]),
+            groups=torch.tensor([0, 2, 2]),
+            reduction="max",
+            output_size=4,
+        )
+        print(reduced)
+
+    .. testoutput::
+
+        tensor([[1, 0, 3, 0],
+                [2, 0, 4, 0]])
+
+    """
 
     if reduction == "sum":
+        # We need to use a fast but non-deterministic backward pass.
         reduced = SumTorch.apply(values, groups, output_size)
     else:
+        if reduction == "max":
+            reduction = "amax"
+        elif reduction == "sum_forward_pass":
+            reduction = "sum"
+
         reduced = torch.zeros(
             values.shape[0], output_size, dtype=values.dtype, device=values.device
         ).scatter_reduce_(
@@ -88,7 +121,7 @@ def group_reduce(
             include_self=False,
         )
 
-    assert reduced.shape == (B, output_size)
+    assert reduced.shape == (values.shape[0], output_size)
     assert reduced.dtype == values.dtype
     return reduced
 
@@ -148,6 +181,9 @@ def group_logsumexp(
     We apply the log-sum-exp trick (https://en.wikipedia.org/wiki/LogSumExp)
     and rely on scatter/gather operations for fast computations on groups
     that may not have the same sizes.
+
+    Cells of the output tensor that do not correspond to a group
+    are set to -inf.
 
     .. testcode::
         import torch

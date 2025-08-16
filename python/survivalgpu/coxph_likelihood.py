@@ -234,8 +234,8 @@ def _compute_time_data(
         from survivalgpu.coxph_likelihood import _compute_time_data
 
         interval_counts = torch.tensor([[1, 2, 3], [2, 3, 4]])
-        interval_weights = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
-        interval_weighted_scores = torch.tensor([[0.01, 0.02, 0.03], [0.04, 0.05, 0.06]])
+        interval_weights = torch.tensor([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
+        interval_weighted_scores = torch.tensor([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
         index_start = torch.tensor([0, 1, 2])
         index_stop = torch.tensor([1, 3, 3])
         event = torch.tensor([0, 1, 1])
@@ -258,6 +258,26 @@ def _compute_time_data(
         tensor([[0, 0, 1, 0, 1, 0, 0, 2, 0, 0, 0, 3, 0, 5, 0, 0],
                 [0, 0, 2, 0, 2, 0, 0, 3, 0, 0, 0, 4, 0, 7, 0, 0]])
 
+
+    .. testcode::
+
+        print(time_weights.view(2, -1))
+
+    .. testoutput::
+
+        tensor([[0., 0., 1., 0., 1., 0., 0., 2., 0., 0., 0., 3., 0., 5., 0., 0.],
+                [0., 0., 2., 0., 2., 0., 0., 3., 0., 0., 0., 4., 0., 7., 0., 0.]])
+
+    .. testcode::
+
+        print(time_weighted_scores.view(2, -1))
+
+    .. testoutput::
+
+        tensor([[  -inf,   -inf, 1.0000,   -inf, 1.0000,   -inf,   -inf, 2.0000,   -inf,
+                   -inf,   -inf, 3.0000,   -inf, 3.3133,   -inf,   -inf],
+                [  -inf,   -inf, 2.0000,   -inf, 2.0000,   -inf,   -inf, 3.0000,   -inf,
+                   -inf,   -inf, 4.0000,   -inf, 4.3133,   -inf,   -inf]])
 
     """
     B, I = interval_counts.shape
@@ -300,7 +320,7 @@ def _compute_time_data(
 
 
 @typecheck
-def intervals_to_time_data(
+def _intervals_to_time_data(
     *,
     scores: Float32Tensor["bootstraps intervals"],
     interval_counts: Int64Tensor["bootstraps intervals"],
@@ -312,9 +332,75 @@ def intervals_to_time_data(
     stop: Int64Tensor["intervals"],
     event: Int64Tensor["intervals"],
 ) -> tuple[
-    Float32Tensor["bootstraps times 2 2"],
-    Int64Tensor["3 times"]
+    Int64Tensor["bootstraps times 2 2"],  # Counts of intervals at each time
+    Float32Tensor["bootstraps times 2 2"],  # Weights of intervals at each time
+    Float32Tensor["bootstraps times 2 2"],  # Weighted scores at each time
+    Int64Tensor["3 times"],  # Unique (batch, strata, time) values
 ]:
+    """Aggregates interval data into a table indexed by time.
+
+    The format of the output is the same as in _compute_time_data(),
+    plus the unique (batch, strata, time) values.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.coxph_likelihood import _intervals_to_time_data
+
+        time_counts, time_weights, time_weighted_scores, unique_batch_strata_time = (
+            _intervals_to_time_data(
+                scores=torch.tensor([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]]),
+                interval_counts=torch.tensor([[1, 1, 3], [2, 2, 1]]),
+                interval_weights=torch.tensor([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]]),
+                interval_log_weights=torch.tensor(
+                    [[0.0, 0.6931, 1.0986], [0.6931, 1.0986, 1.3863]]
+                ),
+                batch=torch.tensor([0, 0, 0]),
+                strata=torch.tensor([0, 0, 0]),
+                start=torch.tensor([0, 0, 0]),
+                stop=torch.tensor([1, 2, 2]),
+                event=torch.tensor([0, 1, 1]),
+            )
+        )
+
+        print(time_counts.view(2, -1))
+
+    .. testoutput::
+
+        tensor([[0, 0, 1, 4, 1, 0, 0, 0, 0, 4, 0, 0],
+                [0, 0, 2, 3, 2, 0, 0, 0, 0, 3, 0, 0]])
+
+    .. testcode::
+
+        print(time_weights.view(2, -1))
+
+    .. testoutput::
+
+        tensor([[0., 0., 1., 5., 1., 0., 0., 0., 0., 5., 0., 0.],
+                [0., 0., 2., 7., 2., 0., 0., 0., 0., 7., 0., 0.]])
+
+    .. testcode::
+
+        print(time_weighted_scores.view(2, -1))
+
+    .. testoutput::
+
+        tensor([[  -inf,   -inf, 1.0000, 4.3179, 1.0000,   -inf,   -inf,   -inf,   -inf,
+                 4.3179,   -inf,   -inf],
+                [  -inf,   -inf, 2.6931, 5.6300, 2.6931,   -inf,   -inf,   -inf,   -inf,
+                 5.6300,   -inf,   -inf]])
+
+    .. testcode::
+
+        print(unique_batch_strata_time)
+
+    .. testoutput::
+
+        tensor([[0, 0, 0],
+                [0, 0, 0],
+                [0, 1, 2]])
+
+    """
     B, I = scores.shape
 
     unique_batch_strata_time, index_start, index_stop = _compute_unique_batch_strata_time(
@@ -342,12 +428,12 @@ def intervals_to_time_data(
         T=T,
     )
 
-    assert time_counts.shape == (B, T, 2, 2)
-    assert time_counts.dtype == torch.int64
-    assert time_weights.shape == (B, T, 2, 2)
-    assert time_weights.dtype == torch.float32
-    assert time_weighted_scores.shape == (B, T, 2, 2)
-    assert time_weighted_scores.dtype == torch.float32
+    return (
+        time_counts,
+        time_weights,
+        time_weighted_scores,
+        unique_batch_strata_time,
+    )
 
 
 
