@@ -62,3 +62,9 @@ class Float32Tensor:
 
     def __class_getitem__(cls, shape):
         return jxt.Float32[Tensor, shape]
+
+class BoolTensor:
+    """Torch tensor of booleans ("bool")."""
+
+    def __class_getitem__(cls, shape):
+        return jxt.Bool[Tensor, shape]

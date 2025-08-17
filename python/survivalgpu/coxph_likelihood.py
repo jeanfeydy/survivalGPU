@@ -30,10 +30,10 @@ With the Efron convention, the neg-log-likelihood is equal to:
 + Sum_{death times t} (
     (Sum_{dead at t} w[i]) / {number of deaths at t}
     *
-    Sum_{k=1}^{number of deaths at t} (
+    Sum_{k=0}^{number of deaths at t - 1} (
         log(
-            Sum_{survived at t} r[i]
-            +
+            Sum_{observed at t} r[i]
+            -
             (k / {number of deaths at t})
             *
             Sum_{dead at t} r[i]
@@ -83,7 +83,13 @@ import numpy as np
 import torch
 
 from .bootstrap import Resampling
-from .group_reduction import group_logsumexp, group_sum
+from .group_reduction import (
+    group_logsumexp,
+    group_sum,
+    keys_to_segments,
+    logdiffexp,
+    segment_logcumsumexp,
+)
 from .typecheck import Callable, Float32Tensor, Int64Tensor, Literal, typecheck
 
 
@@ -436,7 +442,96 @@ def _intervals_to_time_data(
     )
 
 
+@typecheck
+def _compute_time_log_risks(
+    *,
+    time_weighted_scores: Float32Tensor["bootstraps times 2 2"],
+    unique_batch_strata_time: Int64Tensor["3 times"],
+) -> Float32Tensor["bootstraps times"]:
 
+    B, T, _, _ = time_weighted_scores.shape
+
+    # Reduce over the "no event / event" dimension
+    time_risk_updates = time_weighted_scores.logsumexp(dim=-1)
+    assert time_risk_updates.shape == (B, T, 2)
+
+    # Define summation groups by (batch, strata)
+    batch_strata_segments = keys_to_segments(unique_batch_strata_time[:2])
+    assert batch_strata_segments.shape == (T,)
+
+    # TODO: when T > 10k, we should probably switch to float64 here...
+    if T > 10000:
+        # Raise a warning if T is too large
+        import warnings
+        warnings.warn(
+            "T is larger than 10k, we should implement a float64 backend for numerical stability.",
+            stacklevel=1,
+        )
+
+    # Recall that with our convention, the "stop" index is 0 and the "start" index is 1
+    # along the 3rd dimension of our time data tables.
+    time_risk_set_stop = segment_logcumsumexp(
+        values=time_risk_updates[:, :, 0],
+        segments=batch_strata_segments,
+    )
+    time_risk_set_start = segment_logcumsumexp(
+        values=time_risk_updates[:, :, 1],
+        segments=batch_strata_segments,
+    )
+
+    # At time t, the "weighted risk" over the risk set
+    #    Sum_{observed at t} r[i]
+    # is equal to the difference:
+    #    Sum_{started at time < t} r[i]
+    #  - Sum_{stopped at time < t} r[i]
+    # For the sake of numerical stability, we compute this difference
+    # in the log-domain:
+    time_log_risks = logdiffexp(time_risk_set_start, time_risk_set_stop)
+    assert time_log_risks.shape == (B, T)
+
+    # We shift these log-risks to the right by one time step,
+    # in order to compensate for the "< t" condition above.
+    time_log_risks = torch.cat(
+        (
+            -float("inf") * torch.ones_like(time_log_risks[:, :1]),
+            time_log_risks[:, :-1],
+        ),
+        dim=1,
+    )
+    assert time_log_risks.shape == (B, T)
+
+    # N.B.: This shift fills the first time step of every segment
+    #       with a very small value (theoretically equal to -inf
+    #       since every interval appears once in "start" and once in "stop").
+    #       This is not a problem, since the first time step
+    #       of every segment can only correspond to a "start" time,
+    #       not a "stop" time, and therefore does not contribute
+    #       to the log-sum-exp term of the CoxPH objective.
+
+    return time_log_risks
+
+@typecheck
+def _breslow_efron_logsumexp_term(
+    *,
+    time_counts: Int64Tensor["bootstraps times 2 2"],
+    time_weights: Float32Tensor["bootstraps times 2 2"],
+    time_weighted_scores: Float32Tensor["bootstraps times 2 2"],
+    unique_batch_strata_time: Int64Tensor["3 times"],
+) -> Float32Tensor["bootstraps times"]:
+    """Computes the log-sum-exp term for the Breslow or Efron approximation.
+
+    The format of the input is explained in the docstring of _compute_time_data().
+    """
+
+    B, T, _, _ = time_counts.shape
+
+    time_log_risks =  _compute_time_log_risks(
+        time_weighted_scores=time_weighted_scores,
+        unique_batch_strata_time=unique_batch_strata_time,
+    )
+    assert time_log_risks.shape == (B, T)
+
+    assert time_weights.shape == (B, T, 2, 2)
 
 
 

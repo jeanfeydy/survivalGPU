@@ -1,8 +1,12 @@
 # Use PyTorch for fast array manipulations (on the GPU):
+import numpy as np
 import torch
 
-from .typecheck import Float32Tensor, Int64Tensor, Literal, typecheck
+from .typecheck import BoolTensor, Float32Tensor, Int64Tensor, Literal, typecheck
 
+# ========================================================================================
+#                       "sum" operations over arbitrary groups
+# ========================================================================================
 
 @typecheck
 def make_2d(
@@ -40,7 +44,7 @@ class SumTorch(torch.autograd.Function):
             values: Int64Tensor["bootstraps values"] | Float32Tensor["bootstraps values"],
             groups: Int64Tensor["values"] | Int64Tensor["bootstraps values"],
             output_size: int,
-        ) -> Int64Tensor["bootstraps output_size"] | Float32Tensor["bootstraps output_size"]:
+        ) -> Int64Tensor["bootstraps {output_size}"] | Float32Tensor["bootstraps {output_size}"]:
         """Forward pass for the group-wise sum reduction."""
 
         ctx.save_for_backward(groups)
@@ -75,7 +79,7 @@ def group_reduce(
         groups: Int64Tensor["values"] | Int64Tensor["bootstraps values"],
         reduction: Literal["max", "sum", "sum_forward_pass"],
         output_size: int,
-    ):
+    ) -> Int64Tensor["bootstraps {output_size}"] | Float32Tensor["bootstraps {output_size}"]:
     """Group-wise reduction of the values tensor.
 
     This is a wrapper around the torch.scatter_reduce_ function.
@@ -136,7 +140,7 @@ def group_sum(
         values: Int64Tensor["bootstraps values"] | Float32Tensor["bootstraps values"],
         groups: Int64Tensor["values"] | Int64Tensor["bootstraps values"],
         output_size: int,
-    ) -> Int64Tensor["bootstraps output_size"] | Float32Tensor["bootstraps output_size"]:
+    ) -> Int64Tensor["bootstraps {output_size}"] | Float32Tensor["bootstraps {output_size}"]:
     """Group-wise sum reduction.
 
     This is a wrapper around group_reduce with reduction="sum".
@@ -175,7 +179,7 @@ def group_logsumexp(
         values: Float32Tensor["bootstraps values"],
         groups: Int64Tensor["values"],
         output_size: int,
-    ) -> Float32Tensor["bootstraps output_size"]:
+    ) -> Float32Tensor["bootstraps {output_size}"]:
     """Group-wise, numerically stable log-sum-exp reduction.
 
     We apply the log-sum-exp trick (https://en.wikipedia.org/wiki/LogSumExp)
@@ -233,3 +237,240 @@ def group_logsumexp(
     assert reduced.shape == (B, output_size)
 
     return reduced
+
+
+# ========================================================================================
+#               "cumsum" operations over consecutive groups, i.e. segments
+# ========================================================================================
+
+
+@typecheck
+def log1mexp(
+        x: Float32Tensor["*values"],
+    ) -> Float32Tensor["*values"]:
+    """Numerically accurate evaluation of log(1 - exp(x)) for x <= 0.
+
+    See https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf for details.
+
+    We rely on numerically stable implementations of
+    [x -> log(1+x)] and [x -> exp(x)-1] for x close to 0.
+
+    If -log(2) < x < 0, we use the following identity:
+    log(1 - exp(x)) = log(-(exp(x) - 1))
+
+    If x <= -log(2), we use the following identity:
+    log(1 - exp(x)) = log1p(-exp(x))
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.group_reduction import log1mexp
+
+        # A naive float32 implementation with -0.0000001
+        # would return -15.9424 instead of -16.1181.
+        x = torch.tensor([0.0, -0.0, -0.0000001, -0.1, -0.5, -1.0, -2.0])
+        print(log1mexp(x))
+
+    .. testoutput::
+
+        tensor([    -inf,     -inf, -16.1181,  -2.3522,  -0.9328,  -0.4587,  -0.1454])
+
+    """
+    mask = -np.log(2) < x  # x <= 0
+    return torch.where(
+        mask,
+        (-x.expm1()).log(),
+        (-x.exp()).log1p(),
+    )
+
+
+
+@typecheck
+def logdiffexp(
+    a: Float32Tensor["*values"],
+    b: Float32Tensor["*values"],
+) -> Float32Tensor["*values"]:
+    """Computes the logarithm of the difference of exponentials, i.e. log(exp(a) - exp(b)).
+
+    This is a numerically stable version of log(exp(a) - exp(b)), which is useful
+    when a and b are close to each other.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.group_reduction import logdiffexp
+
+        print(
+            logdiffexp(
+                torch.tensor([1.0, 2.0]),
+                torch.tensor([1.0, 1.5]),
+            )
+        )
+
+    .. testoutput::
+
+        tensor([  -inf, 1.0672])
+
+    """
+    # We use the following identity:
+    # if a > b,
+    # log(e^a - e^b) = log( e^a  * (1 - e^(b-a)))
+    #                = a + log(1 - e^(b-a))
+    if torch.any(a < b):
+        msg = "a must be greater than or equal to b for logdiffexp."
+        raise ValueError(msg)
+
+    return a + log1mexp(b - a)
+
+
+
+@typecheck
+def is_segment(
+    groups: Int64Tensor["values"],
+) -> bool:
+    """Checks if the groups tensor is a segment, i.e. if it contains consecutive integers.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.group_reduction import is_segment
+
+        print(is_segment(torch.tensor([0, 0, 1, 1, 2])))
+
+    .. testoutput::
+
+        True
+
+    .. testcode::
+
+        print(is_segment(torch.tensor([0, 1, 2, 3, 5])))
+
+    .. testoutput::
+
+        False
+
+    """
+    diff = groups[1:] - groups[:-1]
+    return bool(torch.all((diff == 0) | (diff == 1)) and groups[0] == 0)
+
+
+@typecheck
+def last_in_segment(
+    segments: Int64Tensor["values"],
+) -> BoolTensor["values"]:
+    """Returns an indicatrix for the last index in each segment.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.group_reduction import last_in_segment
+
+        print(last_in_segment(torch.tensor([0, 0, 0, 1, 1, 2, 3])))
+
+    .. testoutput::
+
+        tensor([False, False,  True, False,  True,  True,  True])
+
+    """
+    assert is_segment(segments), "Segments must be consecutive integers starting from 0."
+    diff = segments[1:] != segments[:-1]
+    return torch.cat(
+        (diff, torch.tensor([True], device=segments.device)),
+        dim=0,
+    )
+
+
+@typecheck
+def keys_to_segments(
+    keys: Int64Tensor["dimensions values"],
+) -> Int64Tensor["values"]:
+    """Converts a 2D tensor of keys into a vector of consecutive group labels.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.group_reduction import keys_to_segments
+
+        print(
+            keys_to_segments(
+                torch.tensor(
+                    [
+                        [0, 0, 0, 0, 1, 1, 1],
+                        [0, 0, 1, 2, 0, 0, 0],
+                    ]
+                )
+            )
+        )
+
+    .. testoutput::
+
+        tensor([0, 0, 1, 2, 3, 3, 3])
+
+    """
+    _, segments = torch.unique_consecutive(
+        keys, return_inverse=True, dim=1
+    )
+    assert is_segment(segments)
+    return segments
+
+
+@typecheck
+def segment_logcumsumexp(
+    *,
+    values: Float32Tensor["bootstraps values"],
+    segments: Int64Tensor["values"],
+) -> Float32Tensor["bootstraps values"]:
+    """Computes the cumulative sum of exponentials over segments, i.e. groups of consecutive indices.
+
+    This is a numerically stable version of the cumulative sum of exponentials.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.group_reduction import segment_logcumsumexp
+
+        print(
+            segment_logcumsumexp(
+                values=torch.tensor([[1.0, 2.0, 3.0, 4.0]]),
+                segments=torch.tensor([0, 0, 1, 1]),
+            )
+        )
+
+    .. testoutput::
+
+        tensor([[1.0000, 2.3133, 3.0000, 4.3133]])
+
+    """
+    B, V = values.shape
+    S = segments[-1] + 1
+    assert is_segment(segments), "Segments must be consecutive integers starting from 0."
+    full_logcumsumexp = torch.logcumsumexp(values, dim=1)
+    assert full_logcumsumexp.shape == (B, V)
+
+    offset_indices = last_in_segment(segments)
+    assert offset_indices.shape == (V,)
+    assert offset_indices.sum() == S
+
+    offsets = full_logcumsumexp[:, offset_indices]
+    assert offsets.shape == (B, S)
+
+    # At this stage, offsets[s] corresponds to the "cumsum"
+    # over segment s.
+    # We "shift" these offsets to the right by one position,
+    # so that offsets[s] corresponds to the "cumsum" over segment s-1
+    # (and offsets[0] is -inf, i.e. a cumsum of exp(-inf) = 0).
+    offsets = torch.cat(
+        (
+            -float("inf") * torch.ones_like(offsets[:, :1]),
+            offsets[:, :-1],
+        ),
+        dim=1,
+    )
+    assert offsets.shape == (B, S)
+
+    offsets_expanded = torch.index_select(offsets, 1, segments)
+    assert offsets_expanded.shape == (B, V)
+
+    result = logdiffexp(full_logcumsumexp, offsets_expanded)
+    assert result.shape == (B, V)
+    return result
