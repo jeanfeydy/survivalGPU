@@ -320,7 +320,13 @@ def logdiffexp(
         msg = "a must be greater than or equal to b for logdiffexp."
         raise ValueError(msg)
 
-    return a + log1mexp(b - a)
+    # We must take care of the case where a == -inf == b,
+    # which would lead to a NaN result.
+    return torch.where(
+        a == b,
+        torch.tensor(float("-inf"), dtype=a.dtype, device=a.device),
+        a + log1mexp(b - a),
+    )
 
 
 
@@ -431,14 +437,14 @@ def segment_logcumsumexp(
 
         print(
             segment_logcumsumexp(
-                values=torch.tensor([[1.0, 2.0, 3.0, 4.0]]),
-                segments=torch.tensor([0, 0, 1, 1]),
+                values=torch.tensor([[-float("inf"), 1.0, 2.0, 3.0, 4.0]]),
+                segments=torch.tensor([0, 0, 0, 1, 1]),
             )
         )
 
     .. testoutput::
 
-        tensor([[1.0000, 2.3133, 3.0000, 4.3133]])
+        tensor([[  -inf, 1.0000, 2.3133, 3.0000, 4.3133]])
 
     """
     B, V = values.shape

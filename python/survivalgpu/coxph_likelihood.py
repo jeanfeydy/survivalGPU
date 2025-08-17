@@ -448,6 +448,69 @@ def _compute_time_log_risks(
     time_weighted_scores: Float32Tensor["bootstraps times 2 2"],
     unique_batch_strata_time: Int64Tensor["3 times"],
 ) -> Float32Tensor["bootstraps times"]:
+    """Computes the log-risk over the full risk set of observed patients at each time point.
+
+    .. warning::
+
+        Currently, this is float32-based, which may lead to numerical errors
+        when the number of time points T is very large (e.g. T > 10k).
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.coxph_likelihood import _compute_time_log_risks
+
+        # First "bootstrap" corresponds to:
+        #  - one interval (0, 1] with a score of 1 and no event,
+        #  - one interval (0, 2] with a score of 2 and an event.
+        # We expect the log-risks to be:
+        #  - at time 0: -inf (no risk set),
+        #  - at time 1: log(e^1 + e^2) = 2.3133
+        #  - at time 2: log(e^2) = 2.0000
+        #
+        # Second "bootstrap" corresponds to:
+        #  - one interval (0, 2] with a score of 1 and no event,
+        #  - one interval (1, 2] with a score of 3 and an event.
+        # We expect the log-risks to be:
+        #  - at time 0: -inf (no risk set),
+        #  - at time 1: log(e^1) = 1.0000
+        #  - at time 2: log(e^1 + e^3) = 3.1269
+        #
+        # We also add an empty strata at the end.
+
+        z = -float("inf")
+        time_log_risks = _compute_time_log_risks(
+            time_weighted_scores=torch.tensor(
+                [
+                    [
+                        [[z, z], [1.0, 2.0]],
+                        [[1.0, z], [z, z]],
+                        [[z, 2.0], [z, z]],
+                        [[z, z], [z, z]],
+                    ],
+                    [
+                        [[z, z], [1.0, z]],
+                        [[z, z], [z, 3.0]],
+                        [[1.0, 3.0], [z, z]],
+                        [[z, z], [z, z]],
+                    ],
+                ]
+            ),
+            unique_batch_strata_time=torch.tensor(
+                [
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 1],
+                    [0, 1, 2, 4],
+                ]
+            ),
+        )
+        print(time_log_risks)
+
+    .. testoutput::
+
+        tensor([[  -inf, 2.3133, 2.0000,   -inf],
+                [  -inf, 1.0000, 3.1269,   -inf]])
+    """
 
     B, T, _, _ = time_weighted_scores.shape
 
@@ -509,6 +572,7 @@ def _compute_time_log_risks(
     #       to the log-sum-exp term of the CoxPH objective.
 
     return time_log_risks
+
 
 @typecheck
 def _breslow_efron_logsumexp_term(
