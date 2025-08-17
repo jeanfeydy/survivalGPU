@@ -361,6 +361,32 @@ def is_segment(
 
 
 @typecheck
+def first_in_segment(
+    segments: Int64Tensor["values"],
+) -> BoolTensor["values"]:
+    """Returns an indicatrix for the first index in each segment.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.group_reduction import first_in_segment
+
+        print(first_in_segment(torch.tensor([0, 0, 0, 1, 1, 2, 3])))
+
+    .. testoutput::
+
+        tensor([ True, False, False,  True, False,  True,  True])
+
+    """
+    assert is_segment(segments), "Segments must be consecutive integers starting from 0."
+    diff = segments[1:] != segments[:-1]
+    return torch.cat(
+        (torch.tensor([True], device=segments.device), diff),
+        dim=0,
+    )
+
+
+@typecheck
 def last_in_segment(
     segments: Int64Tensor["values"],
 ) -> BoolTensor["values"]:

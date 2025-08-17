@@ -84,6 +84,7 @@ import torch
 
 from .bootstrap import Resampling
 from .group_reduction import (
+    first_in_segment,
     group_logsumexp,
     group_sum,
     keys_to_segments,
@@ -581,10 +582,72 @@ def _breslow_efron_logsumexp_term(
     time_weights: Float32Tensor["bootstraps times 2 2"],
     time_weighted_scores: Float32Tensor["bootstraps times 2 2"],
     unique_batch_strata_time: Int64Tensor["3 times"],
-) -> Float32Tensor["bootstraps times"]:
+    ties: Literal["efron", "breslow"],
+    n_batches: int,
+) -> Float32Tensor["bootstraps {n_batches}"]:
     """Computes the log-sum-exp term for the Breslow or Efron approximation.
 
     The format of the input is explained in the docstring of _compute_time_data().
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.coxph_likelihood import _breslow_efron_logsumexp_term
+
+        # Very simple example with just two times, 0 and 1.
+        unique_batch_strata_time = torch.tensor(
+            [
+                [0, 0],
+                [0, 0],
+                [0, 1],
+            ]
+        )
+        # Bootstrap 1 has:
+        # - 1 interval (0, 1] that is censored with a weighted score of 2,
+        # - 1 interval (0, 1] that is an event with a weighted score of 3.
+        # Bootstrap 2 has:
+        # - 3 intervals (0, 1] that are censored with a weighted score of 1,
+        # - 2 intervals (0, 1] that correspond to an event with a weighted score of 0.
+        time_counts = torch.tensor(
+            [
+                [[[0, 0], [1, 1]], [[1, 1], [0, 0]]],
+                [[[0, 0], [3, 2]], [[3, 2], [0, 0]]],
+            ]
+        )
+        time_weights = torch.tensor(
+            [
+                [[[0.0, 0.0], [1.0, 1.0]], [[1.0, 1.0], [0.0, 0.0]]],
+                [[[0.0, 0.0], [3.0, 2.0]], [[3.0, 2.0], [0.0, 0.0]]],
+            ]
+        )
+        z = -float("inf")
+        time_weighted_scores = torch.tensor(
+            [
+                [[[z, z], [2.0, 3.0]], [[2.0, 3.0], [z, z]]],
+                [[[z, z], [1.0, 0.0]], [[1.0, 0.0], [z, z]]],
+            ]
+        )
+
+        # The contribution at time 0 is 0, since there are no deaths at that time.
+        # At time 1, with the Breslow approximation for ties, we expect:
+        # - for bootstrap 1, 1 * log(exp(2) + exp(3)) = 3.3133
+        # - for bootstrap 2, 2 * log(exp(1) + exp(0)) = 2.6265
+        print(
+            _breslow_efron_logsumexp_term(
+                time_counts=time_counts,
+                time_weights=time_weights,
+                time_weighted_scores=time_weighted_scores,
+                unique_batch_strata_time=unique_batch_strata_time,
+                ties="breslow",
+                n_batches=1,
+            )
+        )
+
+    .. testoutput::
+
+        tensor([[3.3133],
+                [2.6265]])
+
     """
 
     B, T, _, _ = time_counts.shape
@@ -595,8 +658,83 @@ def _breslow_efron_logsumexp_term(
     )
     assert time_log_risks.shape == (B, T)
 
-    assert time_weights.shape == (B, T, 2, 2)
+    # Summation groups by (batch, strata)
+    segments = keys_to_segments(unique_batch_strata_time[:2])
+    assert segments.shape == (T,)
 
+    # In every segment, the very first time should be a "start", not a "stop".
+    # We make sure that the corresponding weight is 0.
+    first_in_segment_mask = first_in_segment(segments)
+    assert first_in_segment_mask.shape == (T,)
+
+    # Recall that with our convention, the "stop" index is 0 and the "start" index is 1
+    # along the 3rd dimension of our time data tables.
+    assert (time_weights[:, first_in_segment_mask, 0, :] == 0.).all()
+
+    # The weight factor is usually equal to the number of dead samples at each time,
+    # but we use time_weights instead of time_counts to handle
+    # cases were the user provided varying weights for each patient.
+
+    # Compute the factor "(Sum_{dead at t} w[i])"
+    # 0 on 3rd dimension corresponds to "stop" time,
+    # 1 on 4th dimension corresponds to "event".
+    dead_weights = time_weights[:, :, 0, 1]
+    assert dead_weights.shape == (B, T)
+
+    if ties == "breslow":
+        # The Breslow approximation is straightforward:
+        # we sum the log-risks over the risk set at each time,
+        # weighted by cumulative weight of intervals that stop at that time.
+
+        # Recall that we are computing:
+        # + Sum_{death times t} (
+        #     (Sum_{dead at t} w[i])
+        #     *
+        #     log( Sum_{observed at t} r[i] )
+        #   )
+        time_contributions = dead_weights * time_log_risks
+
+        # When dead_weights == 0, the contribution is 0, even if time_log_risks is -inf.
+        # If we don't mask things out, we would end up with -inf * 0 == NaN.
+        time_contributions = torch.where(
+            dead_weights != 0,
+            time_contributions,
+            torch.zeros_like(time_contributions),
+        )
+        assert time_contributions.shape == (B, T)
+
+        # We sum batch-wise over the time contributions:
+        logsumexp_term = group_sum(
+            values=time_contributions,
+            groups=unique_batch_strata_time[0],
+            output_size=n_batches,
+        )
+
+    elif ties == "efron":
+        # The Efron approximation is more complex:
+        # we sum the log-risks over the risk set at each time,
+        # weighted by cumulative weight of intervals that stop at that time,
+        # divided by the number of deaths at that time.
+
+        # Recall that we are computing:
+        # + Sum_{death times t} (
+        #     (Sum_{dead at t} w[i]) / {number of deaths at t}
+        #     *
+        #     Sum_{k=0}^{number of deaths at t - 1} (
+        #         log(
+        #             Sum_{observed at t} r[i]
+        #             -
+        #             (k / {number of deaths at t})
+        #             *
+        #             Sum_{dead at t} r[i]
+        #         )
+        #     )
+        #   )
+
+        msg = "Very soon!"
+        raise NotImplementedError(msg)
+
+    return logsumexp_term
 
 
 
