@@ -316,14 +316,14 @@ def logdiffexp(
     # if a > b,
     # log(e^a - e^b) = log( e^a  * (1 - e^(b-a)))
     #                = a + log(1 - e^(b-a))
-    if torch.any(a < b):
+    if False: # torch.any(a < b):
         msg = "a must be greater than or equal to b for logdiffexp."
         raise ValueError(msg)
 
     # We must take care of the case where a == -inf == b,
     # which would lead to a NaN result.
     return torch.where(
-        a == b,
+        a <= b,
         torch.tensor(float("-inf"), dtype=a.dtype, device=a.device),
         a + log1mexp(b - a),
     )

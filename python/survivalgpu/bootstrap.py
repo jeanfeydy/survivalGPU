@@ -82,23 +82,27 @@ class Resampling:
         P = int(patient.max() + 1)
         I = patient.shape[0]
 
-        # Step 1: compute the patient weights --------------------------------------------
+        # Step 1: compute the patient weights and counts  --------------------------------
         # Compute the numbers of occurrences of each patient index in the
         # rows of bootstrap_indices:
-        sample_weights = torch.ones(B, S, dtype=torch.float32, device=indices.device)
+        sample_counts = torch.ones(B, S, dtype=torch.int64, device=indices.device)
 
         # sample_weights is (B, S),
         # indices is (B, S) with values in [0, P-1]
         # -> patient weights is (B, P)
-        self.patient_weights = group_sum(
-            values=sample_weights,
+        self.patient_counts = group_sum(
+            values=sample_counts,
             groups=indices,
             output_size=P,
-        ).to(
-            device=indices.device,
-            dtype=torch.float32,
         )
+        assert self.patient_counts.shape == (B, P)
+        assert self.patient_counts.dtype == torch.int64
+        assert self.patient_counts.device == indices.device
+
+        # TODO: handle user-defined patient weights
+        self.patient_weights = self.patient_counts.float()
         assert self.patient_weights.shape == (B, P)
+        assert self.patient_weights.dtype == torch.float32
         # Equivalent to:
         # self.patient_weights
         # = torch.stack([torch.bincount(b_ind, minlength=P) for b_ind in indices])
@@ -115,11 +119,12 @@ class Resampling:
         # [[ 0, 0, 0,  0,   0,   0, 0,    0,  0, 0],
         #  [.7, 0, 0, .7,-inf,-inf, 0, -inf, .7, 0]]
 
-
         # Step 2: compute the interval weights -------------------------------------------
+        self.interval_counts = self.patient_counts[:, patient]
         self.interval_weights = self.patient_weights[:, patient]
         self.interval_log_weights = stable_log(self.interval_weights)
 
+        assert self.interval_counts.shape == (B, I)
         assert self.interval_weights.shape == (B, I)
         assert self.interval_log_weights.shape == (B, I)
 

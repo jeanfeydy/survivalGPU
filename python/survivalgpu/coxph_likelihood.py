@@ -580,6 +580,7 @@ def _compute_efron_data(
     event_counts: Int64Tensor["bootstraps times"],
 ) -> tuple[
     Int64Tensor["events"],  # indices in [0, B*T)
+    Int64Tensor["events"],  # bootstraps in [0, B)
     Int64Tensor["events"],  # event_counts
     Float32Tensor["events"],  # log_offsets, i.e. log(k / {number of deaths at t})
 ]:
@@ -590,8 +591,8 @@ def _compute_efron_data(
         import torch
         from survivalgpu.coxph_likelihood import _compute_efron_data
 
-        efron_indices, efron_event_counts, efron_log_offsets = _compute_efron_data(
-            torch.tensor([[0, 1, 2], [3, 0, 2]])
+        efron_indices, efron_bootstraps, efron_event_counts, efron_log_offsets = (
+            _compute_efron_data(torch.tensor([[0, 1, 2], [3, 0, 2]]))
         )
 
         print(efron_indices)
@@ -599,6 +600,14 @@ def _compute_efron_data(
     .. testoutput::
 
         tensor([1, 2, 2, 3, 3, 3, 5, 5])
+
+    .. testcode::
+
+        print(efron_bootstraps)
+
+    .. testoutput::
+
+        tensor([0, 0, 0, 1, 1, 1, 1, 1])
 
     .. testcode::
 
@@ -623,6 +632,15 @@ def _compute_efron_data(
     assert efron_indices.shape == (E,)
     assert efron_indices.dtype == torch.int64
 
+    B, T = event_counts.shape
+    assert B > 0
+    assert T > 0
+    efron_bootstraps = efron_indices // T
+    assert efron_bootstraps.shape == (E,)
+    assert efron_bootstraps.dtype == torch.int64
+    assert (efron_bootstraps >= 0).all()
+    assert (efron_bootstraps < B).all()
+
     efron_event_counts = torch.index_select(
         event_counts.view(-1),  # Flatten the event_counts tensor
         dim=0,
@@ -638,7 +656,7 @@ def _compute_efron_data(
     assert efron_log_offsets.shape == (E,)
     assert efron_log_offsets.dtype == torch.float32
 
-    return efron_indices, efron_event_counts, efron_log_offsets
+    return efron_indices, efron_bootstraps, efron_event_counts, efron_log_offsets
 
 
 
@@ -840,7 +858,7 @@ def _breslow_efron_logsumexp_term(
 
         # We use repeat_interleave to re-index our dataset.
         # E is the total number of deaths on the full table.
-        efron_indices, efron_event_counts, efron_log_offsets = _compute_efron_data(event_counts)
+        efron_indices, efron_bootstraps, efron_event_counts, efron_log_offsets = _compute_efron_data(event_counts)
         E = len(efron_indices)
         assert event_counts.sum().item() == E
         # No-death times should not be present in efron_indices:
@@ -940,7 +958,7 @@ def _breslow_efron_logsumexp_term(
         assert efron_batch.dtype == torch.int64
 
         # We must add an offset to prevent mixing bootstraps with each other
-        efron_batch = efron_batch + n_batches * (efron_indices // B)
+        efron_batch = efron_batch + n_batches * efron_bootstraps
         assert efron_batch.shape == (E,)
         assert efron_batch.dtype == torch.int64
 
@@ -953,11 +971,289 @@ def _breslow_efron_logsumexp_term(
     return logsumexp_term
 
 
+@typecheck
+def _linear_term(
+    *,
+    scores: Float32Tensor["bootstraps intervals"],
+    interval_weights: Float32Tensor["bootstraps intervals"],
+    event: Int64Tensor["intervals"],
+    batch: Int64Tensor["intervals"],
+    n_batches: int,
+) -> Float32Tensor["bootstraps batches"]:
+    """Computes the term "Sum_{all dead samples} w[i] * dot(x[i], b)"
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.coxph_likelihood import _linear_term
+
+        print(
+            _linear_term(
+                scores=torch.tensor(
+                    [
+                        [1.0, 2.0, 3.0, 4.0],
+                        [2.0, 3.0, 4.0, 5.0],
+                    ]
+                ),
+                interval_weights=torch.tensor(
+                    [
+                        [1.0, 2.0, 2.0, 1.0],
+                        [2.0, 1.0, 3.0, 2.0],
+                    ]
+                ),
+                event=torch.tensor([0, 1, 1, 1]),
+                batch=torch.tensor([0, 0, 0, 1]),
+                n_batches=2,
+            )
+        )
+
+    .. testoutput::
+
+        tensor([[10.,  4.],
+                [15., 10.]])
+
+
+    """
+
+    B, I = scores.shape
+    weighted_scores = interval_weights * scores * event.float().view(1, I)
+    assert weighted_scores.shape == (B, I)
+    assert weighted_scores.dtype == torch.float32
+
+    linear_term = group_sum(
+        values=weighted_scores,
+        groups=batch,
+        output_size=n_batches,
+    )
+    assert linear_term.shape == (B, n_batches)
+    assert linear_term.dtype == torch.float32
+    return linear_term
 
 
 
 @typecheck
 def coxph_objective(
+    *,
+    dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
+    ties: Literal["efron", "breslow"],
+    bootstrap: Resampling,
+    mode: Literal["unit length", "start zero", "any"] = "any",
+) -> Callable[[Float32Tensor["bootstraps intervals"]], Float32Tensor["bootstraps_x_batches"]]:
+    """Implements the CoxPH objective.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.coxph_likelihood import coxph_objective
+        from survivalgpu.torch_datasets import TorchSurvivalDataset
+        from survivalgpu.bootstrap import Resampling
+
+        # Example dataset with:
+        # - 3 patients that die in the first strata of batch 0
+        # - 2 patients that die in the second strata of batch 0
+        # - 1 patient that dies + 1 that is censored in the first strata of batch 1
+        dataset = TorchSurvivalDataset(
+            patient=torch.tensor([0, 1, 2, 3, 4, 5, 6]),
+            batch=torch.tensor([0, 0, 0, 0, 0, 1, 1]),
+            strata=torch.tensor([0, 0, 0, 1, 1, 0, 0]),
+            start=torch.tensor([0, 0, 0, 0, 0, 0, 0]),
+            stop=torch.tensor([1, 1, 1, 1, 1, 1, 1]),
+            event=torch.tensor([1, 1, 1, 1, 1, 0, 1]),
+            # Note that the covariates are not used directly in this objective function,
+            # but only via the scores that come later in this example.
+            covariates=torch.zeros(7, 2, dtype=torch.float32),
+        ).sort()
+
+        print(dataset.patient)
+
+    .. testoutput::
+
+        tensor([0, 1, 2, 3, 4, 5, 6])
+
+    .. testcode::
+
+        bootstrap = Resampling(
+            indices=torch.tensor(
+                [
+                    [0, 1, 2, 3, 4, 5, 6],  # All patients
+                    [0, 0, 0, 0, 0, 5, 5],  # Just the first patient in each batch
+                ]
+            ),
+            patient=dataset.patient,
+        )
+
+        scores = torch.tensor(
+            [
+                [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],  # Scores for bootstrap 1
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],  # Scores for bootstrap 2
+            ]
+        )
+
+        negloglikelihood = coxph_objective(
+            dataset=dataset,
+            bootstrap=bootstrap,
+            ties="breslow",
+        )
+
+        # With the Breslow approximation, for the first bootstrap, we expect:
+        #
+        # 1. For the linear term:
+        #    a. (s[0] + s[1] + s[2] + s[3] + s[4]) = 10 for batch 0,
+        #    b. (s[6]) = 6 for batch 1.
+        #
+        # 2. For the log-sum-exp term:
+        #    a. For the first strata of batch 0:
+        #       3 * lse(s[0], s[1], s[2]) = 7.2228
+        #    b. For the second strata of batch 0:
+        #       2 * lse(s[3], s[4]) = 8.6265
+        #    c. For the first strata of batch 1:
+        #       1 * lse(s[5], s[6]) = 6.3133
+        #
+        # So, overall:
+        #    a. 7.2228 + 8.6265 - 10 = 5.8493 for batch 0,
+        #    b. 6.3133 - 6 = 0.3133 for batch 1.
+        #
+        # For the second bootstrap, we expect:
+        #
+        # 1. For the linear term:
+        #    a. 5 * s[0] = 5 for batch 0,
+        #    b. 0 since no event occurs for batch 1
+        #
+        # 2. For the log-sum-exp term:
+        #    a. For the first strata of batch 0:
+        #       5 * log(exp(s[0]) * 5) = 13.0472
+        #    b. For the first strata of batch 1:
+        #       0 since no event occurs.
+        #
+        # So, overall:
+        #    a. 13.0472 - 5 = 8.0472 for batch 0,
+        #    b. 13.3863 - 12 = 1.3863 for batch 1.
+
+        print(negloglikelihood(scores))
+
+    .. testoutput::
+
+        tensor([5.8493, 0.3133, 8.0472, 0.0000])
+
+    .. testcode::
+
+        negloglikelihood = coxph_objective(
+            dataset=dataset,
+            bootstrap=bootstrap,
+            ties="efron",
+        )
+
+        # With the Efron approximation, linear terms remain the same,
+        # but log-sum-exp terms change slightly.
+        #
+        # For the first bootstrap, we expect:
+        #    a. For the first strata of batch 0:
+        #       (3 / 3) * (
+        #             lse(s[0], s[1], s[2])
+        #           + lse(s[0], s[1], s[2]) + log(2 / 3)
+        #           + lse(s[0], s[1], s[2]) + log(1 / 3)
+        #       ) = 5.7187
+        #    b. For the second strata of batch 0:
+        #       (2 / 2) * (
+        #             lse(s[3], s[4])
+        #           + lse(s[3], s[4]) + log(1 / 2)
+        #       ) = 7.9334
+        #    c. For the first strata of batch 1:
+        #       (1 / 1) * lse(s[5], s[6]) = 6.3133
+        #
+        # So, overall:
+        #    a. 5.7187 + 7.9334 - 10 = 3.6521 for batch 0,
+        #    b. 6.3133 - 6 = 0.3133 for batch 1.
+        #
+        # For the second bootstrap, we expect:
+        #    a. For the first strata of batch 0:
+        #       (5 / 5) * (
+        #             lse(s[0], s[0], s[0], s[0], s[0])
+        #           + lse(s[0], s[0], s[0], s[0], s[0]) + log(1 / 5)
+        #           + lse(s[0], s[0], s[0], s[0], s[0]) + log(2 / 5)
+        #           + lse(s[0], s[0], s[0], s[0], s[0]) + log(3 / 5)
+        #           + lse(s[0], s[0], s[0], s[0], s[0]) + log(4 / 5)
+        #       ) = 9.7875
+        #    b. For the first strata of batch 1:
+        #       0 since no event occurs.
+        # So, overall:
+        #    a. 9.7875 - 5 = 4.7875 for batch 0,
+        #    b. 0 - 0 = 0 for batch 1.
+
+        print(negloglikelihood(scores))
+
+    .. testoutput::
+
+        tensor([3.6521, 0.3133, 4.7875, 0.0000])
+
+    """
+
+    B = len(bootstrap)  # Number of bootstraps to process in parallel
+    assert mode in ("unit length", "start zero", "any")
+
+    if not dataset.is_sorted:
+        msg = "The dataset must be sorted by (batch, strata, start, stop)."
+        raise ValueError(msg)
+
+    @typecheck
+    def negloglikelihood(
+        scores: Float32Tensor["bootstraps intervals"],
+    ) -> Float32Tensor["bootstraps_x_batches"]:
+        """The CoxPH neg-log-likelihood that we try to minimize.
+
+        This function takes as input a batch of score values scores[i, j],
+        each of whom corresponds to the risk score of the j-th interval
+        according to the i-th estimate of the model parameters.
+
+        For linear scores "dot(beta[i], x[j])", this corresponds to
+        scores = beta @ x.T, (B,D) @ (D,I) = (B,I)
+
+        """
+
+        # Compute the linear term of the CoxPH objective
+        linear_term = _linear_term(
+            scores=scores,
+            interval_weights=bootstrap.interval_weights,
+            event=dataset.event,
+            batch=dataset.batch_intervals,
+            n_batches=dataset.n_batch,
+        )
+        assert linear_term.shape == (B, dataset.n_batch)
+
+        # Aggregate the scores into time-indexed data tables
+        time_counts, time_weights, time_weighted_scores, unique_batch_strata_time = (
+            _intervals_to_time_data(
+                scores=scores,
+                interval_counts=bootstrap.interval_counts,
+                interval_weights=bootstrap.interval_weights,
+                interval_log_weights=bootstrap.interval_log_weights,
+                batch=dataset.batch_intervals,
+                strata=dataset.strata_intervals,
+                start=dataset.start,
+                stop=dataset.stop,
+                event=dataset.event,
+            )
+        )
+
+        # Compute the log-sum-exp term for the Breslow or Efron approximation
+        logsumexp_term = _breslow_efron_logsumexp_term(
+            time_counts=time_counts,
+            time_weights=time_weights,
+            time_weighted_scores=time_weighted_scores,
+            unique_batch_strata_time=unique_batch_strata_time,
+            ties=ties,
+            n_batches=dataset.n_batch,
+        )
+        assert logsumexp_term.shape == (B, dataset.n_batch)
+
+        return (logsumexp_term - linear_term).view(B * dataset.n_batch)
+
+    return negloglikelihood
+
+
+
+@typecheck
+def old_coxph_objective(
     *,
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
