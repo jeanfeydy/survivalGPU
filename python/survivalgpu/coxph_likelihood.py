@@ -89,6 +89,7 @@ from .group_reduction import (
     group_sum,
     keys_to_segments,
     logdiffexp,
+    rank_in_segment,
     segment_logcumsumexp,
 )
 from .typecheck import Callable, Float32Tensor, Int64Tensor, Literal, typecheck
@@ -574,6 +575,72 @@ def _compute_time_log_risks(
 
     return time_log_risks
 
+@typecheck
+def _compute_efron_data(
+    event_counts: Int64Tensor["bootstraps times"],
+) -> tuple[
+    Int64Tensor["events"],  # indices in [0, B*T)
+    Int64Tensor["events"],  # event_counts
+    Float32Tensor["events"],  # log_offsets, i.e. log(k / {number of deaths at t})
+]:
+    """Computes the information required to re-index our time tables for Efron summation.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.coxph_likelihood import _compute_efron_data
+
+        efron_indices, efron_event_counts, efron_log_offsets = _compute_efron_data(
+            torch.tensor([[0, 1, 2], [3, 0, 2]])
+        )
+
+        print(efron_indices)
+
+    .. testoutput::
+
+        tensor([1, 2, 2, 3, 3, 3, 5, 5])
+
+    .. testcode::
+
+        print(efron_event_counts)
+
+    .. testoutput::
+
+        tensor([1, 2, 2, 3, 3, 3, 2, 2])
+
+    .. testcode::
+
+        print(efron_log_offsets)
+
+    .. testoutput::
+
+        tensor([   -inf,    -inf, -0.6931,    -inf, -1.0986, -0.4055,    -inf, -0.6931])
+
+    """
+    efron_indices = torch.repeat_interleave(event_counts.view(-1))
+    E = len(efron_indices)
+    assert event_counts.sum().item() == E
+    assert efron_indices.shape == (E,)
+    assert efron_indices.dtype == torch.int64
+
+    efron_event_counts = torch.index_select(
+        event_counts.view(-1),  # Flatten the event_counts tensor
+        dim=0,
+        index=efron_indices,
+    )
+    assert efron_event_counts.shape == (E,)
+    assert efron_event_counts.dtype == torch.int64
+    assert (efron_event_counts > 0).all()
+
+    efron_log_offsets = torch.log(
+        rank_in_segment(efron_indices) / efron_event_counts.float()
+    )
+    assert efron_log_offsets.shape == (E,)
+    assert efron_log_offsets.dtype == torch.float32
+
+    return efron_indices, efron_event_counts, efron_log_offsets
+
+
 
 @typecheck
 def _breslow_efron_logsumexp_term(
@@ -648,10 +715,35 @@ def _breslow_efron_logsumexp_term(
         tensor([[3.3133],
                 [2.6265]])
 
+    .. testcode::
+
+        # With the Efron approximation, we expect:
+        # - for bootstrap 1, 1 * log(exp(2) + exp(3) - (0 / 1) * exp(3)) = 3.3133
+        # - for bootstrap 2, 2 / 2 * [
+        #       log(exp(1) + exp(0) - (0 / 2) * exp(0))
+        #     + log(exp(1) + exp(0) - (1 / 2) * exp(0))
+        #     ] = 2.4821
+        print(
+            _breslow_efron_logsumexp_term(
+                time_counts=time_counts,
+                time_weights=time_weights,
+                time_weighted_scores=time_weighted_scores,
+                unique_batch_strata_time=unique_batch_strata_time,
+                ties="efron",
+                n_batches=1,
+            )
+        )
+
+    .. testoutput::
+
+        tensor([[3.3133],
+                [2.4821]])
+
     """
 
     B, T, _, _ = time_counts.shape
 
+    # Compute "log( Sum_{observed at t} r[i] )"
     time_log_risks =  _compute_time_log_risks(
         time_weighted_scores=time_weighted_scores,
         unique_batch_strata_time=unique_batch_strata_time,
@@ -731,8 +823,132 @@ def _breslow_efron_logsumexp_term(
         #     )
         #   )
 
-        msg = "Very soon!"
-        raise NotImplementedError(msg)
+        # Extract the "number of deaths at t" from our table:
+        # 0 on the 3rd dimension corresponds to "stop" time,
+        # 1 on the 4th dimension corresponds to "event".
+        event_counts = time_counts[:, :, 0, 1]
+        assert event_counts.shape == (B, T)
+        assert event_counts.dtype == torch.int64
+        assert (event_counts >= 0).all()
+
+        # Extract the "log(Sum_{dead at t} r[i])" from our table:
+        # 0 on the 3rd dimension corresponds to "stop" time,
+        # 1 on the 4th dimension corresponds to "event".
+        log_dead_risks = time_weighted_scores[:, :, 0, 1]
+        assert log_dead_risks.shape == (B, T)
+        assert log_dead_risks.dtype == torch.float32
+
+        # We use repeat_interleave to re-index our dataset.
+        # E is the total number of deaths on the full table.
+        efron_indices, efron_event_counts, efron_log_offsets = _compute_efron_data(event_counts)
+        E = len(efron_indices)
+        assert event_counts.sum().item() == E
+        # No-death times should not be present in efron_indices:
+        assert (efron_event_counts > 0).all()
+        assert efron_indices.shape == (E,)
+        assert efron_event_counts.shape == (E,)
+        assert efron_log_offsets.shape == (E,)
+
+        # efron_indices is a (E,) Tensor of int64 that records the indices of the
+        # "death" times over the flattened time table.
+        # Since risk sets have varying sizes, we cannot work with a separate "Bootstrap"
+        # dimension, and use flat vectors instead.
+        efron_log_dead_risks = torch.index_select(
+            log_dead_risks.view(-1),  # Flatten the time table
+            dim=0,
+            index=efron_indices,
+        )
+        assert efron_log_dead_risks.shape == (E,)
+        assert efron_log_dead_risks.dtype == torch.float32
+
+        # The Efron offsets correspond to "log(k / {number of deaths at t})".
+        # We use them to compute
+        # log[ (k / {number of deaths at t}) * Sum_{dead at t} r[i] ]
+        efron_log_dead_risks = efron_log_dead_risks + efron_log_offsets
+        assert efron_log_dead_risks.shape == (E,)
+        assert efron_log_dead_risks.dtype == torch.float32
+        assert not efron_log_dead_risks.isnan().any()
+
+        # Likewise, we compute the "log( Sum_{observed at t} r[i] )"
+        efron_log_observed_risks = torch.index_select(
+            time_log_risks.view(-1),  # Flatten the time table
+            dim=0,
+            index=efron_indices,
+        )
+        assert efron_log_observed_risks.shape == (E,)
+        assert efron_log_observed_risks.dtype == torch.float32
+
+        # Compute log(
+        #             Sum_{observed at t} r[i]
+        #             -
+        #             (k / {number of deaths at t})
+        #             *
+        #             Sum_{dead at t} r[i]
+        #         )
+        efron_log_risks = logdiffexp(
+            efron_log_observed_risks,
+            efron_log_dead_risks,
+        )
+        assert efron_log_risks.shape == (E,)
+        assert efron_log_risks.dtype == torch.float32
+        assert not efron_log_risks.isnan().any()
+
+        # Compute the weight factor
+        # (Sum_{dead at t} w[i]) / {number of deaths at t)
+        efron_dead_weights = torch.index_select(
+            dead_weights.view(-1),  # Flatten the time table
+            dim=0,
+            index=efron_indices,
+        )
+        assert efron_dead_weights.shape == (E,)
+        assert efron_dead_weights.dtype == torch.float32
+
+        efron_factor = efron_dead_weights / efron_event_counts.float()
+        assert efron_factor.shape == (E,)
+        assert efron_factor.dtype == torch.float32
+        assert not efron_factor.isnan().any()
+
+        # Compute the contributions at each sub-time, i.e.
+        # (Sum_{dead at t} w[i]) / {number of deaths at t}
+        # * log(
+        #             Sum_{observed at t} r[i]
+        #             -
+        #             (k / {number of deaths at t})
+        #             *
+        #             Sum_{dead at t} r[i]
+        #       )
+        efron_contributions = efron_factor * efron_log_risks
+        assert efron_contributions.shape == (E,)
+        assert efron_contributions.dtype == torch.float32
+
+        # When efron_factor == 0, the contribution is 0, even if efron_log_risks is -inf.
+        # If we don't mask things out, we would end up with -inf * 0 == NaN.
+        efron_contributions = torch.where(
+            efron_factor != 0,
+            efron_contributions,
+            torch.zeros_like(efron_contributions),
+        )
+        assert efron_contributions.shape == (E,)
+
+        # Finally, we sum batch-wise over the contributions:
+        efron_batch = torch.index_select(
+            unique_batch_strata_time[0].repeat(B),
+            dim=0,
+            index=efron_indices,
+        )
+        assert efron_batch.shape == (E,)
+        assert efron_batch.dtype == torch.int64
+
+        # We must add an offset to prevent mixing bootstraps with each other
+        efron_batch = efron_batch + n_batches * (efron_indices // B)
+        assert efron_batch.shape == (E,)
+        assert efron_batch.dtype == torch.int64
+
+        logsumexp_term = group_sum(
+            values=efron_contributions.view(1, E),
+            groups=efron_batch.view(E),
+            output_size=B * n_batches,
+        ).view(B, n_batches)
 
     return logsumexp_term
 

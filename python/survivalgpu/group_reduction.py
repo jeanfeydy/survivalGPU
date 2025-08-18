@@ -413,6 +413,45 @@ def last_in_segment(
 
 
 @typecheck
+def rank_in_segment(
+    segments: Int64Tensor["values"],
+) -> Int64Tensor["values"]:
+    """Returns the rank of each index in its segment.
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.group_reduction import rank_in_segment
+
+        print(rank_in_segment(torch.tensor([0, 0, 0, 1, 1, 2, 3])))
+
+    .. testoutput::
+
+        tensor([0, 1, 2, 0, 1, 0, 0])
+
+    """
+    # We do *not* check that values are consecutive integers,
+    # because we use this function on the "efron_indices".
+    if segments.numel() == 0:
+        return torch.empty_like(segments)
+
+    # Identify where each new segment starts
+    is_start = torch.zeros_like(segments, dtype=torch.bool)
+    is_start[0] = True
+    is_start[1:] = segments[1:] != segments[:-1]
+
+    # Counter that increases each step
+    counter = torch.arange(len(segments), device=segments.device)
+
+    # Subtract the counter value at the start of the current segment
+    # First, build segment start indices via cumulative sum of is_start
+    seg_ids = torch.cumsum(is_start, dim=0) - 1
+    seg_start_idx = counter[is_start][seg_ids]
+
+    return counter - seg_start_idx
+
+
+@typecheck
 def keys_to_segments(
     keys: Int64Tensor["dimensions values"],
 ) -> Int64Tensor["values"]:
