@@ -195,6 +195,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                 cons = constrained, aic = aic, covariates = covariates
   )
 
+
   # List to return
   results <- list(
     knotsmat = knotsmat,
@@ -210,8 +211,12 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     info.criterion = BIC,
     nknots = nknots,
     confint = confint,
-    nbootstraps = nbootstraps
+    nbootstraps = nbootstraps,
+    time_cox = wce$time_cox,
+    time_feature = wce$time_feature,
+    time_total = wce$time_total,
   )
+
 
   if (nbootstraps > 1) {
     probs <- c((1 - confint) / 2, 1 - (1 - confint) / 2)

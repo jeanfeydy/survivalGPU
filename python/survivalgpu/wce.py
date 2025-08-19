@@ -248,4 +248,11 @@ def wce_R(
         **kwargs,
     )
 
-    return res, result_time
+
+    res["time_feature"] = result_time["time_feature"]
+    res["time_cox"] = result_time["time_cox"]
+    res["time_total"] = result_time["time_total"]
+
+
+
+    return res
