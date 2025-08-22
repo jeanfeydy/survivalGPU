@@ -11,7 +11,6 @@ We provide:
 
 # Use NumPy for basic array manipulation:
 # We use functools.partial
-import functools
 
 # Python >= 3.7:
 from contextlib import nullcontext
@@ -21,15 +20,12 @@ import numpy as np
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
-from .bootstrap import Resampling
-
 # The convex CoxPH objective:
 from .coxph_likelihood import coxph_objective
 from .datasets import SurvivalDataset
 
 # Convex optimizer for the CoxPH objective:
 from .optimizers import newton
-from .torch_datasets import TorchSurvivalDataset
 from .typecheck import (
     Bool,
     Float32Tensor,
@@ -162,29 +158,27 @@ class CoxPHSurvivalAnalysis:
         else:
             mode = self.mode
 
-        objective = functools.partial(
-            coxph_objective,
-            dataset=dataset,
-            ties=self.ties,
-            mode=mode,
-        )
 
         # Define the loss function:
         def loss(*, bootstrap):
             """Our loss function, including the L2 regularization term."""
-            obj = objective(bootstrap=bootstrap)
 
             def aux(coef):
-                scores = self._linear_risk_scores(
-                    coef=coef, dataset=dataset, bootstrap=bootstrap
+                """Wrapper around the CoxPH objective."""
+                B = len(bootstrap)
+                assert coef.shape == (B * n_batch, n_covariates)
+
+                obj = coxph_objective(
+                    coef=coef.view(B, n_batch, n_covariates),
+                    dataset=dataset,
+                    ties=self.ties,
+                    bootstrap=bootstrap,
+                    l2_reg=self.alpha,
+                    scales=scales,
+                    mode=mode,
                 )
-                if scales is None:
-                    scaled_coef = coef
-                else:
-                    assert scales.shape == (coef.shape[-1],)
-                    scaled_coef = coef * scales
-                reg = self.alpha * (scaled_coef**2).sum(dim=1)
-                return obj(scores) + reg
+
+                return obj.view(B * n_batch)
 
             return aux
 
@@ -293,63 +287,6 @@ class CoxPHSurvivalAnalysis:
         if n_bootstraps is not None:
             assert self.bootstrap_coef_.shape == (n_bootstraps, n_batch, n_covariates)
 
-    @typecheck
-    def _linear_risk_scores(
-        self,
-        *,
-        coef: Float32Tensor["batches covariates"],
-        dataset: TorchSurvivalDataset,
-        bootstrap: Resampling,
-    ) -> Float32Tensor["bootstraps intervals"]:
-        """Standard function to compute risks in the CoxPH model: dot(beta, x[i]).
-
-        TODO: clean docstring below
-        - If `batch_size == dataset.n_batch`, the vector of coefficients `coef[i]` will be
-        associated to the subset of patients such that `dataset.batch == i`.
-        - If `batch_size == len(bootstrap) * dataset.n_batch`, the vector of coefficients
-        `coef[i]` will be associated to the subset of patients such that
-        `dataset.batch == i % dataset.n_batch`.
-        In other words, the `(batch_size, covariates)` Tensor of coefficients `coef`
-        is interpreted as a `(n_bootstraps, dataset.n_batch, covariates)` Tensor.
-        """
-
-        assert coef.shape[0] == len(bootstrap) * dataset.n_batch
-
-        # coef is (n_bootstraps, n_batch, covariates):
-        coef = coef.view(len(bootstrap), dataset.n_batch, -1)
-
-        # scattered_coef is (n_bootstraps, n_intervals, covariates):
-
-        if True and dataset.n_batch == 1:
-            # Simple case with no batch - don't waste time with indexing operations:
-            scattered_coef = coef.view(len(bootstrap), 1, -1)
-
-        else:
-            # N.B.: Naive implementation with an indexing operation as in
-            #
-            if False:
-                scattered_coef = coef[:, dataset.batch_intervals, :]  # (B, I, D)
-            #
-            # is MASSIVELY inefficient in the backward pass, as discussed in
-            # https://github.com/pytorch/pytorch/issues/41162
-            # https://github.com/dmlc/dgl/issues/3729
-            #
-            # Instead, we prefer the following line, with a non-deterministic backward pass:
-            else:
-                scattered_coef = torch.index_select(coef, 1, dataset.batch_intervals)
-
-            assert scattered_coef.shape == (
-                len(bootstrap),
-                dataset.n_intervals,
-                dataset.n_covariates,
-            )
-
-        X = dataset.covariates  # (I, D)
-        # (B, I, D) * (1, I, D) -> (B, I, D)
-        scores = scattered_coef * X.view(1, dataset.n_intervals, dataset.n_covariates)
-        scores = scores.sum(-1)  # (B, I, D) -> (B, I)
-        assert scores.shape == (len(bootstrap), dataset.n_intervals)
-        return scores
 
     @typecheck
     def _rescale(

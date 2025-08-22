@@ -84,6 +84,8 @@ import torch
 
 from .bootstrap import Resampling
 from .group_reduction import (
+    LOG0,
+    clip_inf,
     first_in_segment,
     group_logsumexp,
     group_sum,
@@ -517,7 +519,7 @@ def _compute_time_log_risks(
     B, T, _, _ = time_weighted_scores.shape
 
     # Reduce over the "no event / event" dimension
-    time_risk_updates = time_weighted_scores.logsumexp(dim=-1)
+    time_risk_updates = clip_inf(time_weighted_scores).logsumexp(dim=-1)
     assert time_risk_updates.shape == (B, T, 2)
 
     # Define summation groups by (batch, strata)
@@ -558,7 +560,7 @@ def _compute_time_log_risks(
     # in order to compensate for the "< t" condition above.
     time_log_risks = torch.cat(
         (
-            -float("inf") * torch.ones_like(time_log_risks[:, :1]),
+            LOG0 * torch.ones_like(time_log_risks[:, :1]),
             time_log_risks[:, :-1],
         ),
         dim=1,
@@ -1030,21 +1032,28 @@ def _linear_term(
     return linear_term
 
 
-
 @typecheck
-def coxph_objective(
+def coxph_objective_from_scores(
     *,
+    scores: Float32Tensor["bootstraps intervals"],
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
     bootstrap: Resampling,
     mode: Literal["unit length", "start zero", "any"] = "any",
-) -> Callable[[Float32Tensor["bootstraps intervals"]], Float32Tensor["bootstraps_x_batches"]]:
-    """Implements the CoxPH objective.
+) -> Float32Tensor["bootstraps batches"]:
+    """Implements the CoxPH loss function.
+
+    This function takes as input a batch of score values scores[i, j],
+    each of whom corresponds to the risk score of the j-th interval
+    according to the i-th estimate of the model parameters.
+
+    For linear scores "dot(beta[i], x[j])", this corresponds to
+    scores = beta @ x.T, (B,D) @ (D,I) = (B,I)
 
     .. testcode::
 
         import torch
-        from survivalgpu.coxph_likelihood import coxph_objective
+        from survivalgpu.coxph_likelihood import coxph_objective_from_scores
         from survivalgpu.torch_datasets import TorchSurvivalDataset
         from survivalgpu.bootstrap import Resampling
 
@@ -1089,12 +1098,6 @@ def coxph_objective(
             ]
         )
 
-        negloglikelihood = coxph_objective(
-            dataset=dataset,
-            bootstrap=bootstrap,
-            ties="breslow",
-        )
-
         # With the Breslow approximation, for the first bootstrap, we expect:
         #
         # 1. For the linear term:
@@ -1129,19 +1132,21 @@ def coxph_objective(
         #    a. 13.0472 - 5 = 8.0472 for batch 0,
         #    b. 13.3863 - 12 = 1.3863 for batch 1.
 
-        print(negloglikelihood(scores))
+        print(
+            coxph_objective_from_scores(
+                scores=scores,
+                dataset=dataset,
+                bootstrap=bootstrap,
+                ties="breslow",
+            )
+        )
 
     .. testoutput::
 
-        tensor([5.8493, 0.3133, 8.0472, 0.0000])
+        tensor([[5.8493, 0.3133],
+                [8.0472, 0.0000]])
 
     .. testcode::
-
-        negloglikelihood = coxph_objective(
-            dataset=dataset,
-            bootstrap=bootstrap,
-            ties="efron",
-        )
 
         # With the Efron approximation, linear terms remain the same,
         # but log-sum-exp terms change slightly.
@@ -1180,11 +1185,19 @@ def coxph_objective(
         #    a. 9.7875 - 5 = 4.7875 for batch 0,
         #    b. 0 - 0 = 0 for batch 1.
 
-        print(negloglikelihood(scores))
+        print(
+            coxph_objective_from_scores(
+                scores=scores,
+                dataset=dataset,
+                bootstrap=bootstrap,
+                ties="efron",
+            )
+        )
 
     .. testoutput::
 
-        tensor([3.6521, 0.3133, 4.7875, 0.0000])
+        tensor([[3.6521, 0.3133],
+                [4.7875, 0.0000]])
 
     """
 
@@ -1195,60 +1208,133 @@ def coxph_objective(
         msg = "The dataset must be sorted by (batch, strata, start, stop)."
         raise ValueError(msg)
 
-    @typecheck
-    def negloglikelihood(
-        scores: Float32Tensor["bootstraps intervals"],
-    ) -> Float32Tensor["bootstraps_x_batches"]:
-        """The CoxPH neg-log-likelihood that we try to minimize.
+    # Compute the linear term of the CoxPH objective
+    linear_term = _linear_term(
+        scores=scores,
+        interval_weights=bootstrap.interval_weights,
+        event=dataset.event,
+        batch=dataset.batch_intervals,
+        n_batches=dataset.n_batch,
+    )
+    assert linear_term.shape == (B, dataset.n_batch)
 
-        This function takes as input a batch of score values scores[i, j],
-        each of whom corresponds to the risk score of the j-th interval
-        according to the i-th estimate of the model parameters.
-
-        For linear scores "dot(beta[i], x[j])", this corresponds to
-        scores = beta @ x.T, (B,D) @ (D,I) = (B,I)
-
-        """
-
-        # Compute the linear term of the CoxPH objective
-        linear_term = _linear_term(
+    # Aggregate the scores into time-indexed data tables
+    time_counts, time_weights, time_weighted_scores, unique_batch_strata_time = (
+        _intervals_to_time_data(
             scores=scores,
+            interval_counts=bootstrap.interval_counts,
             interval_weights=bootstrap.interval_weights,
-            event=dataset.event,
+            interval_log_weights=bootstrap.interval_log_weights,
             batch=dataset.batch_intervals,
-            n_batches=dataset.n_batch,
+            strata=dataset.strata_intervals,
+            start=dataset.start,
+            stop=dataset.stop,
+            event=dataset.event,
         )
-        assert linear_term.shape == (B, dataset.n_batch)
+    )
 
-        # Aggregate the scores into time-indexed data tables
-        time_counts, time_weights, time_weighted_scores, unique_batch_strata_time = (
-            _intervals_to_time_data(
-                scores=scores,
-                interval_counts=bootstrap.interval_counts,
-                interval_weights=bootstrap.interval_weights,
-                interval_log_weights=bootstrap.interval_log_weights,
-                batch=dataset.batch_intervals,
-                strata=dataset.strata_intervals,
-                start=dataset.start,
-                stop=dataset.stop,
-                event=dataset.event,
-            )
-        )
+    # Compute the log-sum-exp term for the Breslow or Efron approximation
+    logsumexp_term = _breslow_efron_logsumexp_term(
+        time_counts=time_counts,
+        time_weights=time_weights,
+        time_weighted_scores=time_weighted_scores,
+        unique_batch_strata_time=unique_batch_strata_time,
+        ties=ties,
+        n_batches=dataset.n_batch,
+    )
+    assert logsumexp_term.shape == (B, dataset.n_batch)
 
-        # Compute the log-sum-exp term for the Breslow or Efron approximation
-        logsumexp_term = _breslow_efron_logsumexp_term(
-            time_counts=time_counts,
-            time_weights=time_weights,
-            time_weighted_scores=time_weighted_scores,
-            unique_batch_strata_time=unique_batch_strata_time,
-            ties=ties,
-            n_batches=dataset.n_batch,
-        )
-        assert logsumexp_term.shape == (B, dataset.n_batch)
+    return logsumexp_term - linear_term
 
-        return (logsumexp_term - linear_term).view(B * dataset.n_batch)
 
-    return negloglikelihood
+
+@typecheck
+def linear_risk_scores(
+    *,
+    coef: Float32Tensor["bootstraps batches covariates"],
+    dataset, #: TorchSurvivalDataset, omitted to avoid circular import
+) -> Float32Tensor["bootstraps intervals"]:
+    """Standard function to compute risks in the CoxPH model: dot(beta, x[i])."""
+    B, n_batches, D = coef.shape
+    I = dataset.n_intervals
+
+    assert dataset.n_covariates == D
+    assert n_batches == dataset.n_batch
+
+    if n_batches == 1:
+        # Simple case with no batch - don't waste time with indexing operations:
+        scattered_coef = coef.view(B, 1, D)
+
+    else:
+        # N.B.: Naive implementation with an indexing operation as in
+        # scattered_coef = coef[:, dataset.batch_intervals, :]  # (B, I, D)
+        # is MASSIVELY inefficient in the backward pass, as discussed in
+        # https://github.com/pytorch/pytorch/issues/41162
+        # https://github.com/dmlc/dgl/issues/3729
+        #
+        # Instead, we prefer the following line, with a non-deterministic backward pass:
+        scattered_coef = torch.index_select(coef, 1, dataset.batch_intervals)
+        assert scattered_coef.shape == (B, I, D)
+
+    X = dataset.covariates  # (I, D)
+    assert X.shape == (I, D)
+
+    # [(B, 1, D) or (B, I, D)] * (1, I, D) -> (B, I, D)
+    scores = scattered_coef * X.view(1, I, D)
+    assert scores.shape == (B, I, D)
+
+    scores = scores.sum(-1)  # (B, I, D) -> (B, I)
+    assert scores.shape == (B, I)
+    return scores
+
+
+@typecheck
+def coxph_objective(
+    *,
+    coef: Float32Tensor["bootstraps batches covariates"],
+    scales: Float32Tensor["covariates"] | None,
+    dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
+    ties: Literal["efron", "breslow"],
+    bootstrap: Resampling,
+    l2_reg: int | float,
+    mode: Literal["unit length", "start zero", "any"] = "any",
+) -> Float32Tensor["bootstraps batches"]:
+    """Implements the CoxPH objective.
+
+    This function is a wrapper around coxph_objective_from_scores() that computes
+    the risk scores from the model parameters and the dataset covariates.
+    """
+
+    B, n_batches, D = coef.shape
+    I = dataset.n_intervals
+    assert len(bootstrap) == B
+    assert n_batches == dataset.n_batch
+    assert dataset.n_covariates == D
+
+    scores = linear_risk_scores(coef=coef, dataset=dataset)
+    assert scores.shape == (B, I)
+
+    # Vanilla CoxPH objective
+    obj = coxph_objective_from_scores(
+        scores=scores,
+        dataset=dataset,
+        ties=ties,
+        bootstrap=bootstrap,
+        mode=mode,
+    )
+    assert obj.shape == (B, n_batches)
+
+    # L2 regularization term
+    if scales is None:
+        scaled_coef = coef
+    else:
+        assert scales.shape == (D,)
+        scaled_coef = coef * scales
+
+    reg = l2_reg * (scaled_coef**2).sum(dim=-1)
+    assert reg.shape == (B, n_batches)
+
+    return obj + reg
 
 
 
