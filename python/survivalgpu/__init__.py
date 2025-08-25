@@ -23,7 +23,7 @@ __all__ = [
 __version__ = "0.1.0"
 
 # Ties in the CoxPH model:
-SUPPORTED_TIES = ["breslow"]  # , "efron"]
+SUPPORTED_TIES = ["breslow", "efron"]
 
 # Warm up the GPU:
 if use_cuda:

@@ -1,3 +1,8 @@
+"""This is test/book1.R from Terry Therneau's survival package.
+
+Check https://cran.r-project.org/web/packages/survival/vignettes/validate.pdf for details.
+"""
+
 import numpy as np
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -5,16 +10,16 @@ from survivalgpu import SUPPORTED_TIES, CoxPHSurvivalAnalysis
 
 np.set_printoptions(precision=4)
 
-
+# TODO: we dropped the "NA" row from the original dataset
 data_csv = np.array(
     [
         # Time, Death, Covar
+        [9, 1, 0],
         [1, 1, 1],
         [1, 0, 1],
         [6, 1, 1],
         [6, 1, 0],
         [8, 0, 0],
-        [9, 1, 0],
     ]
 )
 ds = {
@@ -33,6 +38,10 @@ final_values = {
     },
     "efron": {
         "coef_": 1.676857,
+        "loglik_": -3.358979,
+        "loglik_init_": -4.276666,
+        "hessian_": 0.612632,
+        "score_": 0.0,
     },
 }
 
@@ -88,14 +97,11 @@ iter_values = {
             0.634168143,
         ],
     },
-    "efron": {
-        "coef_": 1.676857,
-    },
 }
 
 
 @given(
-    ties=st.sampled_from(SUPPORTED_TIES),
+    ties=st.sampled_from(list(iter_values.keys())),
 )
 @settings(deadline=1000)
 def test_iterations(*, ties):

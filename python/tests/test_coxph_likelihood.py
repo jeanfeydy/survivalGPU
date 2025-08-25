@@ -51,8 +51,8 @@ examples = [
     dict(
         intervals= [
             # Patient, Start, Stop, Event, Covar
-            [       0,     0,    1,     0,   -1.],
-            [       1,     0,    1,     1,    2.],
+            [       1,     0,    1,     1,    2.],  # Spice things up with patient 1 on row 0
+            [       0,     0,    1,     0,   -1.],  # and patient 0 on row 1
         ],
         patients=[
             # Batch, Strata
@@ -151,7 +151,7 @@ def test_loss_grad_hessian(*, data, ties, device):
 
     bootstrap = Resampling(
         indices=bootstraps,
-        patient=intervals[:, 0],
+        patient=dataset.patient,
     )
     B = len(bootstrap)
     n_batch = dataset.n_batch
