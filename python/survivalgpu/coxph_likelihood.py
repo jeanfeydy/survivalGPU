@@ -77,24 +77,20 @@ on the weighted scores:
 # was considered for a long time, but eventually dropped to keep dependencies minimal.
 
 # Import numpy to compute logarithms
-import numpy as np
 
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
 from .bootstrap import Resampling
 from .group_reduction import (
-    LOG0,
     clip_inf,
     first_in_segment,
-    group_logsumexp,
     group_sum,
     keys_to_segments,
-    logdiffexp,
     rank_in_segment,
-    segment_logcumsumexp,
+    segment_cumsum,
 )
-from .typecheck import Callable, Float32Tensor, Int64Tensor, Literal, typecheck
+from .typecheck import Float32Tensor, Int64Tensor, Literal, typecheck
 
 
 @typecheck
@@ -188,7 +184,7 @@ def _compute_time_data(
     *,
     interval_counts: Int64Tensor["bootstraps intervals"],
     interval_weights: Float32Tensor["bootstraps intervals"],
-    interval_weighted_scores: Float32Tensor["bootstraps intervals"],
+    interval_weighted_risks: Float32Tensor["bootstraps intervals"],
     index_start: Int64Tensor["intervals"],
     index_stop: Int64Tensor["intervals"],
     event: Int64Tensor["intervals"],
@@ -204,15 +200,14 @@ def _compute_time_data(
 
      - an integer count of "bootstrap" occurrences,
      - a float weight >= 0,
-     - a weighted score that corresponds to log(risk) = log(weight) + dot(beta, x).
+     - a weighted risk that corresponds to risk = weight * exp( dot(beta, x) ).
 
     We aggregate these values into a "time-indexed" data table:
     for every bootstrap b, data for interval (start, stop] is aggregated at locations
     [b, stop, 0, event] and [b, start, 1, event],
     where event == 0 if the interval is "censored" and event == 1 if it ends with an event.
 
-    The reduction for counts and weights is a sum,
-    while the reduction for weighted scores is a log-sum-exp.
+    The reduction for counts, weights and weighted risks is a sum.
 
     For each one of our three "tables" (counts, weights, weighted scores),
     bootstrap index b and time t, the table values correspond to the following aggregations:
@@ -245,16 +240,16 @@ def _compute_time_data(
 
         interval_counts = torch.tensor([[1, 2, 3], [2, 3, 4]])
         interval_weights = torch.tensor([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
-        interval_weighted_scores = torch.tensor([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
+        interval_weighted_risks = torch.tensor([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
         index_start = torch.tensor([0, 1, 2])
         index_stop = torch.tensor([1, 3, 3])
         event = torch.tensor([0, 1, 1])
         T = 4  # Number of unique time points
 
-        time_counts, time_weights, time_weighted_scores = _compute_time_data(
+        time_counts, time_weights, time_weighted_risks = _compute_time_data(
             interval_counts=interval_counts,
             interval_weights=interval_weights,
-            interval_weighted_scores=interval_weighted_scores,
+            interval_weighted_risks=interval_weighted_risks,
             index_start=index_start,
             index_stop=index_stop,
             event=event,
@@ -280,14 +275,12 @@ def _compute_time_data(
 
     .. testcode::
 
-        print(time_weighted_scores.view(2, -1))
+        print(time_weighted_risks.view(2, -1))
 
     .. testoutput::
 
-        tensor([[  -inf,   -inf, 1.0000,   -inf, 1.0000,   -inf,   -inf, 2.0000,   -inf,
-                   -inf,   -inf, 3.0000,   -inf, 3.3133,   -inf,   -inf],
-                [  -inf,   -inf, 2.0000,   -inf, 2.0000,   -inf,   -inf, 3.0000,   -inf,
-                   -inf,   -inf, 4.0000,   -inf, 4.3133,   -inf,   -inf]])
+        tensor([[0., 0., 1., 0., 1., 0., 0., 2., 0., 0., 0., 3., 0., 5., 0., 0.],
+                [0., 0., 2., 0., 2., 0., 0., 3., 0., 0., 0., 4., 0., 7., 0., 0.]])
 
     """
     B, I = interval_counts.shape
@@ -318,13 +311,13 @@ def _compute_time_data(
         output_size=T * 4,
     ).view(B, T, 2, 2)
 
-    time_weighted_scores = group_logsumexp(
-        values=torch.cat((interval_weighted_scores,) * 2, dim=1),
+    time_weighted_risks = group_sum(
+        values=torch.cat((interval_weighted_risks,) * 2, dim=1),
         groups=full_index,
         output_size=T * 4,
     ).view(B, T, 2, 2)
 
-    return time_counts, time_weights, time_weighted_scores
+    return time_counts, time_weights, time_weighted_risks
 
 
 
@@ -332,10 +325,9 @@ def _compute_time_data(
 @typecheck
 def _intervals_to_time_data(
     *,
-    scores: Float32Tensor["bootstraps intervals"],
     interval_counts: Int64Tensor["bootstraps intervals"],
     interval_weights: Float32Tensor["bootstraps intervals"],
-    interval_log_weights: Float32Tensor["bootstraps intervals"],
+    interval_risks: Float32Tensor["bootstraps intervals"],
     batch: Int64Tensor["intervals"],
     strata: Int64Tensor["intervals"],
     start: Int64Tensor["intervals"],
@@ -344,7 +336,7 @@ def _intervals_to_time_data(
 ) -> tuple[
     Int64Tensor["bootstraps times 2 2"],  # Counts of intervals at each time
     Float32Tensor["bootstraps times 2 2"],  # Weights of intervals at each time
-    Float32Tensor["bootstraps times 2 2"],  # Weighted scores at each time
+    Float32Tensor["bootstraps times 2 2"],  # Weighted risks at each time
     Int64Tensor["3 times"],  # Unique (batch, strata, time) values
 ]:
     """Aggregates interval data into a table indexed by time.
@@ -357,14 +349,11 @@ def _intervals_to_time_data(
         import torch
         from survivalgpu.coxph_likelihood import _intervals_to_time_data
 
-        time_counts, time_weights, time_weighted_scores, unique_batch_strata_time = (
+        time_counts, time_weights, time_weighted_risks, unique_batch_strata_time = (
             _intervals_to_time_data(
-                scores=torch.tensor([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]]),
                 interval_counts=torch.tensor([[1, 1, 3], [2, 2, 1]]),
                 interval_weights=torch.tensor([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]]),
-                interval_log_weights=torch.tensor(
-                    [[0.0, 0.6931, 1.0986], [0.6931, 1.0986, 1.3863]]
-                ),
+                interval_risks=torch.tensor([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]]),
                 batch=torch.tensor([0, 0, 0]),
                 strata=torch.tensor([0, 0, 0]),
                 start=torch.tensor([0, 0, 0]),
@@ -391,14 +380,12 @@ def _intervals_to_time_data(
 
     .. testcode::
 
-        print(time_weighted_scores.view(2, -1))
+        print(time_weighted_risks.view(2, -1))
 
     .. testoutput::
 
-        tensor([[  -inf,   -inf, 1.0000, 4.3179, 1.0000,   -inf,   -inf,   -inf,   -inf,
-                 4.3179,   -inf,   -inf],
-                [  -inf,   -inf, 2.6931, 5.6300, 2.6931,   -inf,   -inf,   -inf,   -inf,
-                 5.6300,   -inf,   -inf]])
+        tensor([[ 0.,  0.,  1., 13.,  1.,  0.,  0.,  0.,  0., 13.,  0.,  0.],
+                [ 0.,  0.,  4., 25.,  4.,  0.,  0.,  0.,  0., 25.,  0.,  0.]])
 
     .. testcode::
 
@@ -411,7 +398,7 @@ def _intervals_to_time_data(
                 [0, 1, 2]])
 
     """
-    B, I = scores.shape
+    B, I = interval_risks.shape
 
     unique_batch_strata_time, index_start, index_stop = _compute_unique_batch_strata_time(
         batch=batch,
@@ -424,14 +411,14 @@ def _intervals_to_time_data(
     assert index_start.shape == (I,)
     assert index_stop.shape == (I,)
 
-    # log(r[b,i]) = log(w[b,i]) + dot(beta[b], x[i])
-    interval_weighted_scores = interval_log_weights + scores
-    assert interval_weighted_scores.shape == (B, I)
+    # r[b,i] = w[b,i] * exp( dot(beta[b], x[i]) )
+    interval_weighted_risks = interval_weights * interval_risks
+    assert interval_weighted_risks.shape == (B, I)
 
-    time_counts, time_weights, time_weighted_scores = _compute_time_data(
+    time_counts, time_weights, time_weighted_risks = _compute_time_data(
         interval_counts=interval_counts,
         interval_weights=interval_weights,
-        interval_weighted_scores=interval_weighted_scores,
+        interval_weighted_risks=interval_weighted_risks,
         index_start=index_start,
         index_stop=index_stop,
         event=event,
@@ -441,18 +428,18 @@ def _intervals_to_time_data(
     return (
         time_counts,
         time_weights,
-        time_weighted_scores,
+        time_weighted_risks,
         unique_batch_strata_time,
     )
 
 
 @typecheck
-def _compute_time_log_risks(
+def _compute_time_risks(
     *,
-    time_weighted_scores: Float32Tensor["bootstraps times 2 2"],
+    time_weighted_risks: Float32Tensor["bootstraps times 2 2"],
     unique_batch_strata_time: Int64Tensor["3 times"],
 ) -> Float32Tensor["bootstraps times"]:
-    """Computes the log-risk over the full risk set of observed patients at each time point.
+    """Computes the "sum" risk over the full risk set of observed patients at each time point.
 
     .. warning::
 
@@ -462,41 +449,40 @@ def _compute_time_log_risks(
     .. testcode::
 
         import torch
-        from survivalgpu.coxph_likelihood import _compute_time_log_risks
+        from survivalgpu.coxph_likelihood import _compute_time_risks
 
         # First "bootstrap" corresponds to:
-        #  - one interval (0, 1] with a score of 1 and no event,
-        #  - one interval (0, 2] with a score of 2 and an event.
+        #  - one interval (0, 1] with a risk of 1 and no event,
+        #  - one interval (0, 2] with a risk of 2 and an event.
         # We expect the log-risks to be:
-        #  - at time 0: -inf (no risk set),
-        #  - at time 1: log(e^1 + e^2) = 2.3133
-        #  - at time 2: log(e^2) = 2.0000
+        #  - at time 0: 0 (no risk set),
+        #  - at time 1: 1 + 2 = 3
+        #  - at time 2: 2 = 2
         #
         # Second "bootstrap" corresponds to:
-        #  - one interval (0, 2] with a score of 1 and no event,
-        #  - one interval (1, 2] with a score of 3 and an event.
+        #  - one interval (0, 2] with a risk of 1 and no event,
+        #  - one interval (1, 2] with a risk of 3 and an event.
         # We expect the log-risks to be:
-        #  - at time 0: -inf (no risk set),
-        #  - at time 1: log(e^1) = 1.0000
-        #  - at time 2: log(e^1 + e^3) = 3.1269
+        #  - at time 0: 0 (no risk set),
+        #  - at time 1: 1 = 1
+        #  - at time 2: 1 + 3 = 4
         #
         # We also add an empty strata at the end.
 
-        z = -float("inf")
-        time_log_risks = _compute_time_log_risks(
-            time_weighted_scores=torch.tensor(
+        time_risks = _compute_time_risks(
+            time_weighted_risks=torch.tensor(
                 [
                     [
-                        [[z, z], [1.0, 2.0]],
-                        [[1.0, z], [z, z]],
-                        [[z, 2.0], [z, z]],
-                        [[z, z], [z, z]],
+                        [[0.0, 0.0], [1.0, 2.0]],
+                        [[1.0, 0.0], [0.0, 0.0]],
+                        [[0.0, 2.0], [0.0, 0.0]],
+                        [[0.0, 0.0], [0.0, 0.0]],
                     ],
                     [
-                        [[z, z], [1.0, z]],
-                        [[z, z], [z, 3.0]],
-                        [[1.0, 3.0], [z, z]],
-                        [[z, z], [z, z]],
+                        [[0.0, 0.0], [1.0, 0.0]],
+                        [[0.0, 0.0], [0.0, 3.0]],
+                        [[1.0, 3.0], [0.0, 0.0]],
+                        [[0.0, 0.0], [0.0, 0.0]],
                     ],
                 ]
             ),
@@ -508,18 +494,18 @@ def _compute_time_log_risks(
                 ]
             ),
         )
-        print(time_log_risks)
+        print(time_risks)
 
     .. testoutput::
 
-        tensor([[  -inf, 2.3133, 2.0000,   -inf],
-                [  -inf, 1.0000, 3.1269,   -inf]])
+        tensor([[0., 3., 2., 0.],
+                [0., 1., 4., 0.]])
     """
 
-    B, T, _, _ = time_weighted_scores.shape
+    B, T, _, _ = time_weighted_risks.shape
 
     # Reduce over the "no event / event" dimension
-    time_risk_updates = clip_inf(time_weighted_scores).logsumexp(dim=-1)
+    time_risk_updates = clip_inf(time_weighted_risks).sum(dim=-1)
     assert time_risk_updates.shape == (B, T, 2)
 
     # Define summation groups by (batch, strata)
@@ -535,13 +521,15 @@ def _compute_time_log_risks(
             stacklevel=1,
         )
 
+    # TODO: implement this with + and - signs in a single cumsum.
+    #       This should help with numerical precision.
     # Recall that with our convention, the "stop" index is 0 and the "start" index is 1
     # along the 3rd dimension of our time data tables.
-    time_risk_set_stop = segment_logcumsumexp(
+    time_risk_set_stop = segment_cumsum(
         values=time_risk_updates[:, :, 0],
         segments=batch_strata_segments,
     )
-    time_risk_set_start = segment_logcumsumexp(
+    time_risk_set_start = segment_cumsum(
         values=time_risk_updates[:, :, 1],
         segments=batch_strata_segments,
     )
@@ -551,31 +539,29 @@ def _compute_time_log_risks(
     # is equal to the difference:
     #    Sum_{started at time < t} r[i]
     #  - Sum_{stopped at time < t} r[i]
-    # For the sake of numerical stability, we compute this difference
-    # in the log-domain:
-    time_log_risks = logdiffexp(time_risk_set_start, time_risk_set_stop)
-    assert time_log_risks.shape == (B, T)
+    time_risks = time_risk_set_start - time_risk_set_stop
+    assert time_risks.shape == (B, T)
 
-    # We shift these log-risks to the right by one time step,
+    # We shift these risks to the right by one time step,
     # in order to compensate for the "< t" condition above.
-    time_log_risks = torch.cat(
+    time_risks = torch.cat(
         (
-            LOG0 * torch.ones_like(time_log_risks[:, :1]),
-            time_log_risks[:, :-1],
+            torch.zeros_like(time_risks[:, :1]),
+            time_risks[:, :-1],
         ),
         dim=1,
     )
-    assert time_log_risks.shape == (B, T)
+    assert time_risks.shape == (B, T)
 
     # N.B.: This shift fills the first time step of every segment
-    #       with a very small value (theoretically equal to -inf
+    #       with a very small value (theoretically equal to 0
     #       since every interval appears once in "start" and once in "stop").
     #       This is not a problem, since the first time step
     #       of every segment can only correspond to a "start" time,
     #       not a "stop" time, and therefore does not contribute
     #       to the log-sum-exp term of the CoxPH objective.
 
-    return time_log_risks
+    return time_risks
 
 @typecheck
 def _compute_efron_data(
@@ -584,7 +570,7 @@ def _compute_efron_data(
     Int64Tensor["events"],  # indices in [0, B*T)
     Int64Tensor["events"],  # bootstraps in [0, B)
     Int64Tensor["events"],  # event_counts
-    Float32Tensor["events"],  # log_offsets, i.e. log(k / {number of deaths at t})
+    Float32Tensor["events"],  # offsets, i.e. k / {number of deaths at t}
 ]:
     """Computes the information required to re-index our time tables for Efron summation.
 
@@ -625,7 +611,7 @@ def _compute_efron_data(
 
     .. testoutput::
 
-        tensor([   -inf,    -inf, -0.6931,    -inf, -1.0986, -0.4055,    -inf, -0.6931])
+        tensor([0.0000, 0.0000, 0.5000, 0.0000, 0.3333, 0.6667, 0.0000, 0.5000])
 
     """
     efron_indices = torch.repeat_interleave(event_counts.view(-1))
@@ -652,13 +638,11 @@ def _compute_efron_data(
     assert efron_event_counts.dtype == torch.int64
     assert (efron_event_counts > 0).all()
 
-    efron_log_offsets = torch.log(
-        rank_in_segment(efron_indices) / efron_event_counts.float()
-    )
-    assert efron_log_offsets.shape == (E,)
-    assert efron_log_offsets.dtype == torch.float32
+    efron_offsets = rank_in_segment(efron_indices) / efron_event_counts.float()
+    assert efron_offsets.shape == (E,)
+    assert efron_offsets.dtype == torch.float32
 
-    return efron_indices, efron_bootstraps, efron_event_counts, efron_log_offsets
+    return efron_indices, efron_bootstraps, efron_event_counts, efron_offsets
 
 
 
@@ -667,7 +651,7 @@ def _breslow_efron_logsumexp_term(
     *,
     time_counts: Int64Tensor["bootstraps times 2 2"],
     time_weights: Float32Tensor["bootstraps times 2 2"],
-    time_weighted_scores: Float32Tensor["bootstraps times 2 2"],
+    time_weighted_risks: Float32Tensor["bootstraps times 2 2"],
     unique_batch_strata_time: Int64Tensor["3 times"],
     ties: Literal["efron", "breslow"],
     n_batches: int,
@@ -707,23 +691,22 @@ def _breslow_efron_logsumexp_term(
                 [[[0.0, 0.0], [3.0, 2.0]], [[3.0, 2.0], [0.0, 0.0]]],
             ]
         )
-        z = -float("inf")
-        time_weighted_scores = torch.tensor(
+        time_weighted_risks = torch.tensor(
             [
-                [[[z, z], [2.0, 3.0]], [[2.0, 3.0], [z, z]]],
-                [[[z, z], [1.0, 0.0]], [[1.0, 0.0], [z, z]]],
+                [[[0.0, 0.0], [2.0, 3.0]], [[2.0, 3.0], [0.0, 0.0]]],
+                [[[0.0, 0.0], [2.0, 1.0]], [[2.0, 1.0], [0.0, 0.0]]],
             ]
         )
 
         # The contribution at time 0 is 0, since there are no deaths at that time.
         # At time 1, with the Breslow approximation for ties, we expect:
-        # - for bootstrap 1, 1 * log(exp(2) + exp(3)) = 3.3133
-        # - for bootstrap 2, 2 * log(exp(1) + exp(0)) = 2.6265
+        # - for bootstrap 1, 1 * log(2 + 3) = 1.6094
+        # - for bootstrap 2, 2 * log(2 + 1) = 2.1972
         print(
             _breslow_efron_logsumexp_term(
                 time_counts=time_counts,
                 time_weights=time_weights,
-                time_weighted_scores=time_weighted_scores,
+                time_weighted_risks=time_weighted_risks,
                 unique_batch_strata_time=unique_batch_strata_time,
                 ties="breslow",
                 n_batches=1,
@@ -732,22 +715,22 @@ def _breslow_efron_logsumexp_term(
 
     .. testoutput::
 
-        tensor([[3.3133],
-                [2.6265]])
+        tensor([[1.6094],
+                [2.1972]])
 
     .. testcode::
 
         # With the Efron approximation, we expect:
-        # - for bootstrap 1, 1 * log(exp(2) + exp(3) - (0 / 1) * exp(3)) = 3.3133
+        # - for bootstrap 1, 1 * log(2 + 3 - (0 / 1) * 3) = 1.6094
         # - for bootstrap 2, 2 / 2 * [
-        #       log(exp(1) + exp(0) - (0 / 2) * exp(0))
-        #     + log(exp(1) + exp(0) - (1 / 2) * exp(0))
-        #     ] = 2.4821
+        #       log(2 + 1 - (0 / 2) * 1)
+        #     + log(2 + 1 - (1 / 2) * 1)
+        #     ] = 2.0149
         print(
             _breslow_efron_logsumexp_term(
                 time_counts=time_counts,
                 time_weights=time_weights,
-                time_weighted_scores=time_weighted_scores,
+                time_weighted_risks=time_weighted_risks,
                 unique_batch_strata_time=unique_batch_strata_time,
                 ties="efron",
                 n_batches=1,
@@ -756,19 +739,19 @@ def _breslow_efron_logsumexp_term(
 
     .. testoutput::
 
-        tensor([[3.3133],
-                [2.4821]])
+        tensor([[1.6094],
+                [2.0149]])
 
     """
 
     B, T, _, _ = time_counts.shape
 
-    # Compute "log( Sum_{observed at t} r[i] )"
-    time_log_risks =  _compute_time_log_risks(
-        time_weighted_scores=time_weighted_scores,
+    # Compute "Sum_{observed at t} r[i]"
+    time_risks =  _compute_time_risks(
+        time_weighted_risks=time_weighted_risks,
         unique_batch_strata_time=unique_batch_strata_time,
     )
-    assert time_log_risks.shape == (B, T)
+    assert time_risks.shape == (B, T)
 
     # Summation groups by (batch, strata)
     segments = keys_to_segments(unique_batch_strata_time[:2])
@@ -804,7 +787,7 @@ def _breslow_efron_logsumexp_term(
         #     *
         #     log( Sum_{observed at t} r[i] )
         #   )
-        time_contributions = dead_weights * time_log_risks
+        time_contributions = dead_weights * time_risks.log()
 
         # When dead_weights == 0, the contribution is 0, even if time_log_risks is -inf.
         # If we don't mask things out, we would end up with -inf * 0 == NaN.
@@ -823,12 +806,7 @@ def _breslow_efron_logsumexp_term(
         )
 
     elif ties == "efron":
-        # The Efron approximation is more complex:
-        # we sum the log-risks over the risk set at each time,
-        # weighted by cumulative weight of intervals that stop at that time,
-        # divided by the number of deaths at that time.
-
-        # Recall that we are computing:
+        # The Efron approximation is more complex - recall that we are computing:
         # + Sum_{death times t} (
         #     (Sum_{dead at t} w[i]) / {number of deaths at t}
         #     *
@@ -851,52 +829,52 @@ def _breslow_efron_logsumexp_term(
         assert event_counts.dtype == torch.int64
         assert (event_counts >= 0).all()
 
-        # Extract the "log(Sum_{dead at t} r[i])" from our table:
+        # Extract the "Sum_{dead at t} r[i]" from our table:
         # 0 on the 3rd dimension corresponds to "stop" time,
         # 1 on the 4th dimension corresponds to "event".
-        log_dead_risks = time_weighted_scores[:, :, 0, 1]
-        assert log_dead_risks.shape == (B, T)
-        assert log_dead_risks.dtype == torch.float32
+        dead_risks = time_weighted_risks[:, :, 0, 1]
+        assert dead_risks.shape == (B, T)
+        assert dead_risks.dtype == torch.float32
 
         # We use repeat_interleave to re-index our dataset.
         # E is the total number of deaths on the full table.
-        efron_indices, efron_bootstraps, efron_event_counts, efron_log_offsets = _compute_efron_data(event_counts)
+        efron_indices, efron_bootstraps, efron_event_counts, efron_offsets = _compute_efron_data(event_counts)
         E = len(efron_indices)
         assert event_counts.sum().item() == E
         # No-death times should not be present in efron_indices:
         assert (efron_event_counts > 0).all()
         assert efron_indices.shape == (E,)
         assert efron_event_counts.shape == (E,)
-        assert efron_log_offsets.shape == (E,)
+        assert efron_offsets.shape == (E,)
 
         # efron_indices is a (E,) Tensor of int64 that records the indices of the
         # "death" times over the flattened time table.
         # Since risk sets have varying sizes, we cannot work with a separate "Bootstrap"
         # dimension, and use flat vectors instead.
-        efron_log_dead_risks = torch.index_select(
-            log_dead_risks.view(-1),  # Flatten the time table
+        efron_dead_risks = torch.index_select(
+            dead_risks.view(-1),  # Flatten the time table
             dim=0,
             index=efron_indices,
         )
-        assert efron_log_dead_risks.shape == (E,)
-        assert efron_log_dead_risks.dtype == torch.float32
+        assert efron_dead_risks.shape == (E,)
+        assert efron_dead_risks.dtype == torch.float32
 
-        # The Efron offsets correspond to "log(k / {number of deaths at t})".
+        # The Efron offsets correspond to "k / {number of deaths at t}".
         # We use them to compute
-        # log[ (k / {number of deaths at t}) * Sum_{dead at t} r[i] ]
-        efron_log_dead_risks = efron_log_dead_risks + efron_log_offsets
-        assert efron_log_dead_risks.shape == (E,)
-        assert efron_log_dead_risks.dtype == torch.float32
-        assert not efron_log_dead_risks.isnan().any()
+        # (k / {number of deaths at t}) * Sum_{dead at t} r[i]
+        efron_dead_risks = efron_dead_risks * efron_offsets
+        assert efron_dead_risks.shape == (E,)
+        assert efron_dead_risks.dtype == torch.float32
+        assert not efron_dead_risks.isnan().any()
 
-        # Likewise, we compute the "log( Sum_{observed at t} r[i] )"
-        efron_log_observed_risks = torch.index_select(
-            time_log_risks.view(-1),  # Flatten the time table
+        # Likewise, we compute the "Sum_{observed at t} r[i]"
+        efron_observed_risks = torch.index_select(
+            time_risks.view(-1),  # Flatten the time table
             dim=0,
             index=efron_indices,
         )
-        assert efron_log_observed_risks.shape == (E,)
-        assert efron_log_observed_risks.dtype == torch.float32
+        assert efron_observed_risks.shape == (E,)
+        assert efron_observed_risks.dtype == torch.float32
 
         # Compute log(
         #             Sum_{observed at t} r[i]
@@ -905,10 +883,7 @@ def _breslow_efron_logsumexp_term(
         #             *
         #             Sum_{dead at t} r[i]
         #         )
-        efron_log_risks = logdiffexp(
-            efron_log_observed_risks,
-            efron_log_dead_risks,
-        )
+        efron_log_risks = (efron_observed_risks - efron_dead_risks).log()
         assert efron_log_risks.shape == (E,)
         assert efron_log_risks.dtype == torch.float32
         assert not efron_log_risks.isnan().any()
@@ -1218,13 +1193,15 @@ def coxph_objective_from_scores(
     )
     assert linear_term.shape == (B, dataset.n_batch)
 
-    # Aggregate the scores into time-indexed data tables
-    time_counts, time_weights, time_weighted_scores, unique_batch_strata_time = (
+    # The CoxPH model assumes an exponential relationship between the score and the risk
+    interval_risks = scores.exp()
+
+    # Aggregate the risks into time-indexed data tables
+    time_counts, time_weights, time_weighted_risks, unique_batch_strata_time = (
         _intervals_to_time_data(
-            scores=scores,
             interval_counts=bootstrap.interval_counts,
             interval_weights=bootstrap.interval_weights,
-            interval_log_weights=bootstrap.interval_log_weights,
+            interval_risks=interval_risks,
             batch=dataset.batch_intervals,
             strata=dataset.strata_intervals,
             start=dataset.start,
@@ -1237,7 +1214,7 @@ def coxph_objective_from_scores(
     logsumexp_term = _breslow_efron_logsumexp_term(
         time_counts=time_counts,
         time_weights=time_weights,
-        time_weighted_scores=time_weighted_scores,
+        time_weighted_risks=time_weighted_risks,
         unique_batch_strata_time=unique_batch_strata_time,
         ties=ties,
         n_batches=dataset.n_batch,
@@ -1335,486 +1312,3 @@ def coxph_objective(
     assert reg.shape == (B, n_batches)
 
     return obj + reg
-
-
-
-@typecheck
-def old_coxph_objective(
-    *,
-    dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
-    ties: Literal["efron", "breslow"],
-    bootstrap: Resampling,
-    mode: Literal["unit length", "start zero", "any"],
-) -> Callable[[Float32Tensor["bootstraps intervals"]], Float32Tensor["batch_size"]]:
-    """Implements the CoxPH objective.
-
-    Depending on the value of "mode", we use different optimizations:
-
-      - mode == "unit length" corresponds to the case where `stop == start + 1`.
-
-        Since we follow the survival convention and assume that all intervals are of
-        the form `(start, stop]` with integer time values for `start` and `stop`,
-        the condition above ensures that the intervals used to describe our dataset
-        overlap if and only if they share the same 'stop' time.
-
-      - mode == "start zero" corresponds to the case where `start == 0`.
-
-        This implies that all risk sets correspond to successive subsets of the dataset,
-        with computations that can be handled by a cumsum.
-
-      - mode == "any" corresponds to the general case, where we have no assumption
-        on the values of `start` and `stop`.
-
-    The objective function evaluates `batch_size` instances of the CoxPH
-    neg-log-likelihood in parallel.
-    It takes as input a collection of scores (presumably computed via a dot
-    product between a vector of parameters and a vector of covariates)
-    and returns a vector of length `batch_size == len(bootstrap) * dataset.n_batch`
-    which is identified with len(bootstrap) vectors of length data.n_batch,
-    concatenated with each other.
-
-    .. testcode::
-
-        import survivalgpu
-
-        print(1 + 1)
-
-    .. testoutput::
-
-        2
-
-    """
-    B = len(bootstrap)  # Number of bootstraps to process in parallel
-    I = dataset.n_intervals  # Number of intervals in the dataset
-    E = dataset.n_event_intervals  # Number of event intervals in the dataset
-
-    if I == 0:
-        msg = "The dataset is empty (dataset.n_intervals == 0)."
-        raise ValueError(msg)
-
-    # Pre-processing ---------------------------------------------------------------------
-    # For each bootstrap and value of (batch, strata), aggregate the
-    # "total weights for dead samples" at each time point.
-    # These are required as multiplicative factors by the Efron and Breslow approximations.
-
-    # Recall that bootstrap.interval_weights is a (n_bootstraps, n_intervals)
-    # Tensor of int64 that records the number of occurrences of each interval.
-    assert bootstrap.interval_weights.shape == (B, I)
-
-    # Compute the total weight of dead samples for every event time:
-    dead_weights = bootstrap.interval_weights[:, dataset.event == 1]
-    assert dead_weights.shape == (B, E)
-    # dead_weights is (n_bootstraps, n_event_intervals), e.g.
-    # [[1, 1, 1, 1],
-    #  [2, 0, 1, 1]]
-
-    # Recall that dataset.group is a (n_intervals,) Tensor of int64 that records
-    # the T unique values of (batch, strata, stop):
-    assert dataset.group.shape == (I,)
-
-    # Select the indices of the "death" intervals
-    dead_cluster_indices = dataset.group[dataset.event == 1].long()
-    assert dead_cluster_indices.shape == (E,)
-    # dead_cluster_indices is (n_death_intervals,), e.g.
-    # [0, 0, 1, 2]
-
-    tied_dead_weights = group_sum(
-        values=dead_weights,
-        groups=dead_cluster_indices,
-        output_size=dataset.n_groups,
-    )
-    # Equivalent to:
-    # tied_dead_weights = torch.bincount(cluster_indices[deaths == 1],
-    #                     weights=weights.view(-1)[deaths == 1],
-    #                     minlength=T)
-    #
-    # tied_dead_weights is (n_bootstraps,n_times), e.g.
-    # [[2, 1, 1],
-    #  [2, 1, 1]]
-    assert tied_dead_weights.shape == (B, dataset.n_groups)
-
-    # Create the summation groups --------------------------------------------------------
-    if ties == "breslow":
-        # The Breslow approximation is fairly straightforward,
-        # with summation groups by value of (batch, strata, stop)
-        # that correspond to the time "clusters" of people "at risks" at any given time:
-        group = dataset.group  # (n_intervals,)
-        n_groups = dataset.n_groups  # n_times
-
-        # With the Breslow approximation, the multiplicative factor
-        # in front of the log-sum-exp term is equal to
-        # (Sum_{dead at t} w[i]) = tied_dead_weights
-        # weight_factor is (n_bootstraps, n_times):
-        weight_factor = tied_dead_weights.view(len(bootstrap), n_groups)
-
-    elif ties == "efron":
-        # The Efron approximation handles "survivors" and "dying subjects"
-        # differently (in every cluster of people "at risk").
-        # To handle this, we build 2*n_times summation "groups":
-        group = 2 * dataset.group + dataset.event
-        n_groups = 2 * dataset.n_groups
-        # If dataset.group is equal to:
-        # [0, 0, 0, 0, 0, 1, 1, 1, 2, 2]
-        # And if dataset.event is equal to:
-        # [0, 0, 0, 1, 1, 0, 0, 1, 0, 1]
-        # Then group is equal to:
-        # [0, 0, 0, 1, 1, 2, 2, 3, 4, 5]
-
-        # With the Breslow approximation and weights that come from bootstrapping,
-        # the multiplicative factor in front of the log-sum-exp term is equal to 1.
-        # -> there is no need to define a weight_factor variable.
-
-    # Format the "group" vector for group-wise summations:
-    assert group.shape == (I,)
-    # group is (n_intervals,),
-    # and indicates the summation group that is associated to each interval e.g.
-    # [0, 0, 0, 0, 0, 1, 1, 1, 2, 2]
-
-    @typecheck
-    def negloglikelihood(
-        scores: Float32Tensor["bootstraps intervals"],
-    ) -> Float32Tensor["batches"]:
-        """The CoxPH neg-log-likelihood that we try to minimize.
-
-        This function takes as input a batch of score values scores[i, j],
-        each of whom corresponds to the risk score of the j-th interval
-        according to the i-th estimate of the model parameters.
-
-        For linear scores "dot(beta[i], x[j])", this corresponds to
-        scores = beta @ x.T, (B,D) @ (D,I) = (B,I)
-
-        """
-        if scores.shape[0] != B:
-            msg = (
-                f"The number of rows {scores.shape[0]} of the `scores` Tensor "
-                f"should be equal to the number of bootstrap samples {B}."
-            )
-            raise ValueError(msg)
-
-        if scores.shape[1] != I:
-            msg = (
-                f"The number of columns {scores.shape[1]} of the `scores` Tensor "
-                f"should be equal to the number of intervals {I} "
-                "that are referenced in `dataset.stop`."
-            )
-            raise ValueError(msg)
-
-
-        # The linear term in the CoxPH objective - (n_bootstraps,n_batch) ==============
-        # This is the term:
-        #
-        #   Sum_{all dead samples} w[i] * dot(x[i], b)
-        # = Sum_{all samples} w[i] * dot(x[i], b) * event[i]
-        #
-        # that we compute in parallel over:
-        # - all n_bootstrap values of the scores,
-        # - all n_batch values of the parameter vector.
-        #
-        # Note that the strata does not matter here, because we sum all contributions
-        # identically:
-        # Sum_{strata s} Sum_{all samples in strata s} ... = Sum_{all samples} ...
-        assert torch.all((dataset.event == 0) | (dataset.event == 1))
-        lin = (
-            bootstrap.interval_weights.view(B, I)
-            * scores.view(B, I)
-            * dataset.event.view(1, I)
-        )
-        lin = group_sum(
-            values=lin,
-            groups=dataset.batch_intervals,
-            output_size=dataset.n_batch,
-        )
-        assert lin.shape == (B, dataset.n_batch)
-
-        # The log-sum-exp term in the CoxPH log-likelihood - (n_bootstrap, n_batch) ====
-
-        # We add the logarithms of the weights to the scores, so that
-        # exp(weighted_scores[b,i]) = w[b,i] * exp(beta[b] . x[i]) = r[b,i]:
-        assert bootstrap.interval_log_weights.shape == (B, I)
-        weighted_scores = scores + bootstrap.interval_log_weights  # (B,I)
-        assert weighted_scores.shape == (B, I)
-
-
-        # At this stage:
-        #
-        # - weighted_scores[b,i] = log(r[b,i])
-        #   corresponds to the log-risk
-        #   for the b-th bootstrap (and therefore, the b-th parameter estimate)
-        #   and the i-th interval.
-        assert weighted_scores.shape == (B, I)
-
-        # - group[i]
-        #   corresponds to the summation group id for the i-th interval.
-        #   With "breslow", this is a unique id for (batch, strata, stop).
-        #   With "efron", this is a unique id (batch, strata, stop, event).
-        assert group.shape == (I,)
-
-        # - dataset.unique_groups[:, t]
-        #   is a vector of (batch, strata, stop) values for the t-th group id.
-        assert dataset.unique_groups.shape == (3, dataset.n_groups)
-
-        # - (batch > strata > stop > event) is lexicographically sorted:
-        assert (
-            dataset.is_sorted
-        ), "The dataset must be sorted before computing a log-likelihood."
-
-
-        if ties == "breslow":
-            # This is the term:
-            #
-            # Sum_{strata} ( Sum_{death times t} (              (***)
-            #       (Sum_{dead at t} w[i])                      (**)
-            #       *
-            #       log( Sum_{observed at t} r[i] )             (*)
-            # ))
-            #
-            #
-            # that we compute in parallel over:
-            # - all n_bootstrap values of the scores,
-            # - all n_batch values of the parameter vector.
-
-            # (*) Log-Sum-Exp over the death times,  -------------------------------------
-            # in parallel for bootstraps, batches, strata and stop:
-            # group corresponds to the values of (batch, strata, stop).
-            # groups_scores is (n_bootstraps,n_death_times)
-            group_scores = group_logsumexp(
-                values=weighted_scores,
-                groups=group,
-                output_size=n_groups,
-            )
-            assert weight_factor.shape == (B, n_groups)
-            assert group_scores.shape == (B, n_groups)
-
-            # If mode == "unit length", risks sets exactly correspond to our summation
-            # groups so we can move on to the next step.
-            # However, if mode == "start zero" or "any", risks sets correspond to
-            # unions of these summation groups so we need to aggregate the group scores
-            # to compute the true "risk set scores".
-
-            if mode == "start zero":
-                # At this point, suppose e.g. that data.unique_groups
-                # i.e. the values for (batch, strata, stop) is equal to:
-                # [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
-                #  [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 2],
-                #  [3, 4, 5, 2, 4, 5, 1, 2, 3, 3, 4, 2]]
-                #   a  b  c| d  e  f| g  h  i| k  l| m
-                # -> 5 unique values of (batch, strata)
-                #
-                #
-                # Since the "start" of all intervals is equal to 0, the risk sets
-                # within each "independent group" are
-                #
-                # - Group 1: a+b+c, b+c, c
-                # - Group 2: d+e+f, e+f, f
-                # - Group 3: g+h+i, h+i, i
-                # - Group 4: k+l, l
-                # - Group 5: m
-                #
-                # We implement this using a cumulative logsumexp.
-                # Note that risks sets shrink over time (at patients die),
-                # so we need to compute cumsums in "reverse order".
-
-                # 1) Compute the (log)cumsum(exp)
-                # [a+b+c+d+..., b+c+d+..., ..., k+l+m, l+m, m]
-                # Since cumsum starts from the first index and we are interested
-                # in "backward" sums, we must flip the tensors along the "n_group" dim:
-                cumsums = (
-                    group_scores.flip(dims=(1,)).logcumsumexp(dim=1).flip(dims=(1,))
-                )
-                assert cumsums.shape == (B, n_groups)
-
-                # 2) Compute the offsets that correspond to the different
-                #    "sums over independent groups":
-                #    [(d+e+f) + (g+...), (g+h+i) + ..., (k+l) + m, m]
-                #   These are the values of cumsum that correspond to the
-                #   "first" (reading from left to right) indices of a new group.
-                #   We do not care about the very first value, (a+b+c)+...
-
-                assert dataset.unique_groups.shape == (3, n_groups)
-
-                # batch_strata_group looks like:
-                # [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4]
-                _, batch_strata_group = torch.unique_consecutive(
-                    dataset.unique_groups[0:2],  # (batch, strata)
-                    return_inverse=True,
-                    dim=-1,
-                )
-                assert batch_strata_group.shape == (n_groups,)
-                # Recall that batch_strata_group is of length n_groups,
-                # not n_intervals.
-
-                assert n_groups > 0, "With a non-empty dataset, we always have n_groups >= 1."
-
-                # Identify the indices of the first (batch, strata, stop) group
-                # for each value of (batch, strata):
-                # ., [F, F, T, F, F, T, F, F, T, F, T]
-                first_in_batch_strata_group = (
-                    batch_strata_group[1:] != batch_strata_group[:-1]
-                )
-
-                # Fetch the values of the cumsum at this stage:
-                offsets_per_batch_strata = cumsums[:, 1:][
-                    :, first_in_batch_strata_group
-                ]
-
-                # At this stage, on every row, offsets_per_group is:
-                # [(d+e+f) + (g+...), (g+h+i) + ..., (k+l) + m, m]
-                # N.B.: Since we have discarded the cumsum over the full array,
-                #       if there is only one value for (batch, strata),
-                #       offsets_per_group = tensor([]) !
-
-                # 3) Add an arbitrary "offset" value for the last group.
-                #    This is to avoid indexing on empty tensors, but won't be used.
-                offsets_per_batch_strata = torch.cat(
-                    (
-                        offsets_per_batch_strata,
-                        torch.zeros_like(group_scores[:, :1]),
-                    ),  # (B, 1)
-                    dim=1,
-                )
-                assert offsets_per_batch_strata.shape == (B, batch_strata_group[-1] + 1)
-
-                # 4) Unwrap this offset into a tensor of shape (batch, n_groups).
-                #    On every row:
-                #   [(d+e+f)+..., idem, idem, (g+h+i)+..., ..., m, m, 0]
-                offsets_per_group = offsets_per_batch_strata[:, batch_strata_group]
-                assert offsets_per_group.shape == (B, n_groups)
-
-                # 5) We now want to subtract the offsets from the cumsums.
-                #    This is not trivial, because we are dealing with logsumexps
-                #    instead of sums. We use the following identity:
-                #    if a > b,
-                #    log(e^a - e^b) = log( e^a  * (1 - e^(b-a)))
-                #                   = a + log(1 - e^(b-a))
-                def log1mexp(x):
-                    """Numerically accurate evaluation of log(1 - exp(x)) for x < 0.
-
-                    See https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf for details.
-
-                    We rely on numerically stable implementations of
-                    [x -> log(1+x)] and [x -> exp(x)-1] for x close to 0.
-
-                    If -log(2) < x < 0, we use the following identity:
-                    log(1 - exp(x)) = log(-(exp(x) - 1))
-
-                    If x <= -log(2), we use the following identity:
-                    log(1 - exp(x)) = log1p(-exp(x))
-                    """
-                    mask = -np.log(2) < x  # x < 0
-                    return torch.where(
-                        mask,
-                        (-x.expm1()).log(),
-                        (-x.exp()).log1p(),
-                    )
-
-                # For the last group (the right-most one), there is no offset:
-                last_batch_strata = batch_strata_group == batch_strata_group[-1]
-                last_batch_strata = last_batch_strata.view(n_groups)
-
-                assert torch.all(
-                    cumsums[:, ~last_batch_strata]
-                    > offsets_per_group[:, ~last_batch_strata]
-                )
-
-                group_scores = torch.where(
-                    last_batch_strata,
-                    cumsums,
-                    cumsums + log1mexp(offsets_per_group - cumsums),
-                )
-                assert group_scores.shape == (B, n_groups)
-
-            # (**) Product with (Sum_{dead at t} w[i]): ----------------------------------
-            lse = weight_factor * group_scores
-            assert lse.shape == (B, n_groups)
-
-            # (***) Sum over strata and the death time stop, -----------------------------
-            # in parallel for bootstraps and batches:
-            lse = group_sum(
-                values=lse,
-                # "batch" value for each unique (batch, strata, stop) triplet
-                groups=dataset.unique_groups[0],
-                output_size=dataset.n_batch,
-            )
-
-            assert lse.shape == (B, dataset.n_batch)
-
-        # TODO: Update Efron too!
-        elif ties == "efron":
-            msg = "We are currently re-writing the Efron approximation rule with support for batches and strata."
-            raise NotImplementedError(msg)
-            # groups_scores is (B,T*2)
-            group_scores = group_logsumexp(
-                values=weighted_scores,
-                groups=groups,
-                output_size=T * 2,
-            )
-            # We reshape it as a (B,T,2) array that contains, for every batch b
-            # and every death time t, the log-sum-exp values that correspond
-            # to "survivors" (= group_scores[b,t,0]) and
-            # "tied deaths" (= group_scors[b,t,1]).
-            group_scores = group_scores.view(B, T, 2)
-
-            # To implement the Efron rule efficiently, we need to sort the B*T
-            # groups by increasing number of deaths.
-            # Please note that at this point, we mix together times that come
-            # from different batches.
-            # Please also note that since the tied_dead_weights come from bootstraps,
-            # tied deaths are extremely likely to happen.
-            order = tied_dead_weights.view(B * T).argsort()
-            sorted_dead_weights = tied_dead_weights.view(B * T)[order]  # (B*T,)
-            sorted_group_scores = group_scores.view(B * T, 2)[order, :]  # (B*T, 2)
-
-            # We compute the "slice indices" that correspond to sorted_dead_weights:
-            bincounts = torch.bincount(sorted_dead_weights.long())
-            # bincounts is (Max_tied_deaths+1,).
-            # It looks like:
-            # [4, 5, 1, 0, 3, 0, 0, 1],  (shape = (8,))
-            # i.e. there are:
-            # - 4 times where no one dies,
-            # - 5 times where there is a single death (= no ties),
-            # - 1 time with 2 tied deaths,
-            # - 3 times with 4 tied deaths,
-            # - 1 time with 7 tied deaths.
-            slice_indices = torch.cumsum(bincounts, dim=0).long()
-            # slice_indices is (Max_tied_deaths+1,).
-            # It looks like:
-            # [4, 9, 10, 10, 13, 13, 13, 14],  (shape = (8,))
-
-            # Our buffer for the time-wise values:
-            slices = [torch.zeros_like(sorted_group_scores[:, 0])]  # (B*T,)
-            for it, slice_start in enumerate(slice_indices):
-                sliced_scores = sorted_group_scores[slice_start:, :]  # (#ties > it, 2)
-                sliced_dead_weights = sorted_dead_weights[slice_start:]  # (#ties > it,)
-                # sliced_scores[:,1] = sliced_scores[:,1] + np.log(it+1) - sliced_dead_weights.log()
-                sliced_scores = torch.stack(
-                    (
-                        sliced_scores[:, 0].clamp(min=-(10**6)),
-                        sliced_scores[:, 1]
-                        + np.log(it + 1)
-                        - sliced_dead_weights.log(),
-                    ),
-                    dim=1,
-                )
-
-                new_scores = sliced_scores.logsumexp(dim=-1)
-                slices.append(new_scores)
-
-                # The PyTorch autograd engine does not support in-place operations,
-                # so we have to use a custom operator to implement the update:
-                # sorted_scores[slice_start:] = sorted_scores[slice_start:] + new_scores
-                # in a differentiable way.
-
-            sorted_scores = SlicedSummation.apply(slice_indices, *slices)
-
-            # We now need to re-sort
-            time_scores = torch.zeros_like(sorted_group_scores[:, 0])  # (B*T,)
-            time_scores[order] = sorted_scores
-
-            # The log-sum-exp term in the CoxPH log-likelihood - (B,):
-            lse = time_scores.view(B, T).sum(1)
-
-        # lin and lse are (n_bootstrap, n_batch)
-        ret_value = lse - lin  # (n_bootstrap, n_batch) values, computed in parallel
-        return ret_value.view(B * dataset.n_batch)
-
-    return negloglikelihood

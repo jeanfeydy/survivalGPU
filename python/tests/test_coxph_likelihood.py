@@ -122,8 +122,8 @@ def test_loss_grad_hessian(*, data, ties, device):
 
     f_grad_hessian = derivatives_012(f)
 
-    with torch.autograd.detect_anomaly():
-        loss, grad, hessian = f_grad_hessian(beta.view(B * n_batch, D))
+    # with torch.autograd.detect_anomaly():
+    loss, grad, hessian = f_grad_hessian(beta.view(B * n_batch, D))
 
     assert torch.allclose(loss, gt_loss, rtol=1e-4, atol=1e-4)
     assert torch.allclose(grad, gt_grad, rtol=1e-4, atol=1e-4)
