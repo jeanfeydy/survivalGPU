@@ -1,14 +1,13 @@
 import numpy as np
-import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.testing import assert_allclose
-from survivalgpu import CoxPHSurvivalAnalysis, coxph_R
+from survivalgpu import CoxPHSurvivalAnalysis
 
 np.set_printoptions(precision=4)
 
-SUPPORTED_TIES = ["breslow"]  # , "efron"]
-SUPPORTED_MODES = ["unit length", "start zero"]  # , "any"]
+SUPPORTED_TIES = ["breslow", "efron"]
+SUPPORTED_MODES = ["unit length", "start zero", "any"]
 
 challenges = [
     np.array(
@@ -34,14 +33,16 @@ challenges = [
 ]
 
 
-@pytest.mark.skip()
 @given(
     ties=st.sampled_from(SUPPORTED_TIES),
     alpha=st.just(0.1),
     mode=st.sampled_from(SUPPORTED_MODES),
     example=st.integers(min_value=0, max_value=len(challenges) - 1),
 )
+@settings(deadline=1000)
 def test_doscale_identity(*, ties, alpha, mode, example):
+    """Checks that doscale=True and doscale=False give the same results on small datasets."""
+
     data_csv = challenges[example]
     ds = {
         "stop": data_csv[:, 0].astype(np.int64),
@@ -58,6 +59,8 @@ def test_doscale_identity(*, ties, alpha, mode, example):
         start = ds["stop"] - 1
     elif mode == "start zero":
         start = np.zeros_like(ds["stop"])
+    elif mode == "any":
+        start = -ds["stop"]
 
     for model in models:
         model.fit(
@@ -70,96 +73,10 @@ def test_doscale_identity(*, ties, alpha, mode, example):
     for attr in dir(models[0]):
         if attr.endswith("_") and not attr.endswith("__"):
             for m in models[1:]:
-                if attr in [
-                    "score_"
-                ]:  # "coef_", "imat_", "std_", "hessian_"]:
-                    continue
-                print(attr)
                 assert_allclose(
                     getattr(models[0], attr),
                     getattr(m, attr),
                     atol=1e-3,
-                    rtol=5e-2 if attr in ["imat_", "std_"] else 1e-2,
-                    err_msg=f"Attributes m.{attr} do not coincide.",
-                )
-    print(ties, alpha, mode)
-    if False:
-        for ties in ["efron", "breslow"]:
-            for doscale in [True, False]:
-                print(f"\nties = {ties}, doscale = {doscale} ========")
-                res = coxph_R(
-                    data,
-                    "stop",
-                    "death",
-                    ["covar1", "covar2"],
-                    bootstrap=1,
-                    ties=ties,
-                    doscale=doscale,
-                    profile=None,
-                )
-                for key, item in res.items():
-                    print(f"{key}:")
-                    print(item)
-
-
-@pytest.mark.skip()
-@given(
-    n_patients=st.integers(min_value=10, max_value=20),
-    n_covariates=st.integers(min_value=1, max_value=5),
-    n_batch=st.integers(min_value=1, max_value=3),
-    n_strata=st.integers(min_value=1, max_value=3),
-    ties=st.sampled_from(SUPPORTED_TIES),
-    alpha=st.floats(min_value=0.1, max_value=1),
-    doscale=st.booleans(),
-)
-def test_modes_equality(
-    *, n_patients, n_covariates, n_batch, n_strata, ties, alpha, doscale
-):
-    """Checks that all implementations of the CoxPH likelihood coincide when start=0, stop=1."""
-    models = [
-        CoxPHSurvivalAnalysis(
-            ties=ties, alpha=alpha, mode=mode, doscale=doscale
-        )
-        for mode in SUPPORTED_MODES
-    ]
-    # We need at least two patients per batch to ensure identifiability
-    # and thus test equality:
-    n_patients = max(n_patients, 2 * n_batch)
-
-    rng = np.random.default_rng()
-    covariates = rng.standard_normal(size=(n_patients, n_covariates))
-    start = np.zeros(n_patients, dtype=np.int64)
-    stop = np.ones(n_patients, dtype=np.int64)
-    event = rng.integers(0, 2, size=n_patients, dtype=np.int64)
-    batch = rng.integers(0, n_batch, size=n_patients, dtype=np.int64)
-    strata = rng.integers(0, n_strata, size=n_patients, dtype=np.int64)
-
-    # Ensure that the problem is not degenerate:
-    for k in range(n_batch):
-        event[2 * k] = 0
-        event[2 * k + 1] = 1
-        batch[2 * k : 2 * k + 2] = k
-        strata[2 * k : 2 * k + 2] = 0
-
-    for model in models:
-        model.fit(
-            covariates=covariates,
-            stop=stop,
-            start=start,
-            event=event,
-            batch=batch,
-            strata=strata,
-        )
-
-    for attr in dir(models[0]):
-        if attr.endswith("_") and not attr.endswith("__"):
-            for m in models[1:]:
-                if attr in ["sctest_init_"]:  # ["hessian_", "imat_"]:
-                    continue
-                assert_allclose(
-                    getattr(models[0], attr),
-                    getattr(m, attr),
-                    atol=1e-2 if attr in ["score_"] else 1e-3,
                     rtol=5e-2 if attr in ["imat_", "std_"] else 1e-2,
                     err_msg=f"Attributes m.{attr} do not coincide.",
                 )

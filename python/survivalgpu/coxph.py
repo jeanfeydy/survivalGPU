@@ -151,8 +151,6 @@ class CoxPHSurvivalAnalysis:
 
             # Case 3: general case )start, stop], we use two cumulative hazards:
             else:
-                msg = "Currently, general intervals are not supported."
-                raise NotImplementedError(msg)
                 mode = "any"
 
         else:
@@ -448,16 +446,6 @@ def coxph_R(
     doscale=False,
     profile=None,
 ):
-    if ties == "efron":
-        # Raise Warning and change to "breslow"
-        import warnings
-
-        warnings.warn(
-            "Efron ties are not yet supported in our new implementation. "
-            "Switching to the 'breslow' approximation.", stacklevel=2
-        )
-        ties = "breslow"
-
     if profile is not None:
         print("Profile trace:", profile)
         print("use_cuda:", use_cuda)
