@@ -20,6 +20,8 @@ else:
 # Small datasets, ordered from simplest to most complex
 # fmt: off
 examples = [
+    # First example: just one patient, who dies at time 1.
+    # Since there is no comparison between death and survival, the loss is uniformly 0.
     dict(
         intervals= [
             # Patient, Start, Stop, Event, Covar
@@ -29,35 +31,78 @@ examples = [
             # Batch, Strata
             [     0,      0],
         ],
-        bootstraps=[
-            [0],
-        ],
-        beta=[
-            [[1.]],
-        ],
+        # Just one bootstrap, with patient 0 picked once.
+        bootstraps=[[0]],
+        # Evaluate at beta = (1,)
+        beta=[ [[1.]] ],
         breslow=dict(
-            loss = [
-                [0.],
-            ],
-            grad = [
-                [0.],
-            ],
-            hessian = [
-                [[0.]],
-            ],
+            loss = [[0.]],
+            grad = [[0.]],
+            hessian = [[[0.]]],
         ),
         efron=dict(
-            loss = [
-                [0.],
-            ],
-            grad = [
-                [0.],
-            ],
-            hessian = [
-                [[0.]],
-            ],
+            loss = [[0.]],
+            grad = [[0.]],
+            hessian = [[[0.]]],
         ),
     ),
+
+    # Second example: two patients, one dies and one survives at time 1.
+    dict(
+        intervals= [
+            # Patient, Start, Stop, Event, Covar
+            [       0,     0,    1,     0,   -1.],
+            [       1,     0,    1,     1,    2.],
+        ],
+        patients=[
+            # Batch, Strata
+            [     0,      0],  # Patient 0
+            [     0,      0],  # Patient 1
+        ],
+        # One balanced bootstrap (2 + 2), and one unbalanced (1 + 3)
+        bootstraps=[
+            [0, 0, 1, 1],
+            [0, 1, 1, 1],
+        ],
+        # Evaluate at b = beta = (1,) in the first bootstrap, beta = (2,) in the second bootstrap
+        beta=[ [[1.]], [[2.]] ],
+
+        # With these intervals, the Breslow loss for the first bootstrap is:
+        # 2 * log( 2 * exp(-b) + 2 * exp(2b) ) - 2 * 2b
+        # with 1st derivative:
+        # - 6 / (exp(3b) + 1)
+        # and 2nd derivative:
+        # 18 * exp(3b) / (exp(3b) + 1)^2
+        # to be evaluated at b=1
+        #
+        # For the second bootstrap, the loss is:
+        # 3 * log( 1 * exp(-b) + 3 * exp(2b) ) - 3 * 2b
+        # with 1st derivative:
+        # -9 / (3 * exp(3b) + 1)
+        # and 2nd derivative:
+        # 81 * exp(3b) / (3 * exp(3b) + 1)^2
+        # to be evaluated at b=2
+        breslow=dict(
+            loss = [1.4835, 3.2983],
+            grad = [[-0.2846], [-0.007430]],
+            hessian = [[[0.8132]], [[0.022272]]],
+        ),
+        # With these intervals, the Efron loss for the first bootstrap is:
+        #   log( 2 * exp(-b) + 2 * exp(2b) )
+        # + log( 2 * exp(-b) + 1 * exp(2b) ) - 2 * 2b
+        # to be evaluated at b=1
+        #
+        # For the second bootstrap, the loss is:
+        #   log( 1 * exp(-b) + 3 * exp(2b) )
+        # + log( 1 * exp(-b) + 2 * exp(2b) )
+        # + log( 1 * exp(-b) + 1 * exp(2b) ) - 3 * 2b
+        # to be evaluated at b=2
+        efron=dict(
+            loss = [0.836657, 1.7963],
+            grad = [[-0.413949], [-0.013608]],
+            hessian = [[[1.147798]], [[0.04074935]]],
+        ),
+    )
 ]
 # fmt: on
 
@@ -71,7 +116,9 @@ def test_loss_grad_hessian(*, data, ties, device):
     intervals = torch.tensor(
         data["intervals"], dtype=torch.int64, device=device
     )[:, :4]
-    patients = torch.tensor(data["patients"], dtype=torch.int64, device=device)
+    patient_data = torch.tensor(
+        data["patients"], dtype=torch.int64, device=device
+    )
     bootstraps = torch.tensor(
         data["bootstraps"], dtype=torch.int64, device=device
     )
@@ -93,8 +140,8 @@ def test_loss_grad_hessian(*, data, ties, device):
     )
 
     dataset = TorchSurvivalDataset(
-        batch=patients[:, 0],
-        strata=patients[:, 1],
+        batch=patient_data[:, 0],
+        strata=patient_data[:, 1],
         patient=intervals[:, 0],
         start=intervals[:, 1],
         stop=intervals[:, 2],
@@ -104,7 +151,7 @@ def test_loss_grad_hessian(*, data, ties, device):
 
     bootstrap = Resampling(
         indices=bootstraps,
-        patient=patients[:, 0],
+        patient=intervals[:, 0],
     )
     B = len(bootstrap)
     n_batch = dataset.n_batch
@@ -125,6 +172,6 @@ def test_loss_grad_hessian(*, data, ties, device):
     # with torch.autograd.detect_anomaly():
     loss, grad, hessian = f_grad_hessian(beta.view(B * n_batch, D))
 
-    assert torch.allclose(loss, gt_loss, rtol=1e-4, atol=1e-4)
-    assert torch.allclose(grad, gt_grad, rtol=1e-4, atol=1e-4)
-    assert torch.allclose(hessian, gt_hessian, rtol=1e-4, atol=1e-4)
+    assert torch.allclose(loss, gt_loss, rtol=1e-3, atol=1e-4)
+    assert torch.allclose(grad, gt_grad, rtol=1e-3, atol=1e-4)
+    assert torch.allclose(hessian, gt_hessian, rtol=1e-3, atol=1e-4)

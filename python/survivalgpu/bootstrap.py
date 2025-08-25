@@ -21,18 +21,67 @@ class Resampling:
     the dataset: it is typically larger than P.
 
     Attributes:
-        patient_weights (B, P) float32 Tensor:
+        patient_counts (B, P) int64 Tensor:
             The number of times each patient is drawn in each bootstrap sample.
             This is typically a tensor of integers that sum up to P, such as:
             [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
              [2, 1, 1, 2, 0, 0, 1, 0, 2, 1]]
-        patient_log_weights (B, P) float32 Tensor:
-            The pre-computed logarithms of the patient weights above.
+        patient_weights (B, P) float32 Tensor:
+            The total weights of patient drawn in each bootstrap sample.
+            By default, this is equal to patient_counts.float().
+        interval_counts (B, I) int64 Tensor:
+            The number of times each interval is present in each bootstrap sample.
+            Intervals that correspond to the same patient hold the same value.
         interval_weights (B, I) float32 Tensor:
             The number of times each interval is present in each bootstrap sample.
             Intervals that correspond to the same patient hold the same value.
-        interval_log_weights (B, I) float32 Tensor:
-            The pre-computed logarithms of the interval weights above.
+
+    Examples
+    --------
+
+    .. testcode::
+
+        import torch
+        from survivalgpu.bootstrap import Resampling
+
+        samples = Resampling(
+            indices=torch.tensor([[0, 0, 1, 1], [0, 1, 1, 1]]),
+            patient=torch.tensor([1, 0, 0]),
+        )
+        print(samples.patient_counts)
+
+    .. testoutput::
+
+        tensor([[2, 2],
+                [1, 3]])
+
+    .. testcode::
+
+        print(samples.patient_weights)
+
+    .. testoutput::
+
+        tensor([[2., 2.],
+                [1., 3.]])
+
+    .. testcode::
+
+        print(samples.interval_counts)
+
+    .. testoutput::
+
+        tensor([[2, 2, 2],
+                [3, 1, 1]])
+
+    .. testcode::
+
+        print(samples.interval_weights)
+
+    .. testoutput::
+
+        tensor([[2., 2., 2.],
+                [3., 1., 1.]])
+
     """
 
     @typecheck
@@ -90,6 +139,7 @@ class Resampling:
         # sample_weights is (B, S),
         # indices is (B, S) with values in [0, P-1]
         # -> patient weights is (B, P)
+        assert (indices < P).all()
         self.patient_counts = group_sum(
             values=sample_counts,
             groups=indices,
@@ -111,22 +161,12 @@ class Resampling:
         # [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         #  [2, 1, 1, 2, 0, 0, 1, 0, 2, 1]]
 
-        # Pre-compute the logarithms of the weights:
-        # TODO: We are currently adding a small value to prevent NaN.
-        #       This is not very clean...
-        self.patient_log_weights = stable_log(self.patient_weights)  # (B,P), e.g.
-        assert self.patient_log_weights.shape == (B, P)
-        # [[ 0, 0, 0,  0,   0,   0, 0,    0,  0, 0],
-        #  [.7, 0, 0, .7,-inf,-inf, 0, -inf, .7, 0]]
-
         # Step 2: compute the interval weights -------------------------------------------
         self.interval_counts = self.patient_counts[:, patient]
         self.interval_weights = self.patient_weights[:, patient]
-        self.interval_log_weights = stable_log(self.interval_weights)
 
         assert self.interval_counts.shape == (B, I)
         assert self.interval_weights.shape == (B, I)
-        assert self.interval_log_weights.shape == (B, I)
 
     @typecheck
     def __len__(self) -> int:

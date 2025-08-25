@@ -41,30 +41,6 @@ With the Efron convention, the neg-log-likelihood is equal to:
         )
     )
 
-We assume that the weights w[i] are integer numbers used for copy-free bootstrapping,
-which implies that:
-Sum_{dead at t} w[i] = {number of deaths at t}.
-
-This simplifies the Efron expression as:
-
-- Sum_{all dead samples} w[i] * dot(x[i], b)
-+ Sum_{death times t} (
-    Sum_{k=1}^{Sum_{dead at t} w[i]} (
-        log(
-            Sum_{survived at t} r[i]
-            +
-            (k / {Sum_{dead at t} w[i]})
-            *
-            Sum_{dead at t} r[i]
-            )
-        )
-    )
-
-All the log-sum-exp computations are performed in a numerically stable way,
-by applying the max-factorization trick (https://en.wikipedia.org/wiki/LogSumExp)
-on the weighted scores:
-    log(r[i]) = log(w[i]) + dot(x[i], b)
-
 """
 
 # ======================================================================================
