@@ -40,7 +40,7 @@ test = [
   "pre-commit",
   "pytest",
   "pytest-cov",
-  "pytest-sphinx",
+  "git+https://github.com/jeanfeydy/pytest-sphinx.git",
 ]
 
 all = ["survivalgpu[test]"] # https://stackoverflow.com/questions/75490231/pip-pyproject-toml-can-optional-dependency-groups-require-other-optional-depend

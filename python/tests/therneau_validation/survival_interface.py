@@ -9,11 +9,11 @@ survival = importr("survival")
 
 def coxphfit_to_dict(surv_fit):
     return {
-        "coef_": np.array(surv_fit["coefficients"]).reshape(1, -1),
-        "loglik_": np.array(surv_fit["loglik"])[1],
-        "loglik_init_": np.array(surv_fit["loglik"])[0],
-        "hessian_": np.array(surv_fit["var"]),
-        "iter_": int(surv_fit["iter"][0]),
+        "coef_": np.array(surv_fit.getbyname("coefficients")).reshape(1, -1),
+        "loglik_": np.array(surv_fit.getbyname("loglik"))[1],
+        "loglik_init_": np.array(surv_fit.getbyname("loglik"))[0],
+        "hessian_": np.array(surv_fit.getbyname("var")),
+        "iter_": int(surv_fit.getbyname("iter")[0]),
     }
 
 
