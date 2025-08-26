@@ -144,7 +144,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
   wce <- wce_R(
     data = data, ids = id, covars = py_covariates, stop = stop,
-    doses = expos, events = event, nknots = nknots,
+    doses = expos, events = event, n_knots = nknots,
     constrained = py_constrained, cutoff = cutoff,
     bootstrap = nbootstraps, batchsize = batchsize
   )

@@ -37,6 +37,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff pytest pytest-cov hypothesis
+          pip install git+https://github.com/jeanfeydy/pytest-sphinx.git
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install rpy2
           export LD_LIBRARY_PATH=$(python -m rpy2.situation LD_LIBRARY_PATH):${LD_LIBRARY_PATH}
