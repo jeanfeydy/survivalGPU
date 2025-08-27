@@ -22,8 +22,8 @@ Units (with CPU).
 
 survivalGPU is a package based on a package written in python, dependent
 on the `reticulate` R package. To use it, it’s necessary to have
-installed some python libraries such as `torch`, `torch-scatter`, and
-`pykeops`. To use survivalGPU, you can create a virtual python
+installed some python libraries such as `torch` and `pykeops`.
+To use survivalGPU, you can create a virtual python
 environment through `reticulate`. It’s highly recommended to not to use
 the default python executable.
 
@@ -31,8 +31,7 @@ the default python executable.
 library(reticulate)
 
 virtualenv_create("survivalGPU")
-virtualenv_install("survivalGPU", packages = c("torch", "torch_scatter",
-                                               "pykeops", "matplotlib",
+virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
                                                "beartype", "jaxtyping"))
 # torch takes a long time to set up
 ```
