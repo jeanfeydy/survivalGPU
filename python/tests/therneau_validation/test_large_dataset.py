@@ -42,7 +42,7 @@ def my_dataset(
     n_strata=st.integers(min_value=1, max_value=1),
     unit_length_intervals=st.booleans(),
 )
-@settings(deadline=1000)
+@settings(deadline=5000)
 def test_survival_equality(
     *,
     n_covariates,

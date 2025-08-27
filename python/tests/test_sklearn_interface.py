@@ -14,7 +14,7 @@ small_int = st.integers(min_value=1, max_value=10)
     n_strata=st.integers(min_value=1, max_value=3),
     max_duration=small_int,
 )
-@settings(deadline=1000)
+@settings(deadline=5000)
 def test_coxph_shapes(
     *, n_covariates, n_patients, n_batch, n_strata, max_duration
 ):

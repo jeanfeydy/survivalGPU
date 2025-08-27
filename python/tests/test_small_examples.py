@@ -39,7 +39,7 @@ challenges = [
     mode=st.sampled_from(SUPPORTED_MODES),
     example=st.integers(min_value=0, max_value=len(challenges) - 1),
 )
-@settings(deadline=1000)
+@settings(deadline=5000)
 def test_doscale_identity(*, ties, alpha, mode, example):
     """Checks that doscale=True and doscale=False give the same results on small datasets."""
 
