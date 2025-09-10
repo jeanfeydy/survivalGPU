@@ -192,7 +192,7 @@ class WCESurvivalAnalysis:
     def atoms(self):
         """Samples the B-spline basis functions on the interval [0, cutoff-1]."""
         atoms, _ = bspline_atoms(
-            cutoff=self.cutoff, order=self.order, knots=self.n_knots
+            cutoff=self.cutoff, order=self.order, nknots=self.n_knots
         )
         atoms = self._constrain(atoms)
         assert atoms.shape == (self.cutoff, self.n_atoms)
@@ -262,6 +262,7 @@ class WCESurvivalAnalysis:
         # Step 1: compute the time-dependent features (= exposures)
         exposures, knots = self._wce_features(patient=patient, dose=dose, time=stop)
         assert exposures.shape == (len(stop), self.n_atoms)
+        exposures = np.array(exposures, dtype=np.float64)
 
         # Step 2: perform a CoxPH regression with the new covariates
         if covariates is None:
@@ -307,7 +308,7 @@ class WCESurvivalAnalysis:
         assert self.WCE_coef_.shape == (n_batch, self.n_atoms)
         # Estimated risk function:
         # (n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_batch, cutoff)
-        self.risk_function_ = self.WCE_coef_ @ self.atoms.T
+        self.risk_function_ = torch.from_numpy(self.WCE_coef_).to(device) @ self.atoms.T
         assert self.risk_function_.shape == (n_batch, self.cutoff)
 
         # Standard deviations for the coefficients:
