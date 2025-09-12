@@ -349,7 +349,7 @@ class WCESurvivalAnalysis:
 
             # Estimated risk function:
             # (n_bootstraps, n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_bootstraps, n_batch, cutoff)
-            self.bootstrap_risk_functions_ = self.bootstrap_WCE_coef_ @ self.atoms.T
+            self.bootstrap_risk_functions_ = torch.tensor(self.bootstrap_WCE_coef_, dtype=float32)@ self.atoms.T
 
         # Usual CoxPH results: -------------------------------------------------
         self.means_ = self.survival_model.means_
@@ -360,6 +360,41 @@ class WCESurvivalAnalysis:
         self.hessian_ = self.survival_model.hessian_
         self.imat_ = self.survival_model.imat_
         self.iter_ = self.survival_model.iter_
+
+
+    def HR(self,
+           vecnum:Int64Array["intervals"],
+           vecdenom:Int64Array["intervals"],
+           level = 0.95):
+
+        """Computes the Hazard Ratio between two vectors of doses.
+        Args:
+            vecnum ((Intervals,) int64 array): a vector of doses for the numerator.
+            vecdenom ((Intervals,) int64 array): a vector of doses for the denominator.
+        Returns:
+            (Intervals,) float64 array: the Hazard Ratio between the two vectors of doses.
+            """
+
+        cutoff = self.cutoff
+
+        print("starting HR")
+
+
+        if (len(vecnum) != cutoff) or (len(vecdenom) != cutoff):
+            msg = f"vecnum and vecdenom should have length {cutoff}."
+            raise ValueError(msg)
+
+        if hasattr(self, "bootstrap_risk_functions_"):
+            hr_boot = np.exp(self.bootstrap_risk_functions_.squeeze(1) @ (vecnum - vecdenom)).tolist()
+            lower = np.quantile(hr_boot, (1-level)/2).tolist()
+            upper = np.quantile(hr_boot, 1-(1-level)/2).tolist()
+            hr = np.exp(self.risk_function_.reshape(-1) @ (vecnum - vecdenom)).tolist()
+            return {"HR" : hr, "CI_lower": lower, "CI_upper": upper}
+
+        else:
+            hr = np.exp(self.risk_function_.reshape(-1) @ (vecnum - vecdenom)).tolist()
+            return {"HR" : hr}
+
 
 
 def wce_numpy(
