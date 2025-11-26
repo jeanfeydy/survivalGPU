@@ -139,7 +139,6 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     py_constrained <- constrained
   }
 
-  print("preparing covariates")
 
   if (length(covariates) < 2) {
     py_covariates <- as.list(covariates)
@@ -191,7 +190,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
 
   # bootstrap_WCE_mat <- wce$bootstrap_risk_functions
-  # bootstrap_coef <- wce$bootstrap_coef
+  # bootstrap_beta.hat.covariates <- wce$bootstrap_beta.hat.covariates
   # bootstrap_est <- wce$bootstrap_WCE_coef
 
 
@@ -241,12 +240,14 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   # List to return
   results <- list(
     knotsmat = knotsmat,
-    WCEmat = WCEmat,
-    loglik = loglik,
-    coef = coef,
+    beta.hat.covariates = beta.hat.covariates,
+    se.covariate = se.covariate,
     est = est,
+    SED = SED,
+    WCEmat = WCEmat,
     vcovmat = vcovmat,
     covariates = covariates,
+    loglik = loglik,
     constrained = constrained,
     nevents = nevents,
     aic = aic,
@@ -259,20 +260,21 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
   if (nbootstraps > 1) {
 
-    bootstrap_coef <- drop(wce$bootstrap_coef)
-    rownames(bootstrap_coef) <- paste0("bootstrap", 1:nbootstraps)
-    colnames(bootstrap_coef) <- covariates
-    print("bootstrap_coef OK")
-    print(bootstrap_coef)
+    bootstrap_beta.hat.covariates <- drop(wce$bootstrap_coef)
+    rownames(bootstrap_beta.hat.covariates) <- paste0("bootstrap", 1:nbootstraps)
+    colnames(bootstrap_beta.hat.covariates) <- covariates
+    results$bootstrap_beta.hat.covariates <- bootstrap_beta.hat.covariates
 
     bootstrap_est <- drop(wce$bootstrap_WCE_coef)
     rownames(bootstrap_est) <- paste0("bootstrap", 1:nbootstraps)
     colnames(bootstrap_est) <- paste0("D", 1:(ncol(bootstrap_est)))
+    results$bootstrap_est <- bootstrap_est
 
 
     WCEmat_bootstrap = wce$bootstrap_risk_functions
     rownames(WCEmat_bootstrap) <- paste0("bootstrap", 1:nbootstraps)
     colnames(WCEmat_bootstrap) <- paste0("t", 1:cutoff)
+    results$WCEmat_bootstrap <- WCEmat_bootstrap
 
 
 
@@ -282,8 +284,10 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
 
     # confidence Interval for coefficients (default 95%)
-    results$coef_CI <- results$coef_CI <- apply(bootstrap_coef, 2, stats::quantile, p = probs)
+    results$coef_CI <- results$coef_CI <- apply(bootstrap_beta.hat.covariates, 2, stats::quantile, p = probs)
     results$est_CI <- results$coef_CI <- apply(bootstrap_est, 2, stats::quantile, p = probs)
+
+
 
   }
 
@@ -416,11 +420,14 @@ print.wceGPU <- function(x, ...) {
 #' @exportS3Method summary wceGPU
 #' @rdname wceGPU
 summary.wceGPU <- function(object, ...) {
-  estimates <- object$coef[1, object$covariates]
-  se_estimates <- object$SE[1, object$covariates]
+  estimates <- object$beta.hat.covariates
+  se_estimates <- object$se.covariate
   z <- estimates / se_estimates
   p <- 2 * pnorm(-abs(z))
   conf.int <- confint(object, level = object$confint, parm = object$covariates)
+
+  print(conf.int)
+  # print(conf.int[, 1])
 
   coef_mat <- data.frame(
     coef = estimates,
@@ -578,7 +585,10 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
 #' @exportS3Method confint wceGPU
 #' @rdname wceGPU
 confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
-  cf <- object$coef[1, ]
+
+  cf <- object$beta.hat.covariates[1,]
+  print(cf)
+
   pnames <- names(cf)
   if (missing(parm)) {
     parm <- pnames
@@ -588,11 +598,19 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
   a <- (1 - level) / 2
   a <- c(a, 1 - a)
   pct <- paste(format(100 * a, trim = TRUE, scientific = FALSE, digits = digits), "%")
+  print("pct")
+  print(pct)
   fac <- qnorm(a)
+  print("fac")
+  print(fac)
   ci <- array(NA, dim = c(length(parm), 2L), dimnames = list(parm, pct))
-  ses <- sqrt(diag(object$vcovmat[[1]]))[parm]
+  print("ci")
+  print(ci)
+  ses <- sqrt(diag(object$vcovmat))[parm] # seems to be same thing as object$se.covariate
   ci[] <- cf[parm] + ses %o% fac
   ci
+  print(ci)
+  print("end confint" )
 }
 
 
