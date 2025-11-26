@@ -124,9 +124,12 @@ wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
 #' @exportS3Method wceGPU default
 wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                            aic = FALSE, id, event, start, stop, expos,
-                           covariates = NULL, nbootstraps = 1, batchsize = 0,
+                           covariates = NULL, nbootstraps = 0, batchsize = 0,
                            confint = 0.95, controls = NULL, ...) {
   # survivalgpu <- use_survivalGPU()
+
+
+
   wce_R <- survivalgpu$wce_R
 
   # Minor changes for python inputs
@@ -136,11 +139,14 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     py_constrained <- constrained
   }
 
+  print("preparing covariates")
+
   if (length(covariates) < 2) {
     py_covariates <- as.list(covariates)
   } else {
     py_covariates <- covariates
   }
+
 
   wce <- wce_R(
     data = data, ids = id, covars = py_covariates, stop = stop,
@@ -148,6 +154,12 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     constrained = py_constrained, cutoff = cutoff,
     bootstrap = nbootstraps, batchsize = batchsize
   )
+
+  # print("risk function")
+  # print(wce$risk_function)
+  # print("ending risk function")
+  # print(wce$bootstrap_risk_functions)
+
 
   # --- outputs of wce_R :
   # hessian
@@ -163,28 +175,59 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   # est
   # vcovmat
 
+  # print(wce$covars) # covars very weird
 
-  # Outputs post processing
+
+  # get all relevant outputs and rename them to follow the R WCE
+  # R WCE naming convention
+
+  # beta.hat.covariates <- wce$coef
+  # se.covariates = wce$std
+  # est <- wce$WCE_coef
+  # SED <- wce$SED
+
+  # loglik <- wce$loglik
+  # vcovmat <- wce$imat
+
+
+  # bootstrap_WCE_mat <- wce$bootstrap_risk_functions
+  # bootstrap_coef <- wce$bootstrap_coef
+  # bootstrap_est <- wce$bootstrap_WCE_coef
+
+
+  # call WCE outputs and rename them to follow R WCE convention
+
   knotsmat <- matrix(c(wce$knotsmat), nrow = 1)
   rownames(knotsmat) <- paste(nknots, "knot(s)")
 
-  WCEmat <- wce$WCEmat
+
+  WCEmat <- wce$risk_function
   colnames(WCEmat) <- paste0("t", 1:cutoff)
-  rownames(WCEmat) <- paste0("bootstrap", 1:nbootstraps)
 
-  coef <- wce$coef
-  cov <- c(covariates, paste0("D", 1:(ncol(coef) - length(covariates))))
-  colnames(coef) <- cov
-  rownames(coef) <- paste0("bootstrap", 1:nbootstraps)
+  beta.hat.covariates <- wce$coef
+  colnames(beta.hat.covariates) <- covariates
 
-  vcovmat <- lapply(c(1:nbootstraps), function(x) wce$imat[x, , ])
-  vcovmat <- lapply(vcovmat, "colnames<-", cov)
-  vcovmat <- lapply(vcovmat, "rownames<-", cov)
-  names(vcovmat) <- paste0("bootstrap", 1:nbootstraps)
+  se.covariate <- wce$std
+  colnames(se.covariate) <- covariates
 
-  SE <- cbind(wce$std, wce$SED)
-  colnames(SE) <- cov
-  rownames(SE) <- paste0("bootstrap", 1:nbootstraps)
+  est <- wce$WCE_coef
+  colnames(est) <- paste0("D", 1:(ncol(est)))
+
+  SED = wce$SED
+  colnames(SED) <- paste0("D", 1:(ncol(SED)))
+
+  loglik <- c(wce$loglik)
+
+  vcovmat <- wce$imat
+  # vcovmat arrive in dim 1 x x, need to drop dim x x (x being the number
+  # of covariates + artificial covariates)
+  vcovmat <- drop(vcovmat)
+
+
+  cov <- c(covariates, paste0("D", 1:(ncol(est))))
+  rownames(vcovmat) <- cov
+  colnames(vcovmat) <- cov
+
 
   names(data)[names(data) == event] <- "Event"
   nevents <- length(data$Event[data$Event == 1])
@@ -194,14 +237,15 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                 cons = constrained, aic = aic, covariates = covariates
   )
 
+
   # List to return
   results <- list(
     knotsmat = knotsmat,
     WCEmat = WCEmat,
-    loglik = c(wce$loglik),
+    loglik = loglik,
     coef = coef,
+    est = est,
     vcovmat = vcovmat,
-    SE = SE,
     covariates = covariates,
     constrained = constrained,
     nevents = nevents,
@@ -212,13 +256,35 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     nbootstraps = nbootstraps
   )
 
+
   if (nbootstraps > 1) {
+
+    bootstrap_coef <- drop(wce$bootstrap_coef)
+    rownames(bootstrap_coef) <- paste0("bootstrap", 1:nbootstraps)
+    colnames(bootstrap_coef) <- covariates
+    print("bootstrap_coef OK")
+    print(bootstrap_coef)
+
+    bootstrap_est <- drop(wce$bootstrap_WCE_coef)
+    rownames(bootstrap_est) <- paste0("bootstrap", 1:nbootstraps)
+    colnames(bootstrap_est) <- paste0("D", 1:(ncol(bootstrap_est)))
+
+
+    WCEmat_bootstrap = wce$bootstrap_risk_functions
+    rownames(WCEmat_bootstrap) <- paste0("bootstrap", 1:nbootstraps)
+    colnames(WCEmat_bootstrap) <- paste0("t", 1:cutoff)
+
+
+
     probs <- c((1 - confint) / 2, 1 - (1 - confint) / 2)
     # confidence Interval for weights (default 95%)
     results$WCEmat_CI <- apply(WCEmat, 2, stats::quantile, p = probs)
 
+
     # confidence Interval for coefficients (default 95%)
-    results$coef_CI <- apply(coef, 2, stats::quantile, p = probs)
+    results$coef_CI <- results$coef_CI <- apply(bootstrap_coef, 2, stats::quantile, p = probs)
+    results$est_CI <- results$coef_CI <- apply(bootstrap_est, 2, stats::quantile, p = probs)
+
   }
 
   results$analysis <- "Cox"

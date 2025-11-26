@@ -416,6 +416,9 @@ def wce_numpy(
     device: TorchDevice | None = None,
     **kwargs,
 ):
+
+    print(doses)
+
     surv_model = CoxPHSurvivalAnalysis(**kwargs)
     model = WCESurvivalAnalysis(
         cutoff=cutoff,
@@ -426,7 +429,7 @@ def wce_numpy(
     )
 
     model.fit(
-        doses=doses,
+        dose=doses,
         stop=times,
         start=times - 1,
         event=events,
@@ -440,13 +443,21 @@ def wce_numpy(
         device=device,
     )
 
+    # # Estimate the standard deviations of the coefficients for the covariates:
+    # variances = torch.diagonal(result["imat"], dim1=1, dim2=2)
+    # stds = torch.sqrt(variances)
+    # result["std"] = stds[:, :ncovariates]
+    # result["SED"] = stds[:, ncovariates:]
+
+
+
     output = dict(
-        knots=model.knots_,
+        knotsmat=model.knots_,
         coef=model.coef_,
-        WCE_coef=model.WCE_coef_,
-        risk_function=model.risk_function_,
         std=model.std_,
+        WCE_coef=model.WCE_coef_,
         SED=model.SED_,
+        risk_function=model.risk_function_.cpu().numpy(),
         means=model.means_,
         score=model.score_,
         sctest_init=model.sctest_init_,
@@ -457,12 +468,22 @@ def wce_numpy(
         iter=model.iter_,
     )
 
+    # print("printing of covariates inside wce_numpy")
+    # print("covariates shape:", covariates.shape)
+    # print("covariates type:", type(covariates))
+    # print(covariates)
+
+    # print("end of covariate")
+
+    # quit()
+
     if n_bootstraps is not None:
         output.update(
             bootstrap_coef=model.bootstrap_coef_,
             bootstrap_WCE_coef=model.bootstrap_WCE_coef_,
-            bootstrap_risk_functions=model.bootstrap_risk_functions_,
+            bootstrap_risk_functions=model.bootstrap_risk_functions_.squeeze(axis=1).cpu().numpy(),
         )
+
 
     return output
 
@@ -489,13 +510,23 @@ def wce_R(
     maxiter=20,
     init=None,
     doscale=False,
+    strata = None,
 ):
-    ids = np.array(data[ids])
-    doses = np.array(data[doses])
-    times = np.array(data[stop])
-    events = np.array(data[events])
+
+
+
+
+    ids = np.array(data[ids], dtype = np.int64)
+    doses = np.array(data[doses], dtype = np.float64)
+    times = np.array(data[stop], dtype = np.int64)
+    events = np.array(data[events], dtype = np.int64)
     N = len(times)
 
+
+
+
+
+    #TODO type of covars, test must be OK for None, in first part will ignore it
     if covars is not None and len(covars) > 0:
         cov = [data[covar] for covar in covars]
         covariates = np.array(cov).reshape([len(cov), N]).T.reshape([N, len(cov)])
@@ -534,14 +565,10 @@ def wce_R(
             doscale=doscale,
         )
 
+
+
     if profile is not None:
         prof.export_chrome_trace(profile)
-
-    res.update(
-        WCEmat=res["bootstrap_risk_functions"],
-        est=res["bootstrap_WCE_coef"],
-        vcovmat=res["imat"],
-    )
 
     return res
 
