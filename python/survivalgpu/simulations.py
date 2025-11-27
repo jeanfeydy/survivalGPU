@@ -17,24 +17,38 @@ def TDhist(max_time,doses):
     Generate prescription of different duration and doses
     """
 
-    duration = int(7 + 7*np.round(np.random.Generator(mean =0.5, sigma =0.8, size = 1)).item())
+
+
+    rng = np.random.default_rng()
+    duration     = int(7 + 7 * np.round(rng.lognormal(mean=0.5, sigma=0.8, size=1)).item())
     # duration is in weeks *
 
     dose = random.choice(doses)
     exposure_vector = np.repeat(dose,repeats = duration)
 
 
-
     while len(exposure_vector) <= max_time:
 
-        rng = np.random.default_rng()
-        intermission = int(7 + 7 * np.round(rng.normal(loc=0.5, scale=0.8, size=1)).item())
-        duration     = int(7 + 7 * np.round(rng.normal(loc=0.5, scale=0.8, size=1)).item())
 
-        dose = random.choice(doses)
+        # Old RNG seeding (legacy API)
+
+        # intermission = int(7 + 7 * np.round(np.random.lognormal(mean=0.5, sigma=0.8, size=1)).item())
+        # duration     = int(7 + 7 * np.round(np.random.lognormal(mean=0.5, sigma=0.8, size=1)).item())
+
+        # # New RNG seeding (modern Generator API)
+        # rng = np.random.default_rng(seed)
+
+        intermission = int(7 + 7 * np.round(rng.lognormal(mean=0.5, sigma=0.8, size=1)).item())
+        duration     = int(7 + 7 * np.round(rng.lognormal(mean=0.5, sigma=0.8, size=1)).item())
+
+        # print("Intermission (new)     :", intermission)
+        # print("Intermission (old)     :", old_intermission)
+        # print("Duration (new)         :", duration)
+        # print("Duration (old)         :", old_duration)
+
 
         exposure_vector = np.concatenate((exposure_vector,np.repeat(0,repeats = intermission),np.repeat(dose,repeats = duration)))
-
+    # print(exposure_vector)
     return exposure_vector[:max_time]
 
 
@@ -101,7 +115,6 @@ class ConstantCovariate(Covariate):
         self.n_patients = n_patients
         self.max_time = max_time
         self.generate_Xvector()
-
         return self
 
 def generate_Xvector(self):
@@ -146,6 +159,7 @@ class TimeDependentCovariate(Covariate):
         self.generate_Xvector()
 
 
+
         if self.cumulative:
             if  self.cutoff is None:
                 self.cutoff = self.max_time
@@ -155,8 +169,8 @@ class TimeDependentCovariate(Covariate):
 
     def generate_Xvector(self):
 
-        Xvector = np.array([TDhist(self.max_time,self.values) for i in range(self.n_patients)],dtype=float).flatten()
 
+        Xvector = np.array([TDhist(self.max_time,self.values) for i in range(self.n_patients)],dtype=float).flatten()
         self.Xvector = Xvector
 
         return self
@@ -732,8 +746,8 @@ def simulate_dataset(max_time, n_patients,
 
 
     wce_id_selected = matching_algo(WCEmat = WCEmat,
-                                    n_cox_covariates=n_cox_covariates,
-                                    n_wce_covariates=n_wce_covariates,
+                                    # n_cox_covariates=n_cox_covariates,
+                                    # n_wce_covariates=n_wce_covariates,
                                     HR_target_list=HR_target_list,
                                     max_time=max_time,
                                     n_patients=n_patients,
@@ -760,7 +774,6 @@ def simulate_dataset(max_time, n_patients,
 
 
 def simulate_for_experiment(n_patients, max_time,HR_target, scenario_name):
-    dataset = []
 
     wce_covariate = WCECovariate(
         name = "dose",
@@ -769,18 +782,10 @@ def simulate_for_experiment(n_patients, max_time,HR_target, scenario_name):
         HR_target = HR_target)
 
 
-
-
-
-    dataset = simulate_dataset(
+    return simulate_dataset(
         max_time = max_time,
         n_patients = n_patients,
         list_covariates = [wce_covariate])
-
-
-    print(type(wce_covariate))
-
-    return dataset
 
 def WCE_permalgo(n_patients,
                  max_time,
