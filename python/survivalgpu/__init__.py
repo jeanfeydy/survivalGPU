@@ -2,6 +2,13 @@ import torch
 
 from . import optimizers, utils
 from .coxph import CoxPHSurvivalAnalysis, coxph_numpy, coxph_R
+from .simulation import (
+    WCE_permalgo,
+    get_dataset,
+    matching_algo,
+    simulate_dataset,
+    simulate_for_experiment,
+)
 from .utils import device, float32, int32, int64, use_cuda
 from .wce import WCESurvivalAnalysis, wce_numpy, wce_R
 
@@ -18,6 +25,7 @@ __all__ = [
         "wce_R",
         "CoxPHSurvivalAnalysis",
         "WCESurvivalAnalysis",
+        "simulate_for_experiment",
     ]
 
 __version__ = "0.1.0"
