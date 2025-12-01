@@ -181,7 +181,6 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   # R WCE naming convention
 
   # beta.hat.covariates <- wce$coef
-  # se.covariates = wce$std
   # est <- wce$WCE_coef
   # SED <- wce$SED
 
@@ -206,8 +205,8 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   beta.hat.covariates <- wce$coef
   colnames(beta.hat.covariates) <- covariates
 
-  se.covariate <- wce$std
-  colnames(se.covariate) <- covariates
+  se.covariates <- wce$std
+  colnames(se.covariates) <- covariates
 
   est <- wce$WCE_coef
   colnames(est) <- paste0("D", 1:(ncol(est)))
@@ -217,15 +216,18 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
   loglik <- c(wce$loglik)
 
-  vcovmat <- wce$imat
-  # vcovmat arrive in dim 1 x x, need to drop dim x x (x being the number
-  # of covariates + artificial covariates)
-  vcovmat <- drop(vcovmat)
+  vcovmat <- wce$imat   # (1, n, m) array — will need to adapt it if we do with mode than one nknots
 
 
+  vcovmat <- list()
+
+  vcovmat_knot <- drop(wce$imat)
   cov <- c(covariates, paste0("D", 1:(ncol(est))))
-  rownames(vcovmat) <- cov
-  colnames(vcovmat) <- cov
+  rownames(vcovmat_knot) <- cov
+  colnames(vcovmat_knot) <- cov
+
+  vcovmat[[paste(nknots, "knot(s)")]] <- vcovmat_knot
+
 
 
   names(data)[names(data) == event] <- "Event"
@@ -237,11 +239,12 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   )
 
 
+
   # List to return
   results <- list(
     knotsmat = knotsmat,
     beta.hat.covariates = beta.hat.covariates,
-    se.covariate = se.covariate,
+    se.covariates = se.covariates,
     est = est,
     SED = SED,
     WCEmat = WCEmat,
@@ -421,7 +424,7 @@ print.wceGPU <- function(x, ...) {
 #' @rdname wceGPU
 summary.wceGPU <- function(object, ...) {
   estimates <- object$beta.hat.covariates
-  se_estimates <- object$se.covariate
+  se_estimates <- object$se.covariates
   z <- estimates / se_estimates
   p <- 2 * pnorm(-abs(z))
   conf.int <- confint(object, level = object$confint, parm = object$covariates)
@@ -606,7 +609,7 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
   ci <- array(NA, dim = c(length(parm), 2L), dimnames = list(parm, pct))
   print("ci")
   print(ci)
-  ses <- sqrt(diag(object$vcovmat))[parm] # seems to be same thing as object$se.covariate
+  ses <- sqrt(diag(object$vcovmat))[parm] # seems to be same thing as object$se.covariates
   ci[] <- cf[parm] + ses %o% fac
   ci
   print(ci)

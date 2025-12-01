@@ -41,7 +41,7 @@ test_that("WCE mat", {
 test_that("coef covariates", {
   expect_equal(
     round(as.vector(wce$beta.hat.covariates), 1),
-    round(as.vector(wce_gpu$coef[, wce_gpu$covariates]), 1)
+    round(as.vector(wce_gpu$beta.hat.covariates), 1)
   )
 })
 
@@ -49,7 +49,7 @@ test_that("coef covariates", {
 test_that("SE covariates", {
   expect_equal(
     round(as.vector(wce$se.covariates), 1),
-    round(as.vector(wce_gpu$SE[, wce_gpu$covariates]), 1)
+    round(as.vector(wce_gpu$se.covariates), 1)
   )
 })
 

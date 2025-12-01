@@ -417,8 +417,6 @@ def wce_numpy(
     **kwargs,
 ):
 
-    print(doses)
-
     surv_model = CoxPHSurvivalAnalysis(**kwargs)
     model = WCESurvivalAnalysis(
         cutoff=cutoff,
@@ -513,7 +511,15 @@ def wce_R(
     strata = None,
 ):
 
-
+    if constrained == "None":
+        constrained = None
+    elif constrained in ["L", "l", "Left", "left"]:
+        constrained = "left"
+    elif constrained in ["R", "r", "Right", "right"]:
+        constrained = "right"
+    else:
+        msg = f"constrained should be 'None', 'left', 'Left', 'l', 'L', 'right', 'Right', or 'R'. Received {constrained}."
+        raise ValueError(msg)
 
 
     ids = np.array(data[ids], dtype = np.int64)
