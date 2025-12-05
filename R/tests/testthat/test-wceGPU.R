@@ -8,7 +8,7 @@ wce_gpu <- wceGPU(
   event = "Event", start = "Start", stop = "Stop",
   expos = "dose", covariates = c("age", "sex"),
   constrained = FALSE, aic = FALSE, confint = 0.95,
-  nbootstraps = 1, batchsize = 0
+  nbootstraps = 0, batchsize = 0
 )
 
 wce_gpu_bootstrap <- wceGPU(
@@ -82,7 +82,8 @@ test_that("info.criterion", {
 exposed   <- rep(1, 90)
 unexposed <- rep(0, 90)
 
-test_that("HR", {
+test_that("HR",
+{
   expect_equal(
     round(HR(wce_gpu_bootstrap, exposed, unexposed)[1], 1),
     round(WCE::HR.WCE(wce, exposed, unexposed)[1], 1)
@@ -98,7 +99,7 @@ test_that("WCE - no covariates", {
       event = "Event", start = "Start", stop = "Stop",
       expos = "dose",
       constrained = FALSE, aic = FALSE, confint = 0.95,
-      nbootstraps = 1, batchsize = 0
+      nbootstraps = 0, batchsize = 0
     )
   })
 })
@@ -110,7 +111,7 @@ test_that("WCE - one covariate", {
       event = "Event", start = "Start", stop = "Stop",
       expos = "dose", covariates = c("age"),
       constrained = FALSE, aic = FALSE, confint = 0.95,
-      nbootstraps = 1, batchsize = 0
+      nbootstraps = 0, batchsize = 0
     )
   })
 })
@@ -122,7 +123,7 @@ test_that("WCE - two covariates", {
       event = "Event", start = "Start", stop = "Stop",
       expos = "dose", covariates = c("age","sex"),
       constrained = FALSE, aic = FALSE, confint = 0.95,
-      nbootstraps = 1, batchsize = 0
+      nbootstraps = 0, batchsize = 0
     )
   })
 })
@@ -134,7 +135,7 @@ test_that("WCE - AIC", {
       event = "Event", start = "Start", stop = "Stop",
       expos = "dose", covariates = c("age","sex"),
       constrained = FALSE, aic = TRUE, confint = 0.95,
-      nbootstraps = 1, batchsize = 0
+      nbootstraps = 0, batchsize = 0
     )
   })
 })
@@ -146,7 +147,7 @@ test_that("WCE - right constraint", {
       event = "Event", start = "Start", stop = "Stop",
       expos = "dose", covariates = c("age","sex"),
       constrained = "R", aic = FALSE, confint = 0.95,
-      nbootstraps = 1, batchsize = 0
+      nbootstraps = 0, batchsize = 0
     )
   })
 })
@@ -158,7 +159,7 @@ test_that("WCE - left constraint", {
       event = "Event", start = "Start", stop = "Stop",
       expos = "dose", covariates = c("age","sex"),
       constrained = "L", aic = FALSE, confint = 0.95,
-      nbootstraps = 1, batchsize = 0
+      nbootstraps = 0, batchsize = 0
     )
   })
 })
@@ -170,7 +171,7 @@ test_that("WCE - 3 knots", {
       event = "Event", start = "Start", stop = "Stop",
       expos = "dose", covariates = c("age","sex"),
       constrained = FALSE, aic = FALSE, confint = 0.95,
-      nbootstraps = 1, batchsize = 0
+      nbootstraps = 0, batchsize = 0
     )
   })
 })

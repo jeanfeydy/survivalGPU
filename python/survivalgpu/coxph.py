@@ -445,7 +445,19 @@ def coxph_R(
     init=None,
     doscale=False,
     profile=None,
+    device=None,
 ):
+    if device == "None":
+        device = None
+
+    if device not in [None, "cpu", "cuda"]:
+        msg = f"device should be None, 'cpu' or 'cuda'. Received {device}."
+        raise ValueError(msg)
+
+    if device == "cuda" and not use_cuda:
+        msg = "CUDA device requested but no GPU available."
+        raise ValueError(msg)
+
     if profile is not None:
         print("Profile trace:", profile)
         print("use_cuda:", use_cuda)

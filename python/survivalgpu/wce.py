@@ -416,6 +416,8 @@ def wce_numpy(
     device: TorchDevice | None = None,
     **kwargs,
 ):
+    if n_bootstraps == 0:
+        n_bootstraps = None
 
     surv_model = CoxPHSurvivalAnalysis(**kwargs)
     model = WCESurvivalAnalysis(
@@ -509,7 +511,10 @@ def wce_R(
     init=None,
     doscale=False,
     strata = None,
+    device = None
 ):
+    print("Ok")
+
 
     if constrained == "None":
         constrained = None
@@ -520,6 +525,35 @@ def wce_R(
     else:
         msg = f"constrained should be 'None', 'left', 'Left', 'l', 'L', 'right', 'Right', or 'R'. Received {constrained}."
         raise ValueError(msg)
+
+
+    if device == "None":
+        device = None
+
+    if device not in [None, "cpu", "cuda"]:
+        msg = f"device should be None, 'cpu' or 'cuda'. Received {device}."
+        raise ValueError(msg)
+
+    if device == "cuda" and not use_cuda:
+        msg = "CUDA device requested but no GPU available."
+        raise ValueError(msg)
+
+
+
+    # if device is not None:
+    #     if device == "cpu":
+    #         device = torch.device("cpu")
+    #     elif device == "cuda":
+    #         device = torch.device("cuda")
+    #     else:
+    #         msg = f"device should be 'cpu' or 'cuda'. Received {device}."
+    #         raise ValueError(msg)
+    #     torch.cuda.set_device(device)
+
+    if device == torch.device("cuda") and not use_cuda:
+        msg = "CUDA device requested but no GPU available."
+        raise ValueError(msg)
+
 
 
     ids = np.array(data[ids], dtype = np.int64)
