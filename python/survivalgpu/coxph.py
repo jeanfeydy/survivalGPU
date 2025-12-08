@@ -425,7 +425,7 @@ def coxph_numpy(
     }
 
     if hasattr(model, "bootstrap_coef_"):
-        output["bootstrap coef"] = model.bootstrap_coef_
+        output["bootstrap_coef"] = model.bootstrap_coef_
 
     return output
 

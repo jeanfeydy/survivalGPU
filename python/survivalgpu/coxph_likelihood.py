@@ -763,7 +763,8 @@ def _breslow_efron_logsumexp_term(
         #     *
         #     log( Sum_{observed at t} r[i] )
         #   )
-        time_contributions = dead_weights * time_risks.log()
+        safe_log = (time_risks + 1e-12).log() # add a safe value to the log to avoid nan issues
+        time_contributions = dead_weights * safe_log
 
         # When dead_weights == 0, the contribution is 0, even if time_log_risks is -inf.
         # If we don't mask things out, we would end up with -inf * 0 == NaN.
