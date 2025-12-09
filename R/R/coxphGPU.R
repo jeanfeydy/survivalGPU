@@ -82,7 +82,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
                              model = FALSE, x = FALSE, y = TRUE, ..., weights,
                              subset, na.action, robust, tt, method = ties, id,
                              cluster, istate, statedata,
-                             nocenter = c(-1, 0, 1)) {
+                             nocenter = c(-1, 0, 1), device = NULL) {
 
   if (!missing(weights)) stop("weights are not yet implemented in coxphGPU")
   if (!missing(tt)) stop("tt process is not yet implemented in coxphGPU")
@@ -275,6 +275,10 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     id <- new$id
     Y <- new$y
     n <- nrow(mf)
+
+    print("processed survival object Y:")
+    print(Y)
+    print(head(mf))
   }
 
   # Process if Y is not a Surv2 object
@@ -286,8 +290,12 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   if (n == 0) stop("No (non-missing) observations")
 
+  # print(Y)
+
   type <- attr(Y, "type")
   # several types : right, left, counting, etc...
+  print("survival object type:")
+  print(type)
 
   multi <- FALSE
   if (type == "mright" || type == "mcounting") {
@@ -439,6 +447,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
       tindex <- counts$index
     }
     Y <- Surv(rep(counts$time, counts$nrisk), counts$status)
+    print("processed survival object Y after tt():")
+    print(Y)
     type <- "right" # new Y is right censored, even if the old was (start, stop]
 
     mf <- mf[tindex, ]
@@ -788,6 +798,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   # from agreg.fit.R (survival) / for counting type Surv object
   nvar <- ncol(X)
   event <- Y[, 3]
+
   if (all(event == 0)) stop("Can't fit a Cox model with 0 failures")
 
   if (missing(offset) || is.null(offset)) offset <- rep(0.0, nrow(Y))
@@ -961,24 +972,49 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   # Variable 'Stop' and 'Event' for coxph_R
   if (type == "counting") { # if Surv object is counting type
+
+
+    print("Surv object is counting type")
+    print("ytemp")
+    print(ytemp)
+    start <- ytemp[1]
     stop <- ytemp[2]
     event <- ytemp[3]
 
-    data <- data.frame(time = y2,
+    data <- data.frame(start = y1,
+                       stop = y2,
                        status = Y[,3])
 
+    print("Data frame for coxph_R:")
+
+    print(head(data))
+
+    names(data)[1] <- start
+    names(data)[2] <- stop
+    names(data)[3] <- event
+
+
+
+
+
   } else { # if Surv object is right (Without Start in Surv)
+    print("Surv object is right type")
+    start = NULL
     stop <- ytemp[1]
     event <- ytemp[2]
 
-    data <- data.frame(time = time,
+    data <- data.frame(stop = time,
                        status = status)
+
+    names(data)[1] <- stop
+    names(data)[2] <- event
   }
 
+  data <- cbind(data,X)
+  print(head(data))
 
-  data <- cbind(data, X)
-  names(data)[1] <- stop
-  names(data)[2] <- event
+
+
 
 
   # return(list(y1=y1,
@@ -1013,16 +1049,26 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   # Python coxph
   # survivalgpu <- use_survivalGPU() # change due to .onload
   coxph_R <- survivalgpu$coxph_R
+
+  print("############# Starting value before coxph_R #############")
+  print(start)
+  print("##########################")
+
+  print(head(data))
+
+
   coxfit <- coxph_R(data,
+                    start,
                     stop,
                     event,
                     covar,
                     ties = ties,
-                    survtype = type,
+                    # survtype = type,
                     strata = strata,
                     bootstrap = bootstrap,
                     batchsize = batchsize,
-                    maxiter = maxiter#,
+                    maxiter = maxiter,
+                    device = device#,
                     #init = init
   )
   # maxiter = maxiter (add maxiter argument in coxph_R)
@@ -1097,7 +1143,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   fit$method <- method
   fit$nbootstraps <- bootstrap
   if (bootstrap > 1){
-    coef_bootstrap <- matrix(coxfit$`bootstrap coef`,
+    coef_bootstrap <- matrix(coxfit$`bootstrap_coef`,
                              ncol = length(coef))
     colnames(coef_bootstrap) <- dimnames(X)[[2]]
     fit$coef_bootstrap <- coef_bootstrap
@@ -1273,6 +1319,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     # }
 
     #Wald test
+
+
     if (length(fit$coefficients) && is.null(fit$wald.test)) {
       #not for intercept only models, or if test is already done
       nabeta <- !is.na(fit$coefficients)

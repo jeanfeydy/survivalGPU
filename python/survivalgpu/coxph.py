@@ -345,12 +345,13 @@ class CoxPHSurvivalAnalysis:
 def coxph_numpy(
     *,
     x,
-    times,
+    start,
+    stop,
     deaths,
     bootstrap=1,
     batchsize=None,
     ties="efron",
-    survtype,
+    # survtype,
     strata=None,
     maxiter=20,
     init=None,
@@ -397,11 +398,11 @@ def coxph_numpy(
     )
 
     # Configure 'start' according to survtype ('counting' or 'right')
-    start = times - 1 if survtype == "counting" else None
+    # start = times - 1 if survtype == "counting" else None
 
     model.fit(
         covariates=x,
-        stop=times,
+        stop=stop,
         start=start,
         event=deaths,
         strata=strata,
@@ -433,10 +434,11 @@ def coxph_numpy(
 
 def coxph_R(
     data,
+    start,
     stop,
     death,
     covars,
-    survtype,
+    # survtype,
     bootstrap=1,
     batchsize=0,
     ties="efron",
@@ -447,6 +449,12 @@ def coxph_R(
     profile=None,
     device=None,
 ):
+
+    print("############# Starting value before coxph_R #############")
+    print(start)
+    print(stop)
+    if start == "None":
+        start = None
     if device == "None":
         device = None
 
@@ -469,11 +477,17 @@ def coxph_R(
         strata = np.array(strata, dtype=np.int64)
 
     with myprof as prof:
-        times = np.array(data[stop], dtype=np.int64)
+        print("############# Starting value before coxph_numpy #############")
+        print(data)
+        start = np.array(data[start], dtype=np.int64)
+        print(start)
+        print("##########################")
+        stop = np.array(data[stop], dtype=np.int64)
         deaths = np.array(data[death], dtype=np.int64)
-        N = len(times)
+        N = len(stop)
 
-        assert times.dtype == np.int64
+        assert start.dtype == np.int64
+        assert stop.dtype == np.int64
         assert deaths.dtype == np.int64
 
         cov = [data[covar] for covar in covars]
@@ -481,10 +495,11 @@ def coxph_R(
 
         res = coxph_numpy(
             x=x,
-            times=times,
+            start=start,
+            stop=stop,
             deaths=deaths,
             ties=ties,
-            survtype=survtype,
+            # survtype=survtype,
             strata=strata,
             bootstrap=int(bootstrap),
             batchsize=int(batchsize) if batchsize > 0 else None,

@@ -170,50 +170,6 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   }
 
 
-
-
-
-
-
-  # print("risk function")
-  # print(wce$risk_function)
-  # print("ending risk function")
-  # print(wce$bootstrap_risk_functions)
-
-
-  # --- outputs of wce_R :
-  # hessian
-  # coef
-  # loglik
-  # u
-  # imat
-  # means
-  # knotsmat
-  # std
-  # SED
-  # WCEmat
-  # est
-  # vcovmat
-
-  # print(wce$covars) # covars very weird
-
-
-  # get all relevant outputs and rename them to follow the R WCE
-  # R WCE naming convention
-
-  # beta.hat.covariates <- wce$coef
-  # est <- wce$WCE_coef
-  # SED <- wce$SED
-
-  # loglik <- wce$loglik
-  # vcovmat <- wce$imat
-
-
-  # bootstrap_WCE_mat <- wce$bootstrap_risk_functions
-  # bootstrap_beta.hat.covariates <- wce$bootstrap_beta.hat.covariates
-  # bootstrap_est <- wce$bootstrap_WCE_coef
-
-
   # call WCE outputs and rename them to follow R WCE convention
 
   knotsmat <- matrix(c(wce$knotsmat), nrow = 1)
