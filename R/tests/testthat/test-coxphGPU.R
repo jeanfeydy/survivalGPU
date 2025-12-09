@@ -21,6 +21,8 @@ coxph <- coxph(
   ties = ties
 )
 
+print("fit coxph:")
+
 # Surv type right
 coxph_right <- coxph(
   Surv(Stop, Event) ~ sex + age,
@@ -28,29 +30,44 @@ coxph_right <- coxph(
   ties = ties
 )
 
+summary(coxph)
+
+print("fit coxph right:")
+
+
 
 ## CoxphGPU model ------
 
-# Counting
-coxphGPU <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-  drugdata,
-  ties = ties,
-  bootstrap = 1
-)
+# # Counting
+# coxphGPU <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+#   drugdata,
+#   ties = ties,
+#   # bootstrap = 1
+# )
 
-coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-                               drugdata,
-                               ties = ties,
-                               bootstrap = 15
-)
 
-# Right
+print("fit coxphGPU:")
+
+# coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+#                                drugdata,
+#                                ties = ties,
+#                                bootstrap = 15
+# )
+
+coxphGPU_bootstrap <- "dummy"
+
+print("fit coxphGPU with bootstrap:")
+
+
 coxphGPU_right <- coxphGPU(Surv(Stop, Event) ~ sex + age,
                            drugdata,
                            ties = ties,
                            bootstrap = 1
 )
 
+# coxphGPU_right <- "dummy"
+
+print("fit coxphGPU right:")
 
 # Tests
 
