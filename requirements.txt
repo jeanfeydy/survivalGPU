@@ -4,3 +4,4 @@ torch
 pykeops
 beartype
 jaxtyping
+pandas
