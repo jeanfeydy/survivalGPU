@@ -5,3 +5,4 @@ pykeops
 beartype
 jaxtyping
 pandas
+scipy
