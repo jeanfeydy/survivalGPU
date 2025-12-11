@@ -79,6 +79,7 @@ class CoxPHSurvivalAnalysis:
         self.verbosity = verbosity
         self.mode = mode
 
+
     @typecheck
     def fit(
         self,
@@ -102,6 +103,7 @@ class CoxPHSurvivalAnalysis:
             y (array-like): Survival times and event indicators.
             sample_weight (array-like): Sample weights.
         """
+
         # Pre-process the input data: ----------------------------------------------------
         # Create a dataset object: this enforces checks on the input data
         dataset = SurvivalDataset(
@@ -113,6 +115,7 @@ class CoxPHSurvivalAnalysis:
             strata=strata,
             batch=batch,
         )
+
 
 
         # Re-encode the data arrays as PyTorch tensors on the correct device,

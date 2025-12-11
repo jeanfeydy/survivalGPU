@@ -1036,11 +1036,11 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
 
 
-  coxfit <- coxph_R(data,
-                    start,
-                    stop,
-                    event,
-                    covar,
+  coxfit <- coxph_R(data = data,
+                    start = start,
+                    stop = stop,
+                    death = event,
+                    covars = covar,
                     ties = ties,
                     # survtype = type,
                     strata = strata,
