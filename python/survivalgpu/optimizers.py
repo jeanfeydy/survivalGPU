@@ -90,6 +90,7 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
         # Compute the value of the convex objective, its gradient and its Hessian:
         # (We perform this step in parallel over the B bootstrap samples.)
         values, grads, hessians = loss_grad_hessian(candidates)
+
         # values is (B,)
         # grads is (B,D)
         # hessians is (B,D,D)
@@ -100,7 +101,19 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
         # N.B.: Currently, we encounter a strange CUDA bug with linsolve.
         #       A simple workaround is to come back to the CPU, just for this operation.
         # TODO: remove this "duct tape" fix.
-        steps = torch.linalg.solve(hessians.cpu(), grads.cpu()).to(grads.device)
+        #
+        # N.B. torch.linalg.solve(hessians.cpu(), grads.cpu()) is a very sensitive
+        #      operation and doing in float32 leads to error that can lead to a final
+        #      error that are close to 1%. This step is done on the CPU so float64
+        #      are always available. This sensitive step is thus done in float64
+        #      it is important to put it on the cpu before putting it in f64
+
+        grads_cpu    = grads.cpu().to(torch.float64)
+        hessians_cpu = hessians.cpu().to(torch.float64)
+        steps = torch.linalg.solve(hessians_cpu, grads_cpu)
+
+        # we then send the steps in f32 the nto the device
+        steps = steps.to(torch.float32).to(grads.device)
 
         # The R survival package returns the score test statistic at iteration 0,
         # so we do the same:

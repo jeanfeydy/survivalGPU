@@ -113,6 +113,8 @@ class CoxPHSurvivalAnalysis:
             strata=strata,
             batch=batch,
         )
+
+
         # Re-encode the data arrays as PyTorch tensors on the correct device,
         # with the correct dtype (float64 -> float32)
         if device is None:
@@ -355,7 +357,7 @@ def coxph_numpy(
     strata=None,
     maxiter=20,
     init=None,
-    eps=1e-9,
+    eps=1e-5,
     alpha=0,
     verbosity=0,
     doscale=False,
@@ -400,17 +402,14 @@ def coxph_numpy(
     # Configure 'start' according to survtype ('counting' or 'right')
     # start = times - 1 if survtype == "counting" else None
 
-    print("############# Starting value before model.fit #############")
-
-    print(strata) # mock use of strata so the linter doesn't complain about unused variables
-
+    # mock use of strata to avoid unused argument warning
 
     model.fit(
         covariates=x,
         stop=stop,
         start=start,
         event=deaths,
-        # strata=strata,
+        strata=strata,
         n_bootstraps=bootstrap,
         batch_size=batchsize,
         init=init,
@@ -481,7 +480,6 @@ def coxph_R(
     with myprof as prof:
 
         if start is not None:
-            print("not None")
             start = np.array(data[start], dtype=np.int64)
         else:
             start = np.array([0] * len(data[stop]), dtype=np.int64)
@@ -498,7 +496,6 @@ def coxph_R(
         x = np.array(cov).T.reshape([N, len(cov)])
 
 
-        print("############# Starting value before coxph_numpy call #############")
 
         res = coxph_numpy(
             x=x,

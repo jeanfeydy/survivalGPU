@@ -65,7 +65,7 @@
 #'
 #' summary(coxph_bootstrap)
 #' }
-coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
+coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 0,
                      batchsize = 0, init, all.results = FALSE, control,
                      singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
                      ...) {
@@ -77,7 +77,7 @@ coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
 #' @method coxphGPU default
 #' @exportS3Method coxphGPU default
 coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
-                             bootstrap = 1, batchsize = 0, init,
+                             bootstrap = 0, batchsize = 0, init,
                              all.results = FALSE, control, singular.ok = TRUE,
                              model = FALSE, x = FALSE, y = TRUE, ..., weights,
                              subset, na.action, robust, tt, method = ties, id,
@@ -275,10 +275,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     id <- new$id
     Y <- new$y
     n <- nrow(mf)
-
-    print("processed survival object Y:")
-    print(Y)
-    print(head(mf))
   }
 
   # Process if Y is not a Surv2 object
@@ -290,13 +286,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
   if (n == 0) stop("No (non-missing) observations")
 
-  # print(Y)
 
   type <- attr(Y, "type")
   # several types : right, left, counting, etc...
-  print("survival object type:")
-  print(type)
-
   multi <- FALSE
   if (type == "mright" || type == "mcounting") {
     multi <- TRUE
@@ -447,8 +439,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
       tindex <- counts$index
     }
     Y <- Surv(rep(counts$time, counts$nrisk), counts$status)
-    print("processed survival object Y after tt():")
-    print(Y)
     type <- "right" # new Y is right censored, even if the old was (start, stop]
 
     mf <- mf[tindex, ]
@@ -974,9 +964,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   if (type == "counting") { # if Surv object is counting type
 
 
-    print("Surv object is counting type")
-    print("ytemp")
-    print(ytemp)
     start <- ytemp[1]
     stop <- ytemp[2]
     event <- ytemp[3]
@@ -985,9 +972,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
                        stop = y2,
                        status = Y[,3])
 
-    print("Data frame for coxph_R:")
-
-    print(head(data))
 
     names(data)[1] <- start
     names(data)[2] <- stop
@@ -998,7 +982,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
 
   } else { # if Surv object is right (Without Start in Surv)
-    print("Surv object is right type")
     start = NULL
     stop <- ytemp[1]
     event <- ytemp[2]
@@ -1011,7 +994,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   }
 
   data <- cbind(data,X)
-  print(head(data))
 
 
 
@@ -1046,15 +1028,12 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
   # data <- quote(options()$na.action)
   data <- na.omit(data)
 
+
+
   # Python coxph
   # survivalgpu <- use_survivalGPU() # change due to .onload
   coxph_R <- survivalgpu$coxph_R
 
-  print("############# Starting value before coxph_R #############")
-  print(start)
-  print("##########################")
-
-  print(head(data))
 
 
   coxfit <- coxph_R(data,
