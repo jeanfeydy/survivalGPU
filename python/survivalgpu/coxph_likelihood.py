@@ -763,16 +763,31 @@ def _breslow_efron_logsumexp_term(
         #     *
         #     log( Sum_{observed at t} r[i] )
         #   )
-        safe_log = (time_risks + 1e-12).log() # add a safe value to the log to avoid nan issues
-        time_contributions = dead_weights * safe_log
+        # safe_log = (time_risks + 1.2e-7).log() # add a safe value to the log to avoid nan issues
 
         # When dead_weights == 0, the contribution is 0, even if time_log_risks is -inf.
         # If we don't mask things out, we would end up with -inf * 0 == NaN.
-        time_contributions = torch.where(
+        # it is necessary to do it before calculating the time contribution to avoid NaN in the gradient and Hessian
+        safe_time_risks = torch.where(
             dead_weights != 0,
-            time_contributions,
-            torch.zeros_like(time_contributions),
+            time_risks,
+            torch.ones_like(time_risks)   # anything positive, log(1)=0
         )
+
+        time_contributions = dead_weights * safe_time_risks
+
+
+        safe_log = (time_risks + 1.2e-7).log()
+
+        time_contributions = dead_weights * safe_log
+
+        # # When dead_weights == 0, the contribution is 0, even if time_log_risks is -inf.
+        # # If we don't mask things out, we would end up with -inf * 0 == NaN.
+        # time_contributions = torch.where(
+        #     dead_weights != 0,
+        #     time_contributions,
+        #     torch.zeros_like(time_contributions),
+        # )
         assert time_contributions.shape == (B, T)
 
         # We sum batch-wise over the time contributions:
