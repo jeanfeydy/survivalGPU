@@ -88,7 +88,7 @@ class CoxPHSurvivalAnalysis:
         *,
         start: Int64Array["intervals"] | None = None,
         event: Int64Array["intervals"] | None = None,
-        # patient: Int64Array["intervals"] | None = None, # removed for now, in the future can be used for clustering
+        patient: Int64Array["intervals"] | None = None, # patient Id is needed for bootstraps purposes
         strata: Int64Array["intervals"] | None = None,
         batch: Int64Array["intervals"] | None = None,
         init: Float64Array["covariates"] | None = None,
@@ -111,7 +111,7 @@ class CoxPHSurvivalAnalysis:
             stop=stop,
             start=start,
             event=event,
-            # patient=patient,
+            patient=patient,
             strata=strata,
             batch=batch,
         )
@@ -353,6 +353,7 @@ def coxph_numpy(
     start,
     stop,
     deaths,
+    patient_id=None,
     bootstrap=1,
     batchsize=None,
     ties="efron",
@@ -413,6 +414,7 @@ def coxph_numpy(
         start=start,
         event=deaths,
         strata=strata,
+        patient=patient_id,
         n_bootstraps=bootstrap,
         batch_size=batchsize,
         init=init,
@@ -446,6 +448,7 @@ def coxph_R(
     death,
     covars,
     # survtype,
+    patient_id=None,
     bootstrap=0,
     batchsize=0,
     ties="efron",
@@ -456,6 +459,9 @@ def coxph_R(
     profile=None,
     device=None,
 ):
+    print(patient_id)
+    if patient_id == "None":
+        patient_id = None
     if isinstance(covars, str):
         covars = [covars]
 
@@ -486,19 +492,26 @@ def coxph_R(
 
         if start is not None:
             start = np.array(data[start], dtype=np.int64)
-        else:
-            start = np.array([0] * len(data[stop]), dtype=np.int64)
+            assert start.dtype == np.int64
+
+
+        if patient_id is not None:
+            patient_id = np.array(data[patient_id], dtype =np.int64)
+            assert patient_id.dtype == np.int64
+
 
         stop = np.array(data[stop], dtype=np.int64)
         deaths = np.array(data[death], dtype=np.int64)
         N = len(stop)
 
-        assert start.dtype == np.int64
+
         assert stop.dtype == np.int64
         assert deaths.dtype == np.int64
 
         cov = [data[covar] for covar in covars]
         x = np.array(cov).T.reshape([N, len(cov)])
+
+        print("launch numpy")
 
 
 
@@ -510,6 +523,7 @@ def coxph_R(
             ties=ties,
             # survtype=survtype,
             strata=strata,
+            patient_id=patient_id,
             bootstrap=int(bootstrap),
             batchsize=int(batchsize) if batchsize > 0 else None,
             maxiter=int(maxiter) if profile is None else 1,

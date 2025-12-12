@@ -76,8 +76,8 @@ coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 0,
 #' @noRd
 #' @method coxphGPU default
 #' @exportS3Method coxphGPU default
-coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
-                             bootstrap = 0, batchsize = 0, init,
+coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
+                             bootstrap = 1, batchsize = 0, init,
                              all.results = FALSE, control, singular.ok = TRUE,
                              model = FALSE, x = FALSE, y = TRUE, ..., weights,
                              subset, na.action, robust, tt, method = ties, id,
@@ -299,6 +299,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     ))
   }
   data.n <- nrow(Y) # remember this before any time transforms
+
+  print("Data check : 1")
+  print(head(data))
 
   if (!multi && multiform) {
     stop("formula is a list but the response is not multi-state")
@@ -968,14 +971,18 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     stop <- ytemp[2]
     event <- ytemp[3]
 
-    data <- data.frame(start = y1,
+    print("Data check : 2")
+    print(head(data))
+
+
+    data_processed <- data.frame(start = y1,
                        stop = y2,
                        status = Y[,3])
 
 
-    names(data)[1] <- start
-    names(data)[2] <- stop
-    names(data)[3] <- event
+    names(data_processed)[1] <- start
+    names(data_processed)[2] <- stop
+    names(data_processed)[3] <- event
 
 
 
@@ -986,14 +993,45 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
     stop <- ytemp[1]
     event <- ytemp[2]
 
-    data <- data.frame(stop = time,
+    print("Data check : 2")
+    print(head(data))
+
+
+
+    data_processed <- data.frame(stop = time,
                        status = status)
 
-    names(data)[1] <- stop
-    names(data)[2] <- event
+    names(data_processed)[1] <- stop
+    names(data_processed)[2] <- event
   }
 
-  data <- cbind(data,X)
+  data_processed <- cbind(data_processed,X)
+
+
+  # Add patient_id data if defined for bootstrap purposes
+
+  # Type check for patient_id
+  if (!is.null(patient_id) &&
+      (!is.character(patient_id) || length(patient_id) != 1)) {
+    stop("patient_id must be NULL or a single string")
+  }
+
+  # Logical constraint with bootstrap
+  if (is.null(patient_id) &&
+      !is.null(bootstrap) &&
+      bootstrap > 0) {
+    stop("patient_id must be provided if bootstrap > 0")
+  }
+
+  if (!is.null(patient_id) && !patient_id %in% names(data)) {
+    stop("patient_id must be the name of a column in data")
+  }
+
+
+  if (!is.null(patient_id)){
+    data_processed <- cbind(data[patient_id],data_processed)
+    names(data_processed[1]) = patient_id
+  }
 
 
 
@@ -1036,7 +1074,11 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
 
 
 
-  coxfit <- coxph_R(data = data,
+  print(head(data))
+  print(head(data_processed))
+
+
+  coxfit <- coxph_R(data = data_processed,
                     start = start,
                     stop = stop,
                     death = event,
@@ -1044,6 +1086,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"),
                     ties = ties,
                     # survtype = type,
                     strata = strata,
+                    patient_id = patient_id,
                     bootstrap = bootstrap,
                     batchsize = batchsize,
                     maxiter = maxiter,
