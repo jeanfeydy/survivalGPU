@@ -104,6 +104,9 @@ class CoxPHSurvivalAnalysis:
             sample_weight (array-like): Sample weights.
         """
 
+        print("inside fitting")
+        print()
+
         # Pre-process the input data: ----------------------------------------------------
         # Create a dataset object: this enforces checks on the input data
         dataset = SurvivalDataset(
@@ -232,7 +235,7 @@ class CoxPHSurvivalAnalysis:
         self.iter_ = res.iterations
 
         # If required, compute a distribution of the coefficients using bootstrap: -------
-        if n_bootstraps is not None:
+        if (n_bootstraps is not None) and (n_bootstraps >0):
             bootstrap_coef = []
             for bootstrap in dataset.bootstraps(
                 n_bootstraps=n_bootstraps, batch_size=batch_size
@@ -287,7 +290,7 @@ class CoxPHSurvivalAnalysis:
         assert self.hessian_.shape == hessian_shape
         assert self.imat_.shape == hessian_shape
 
-        if n_bootstraps is not None:
+        if (n_bootstraps is not None) and (n_bootstraps >0 ):
             assert self.bootstrap_coef_.shape == (n_bootstraps, n_batch, n_covariates)
 
 
@@ -354,7 +357,7 @@ def coxph_numpy(
     stop,
     deaths,
     patient_id=None,
-    bootstrap=1,
+    bootstrap=0,
     batchsize=None,
     ties="efron",
     # survtype,
@@ -394,6 +397,7 @@ def coxph_numpy(
             "hessian": (B,D,D) or (B,C,D,D) tensor that represents, for each bootstrap, the Hessian of the neg-log-likelihood at the optimum - this should be a symmetric, positive (D,D) matrix.
             "imat": (B,D,D) or (B,C,D,D) tensor that represents, for each bootstrap, the inverse of the Hessian above. This corresponds to an estimated variance matrix for the optimal coefficients.
     """
+
     model = CoxPHSurvivalAnalysis(
         alpha=alpha,
         ties=ties,
@@ -408,6 +412,8 @@ def coxph_numpy(
 
     # mock use of strata to avoid unused argument warning
 
+    print("fitting model")
+
     model.fit(
         covariates=x,
         stop=stop,
@@ -419,6 +425,8 @@ def coxph_numpy(
         batch_size=batchsize,
         init=init,
     )
+
+    print(model.coef_)
 
     # Step 5: turn the list of dicts into a dicts of concatenated results ==========
     output = {
@@ -459,7 +467,6 @@ def coxph_R(
     profile=None,
     device=None,
 ):
-    print(patient_id)
     if patient_id == "None":
         patient_id = None
     if isinstance(covars, str):

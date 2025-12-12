@@ -300,8 +300,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   }
   data.n <- nrow(Y) # remember this before any time transforms
 
-  print("Data check : 1")
-  print(head(data))
 
   if (!multi && multiform) {
     stop("formula is a list but the response is not multi-state")
@@ -971,9 +969,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     stop <- ytemp[2]
     event <- ytemp[3]
 
-    print("Data check : 2")
-    print(head(data))
-
 
     data_processed <- data.frame(start = y1,
                        stop = y2,
@@ -992,10 +987,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     start = NULL
     stop <- ytemp[1]
     event <- ytemp[2]
-
-    print("Data check : 2")
-    print(head(data))
-
 
 
     data_processed <- data.frame(stop = time,
@@ -1073,12 +1064,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   coxph_R <- survivalgpu$coxph_R
 
 
-
-  print(head(data))
-  print(head(data_processed))
-
-
-  coxfit <- coxph_R(data = data_processed,
+   coxfit <- coxph_R(data = data_processed,
                     start = start,
                     stop = stop,
                     death = event,
@@ -1472,7 +1458,7 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
 
   NextMethod("print", x)
 
-  if (x$nbootstraps > 1) {
+  if (x$nbootstraps > 0) {
         cat("\n--- Other results with bootstrap with summary() ---")
       }
 }
@@ -1504,7 +1490,7 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
   survival_summary$nbootstraps <- object$nbootstraps
   survival_summary$conf.int_level = conf.int
 
-    if (object$nbootstraps > 1) {
+    if (object$nbootstraps > 0) {
       probs <- c((1 - conf.int) / 2, 1 - (1 - conf.int) / 2)
 
       # confidence Interval for coefficients (default 95%)
