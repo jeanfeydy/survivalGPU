@@ -14,6 +14,7 @@ We provide:
 
 
 import numpy as np
+import pandas as pd
 import torch
 from matplotlib import pyplot as plt
 
@@ -90,8 +91,8 @@ class SurvivalDataset:
         start: Int64Array["intervals"] | None = None,
         event: Int64Array["intervals"] | None = None,
         patient: Int64Array["intervals"] | None = None,
-        strata: Int64Array["patients"] | None = None,
-        batch: Int64Array["patients"] | None = None,
+        strata: Int64Array["intervals"] | None = None,
+        batch: Int64Array["patient"] | None = None,
         covariates: Float64Array["intervals covariates"] | None = None,
         dose: Float64Array["doses"] | None = None,
         dose_time: Int64Array["doses"] | None = None,
@@ -196,29 +197,66 @@ class SurvivalDataset:
         # Checks for strata -------------------------------------------------------------
         # Default value for strata is [0, 0, 0, ...]: all patients belong to the same stratum.
         if strata is None:
-            strata = np.zeros((self.n_patients,), dtype=np.int64)
+            strata = np.zeros((self.stop.shape[0],), dtype=np.int64)
 
-        if strata.shape != (self.n_patients,):
+        if strata.shape != (self.stop.shape[0],):
             msg = (
-                "Strata must be a vector of length n_patients = max(patient) + 1. "
-                f"Got {strata.shape} instead of {self.n_patients}."
+                "Strata must be a vector of the length of stop. "
+                f"Got {strata.shape} instead of {self.stop.shape[0]}."
             )
             raise ValueError(msg)
+
+        df_patient_strata = pd.DataFrame({
+            "patient": patient,
+            "strata": strata
+        })
+
+        if df_patient_strata["strata"].isna().any():
+            msg = "Strata variable contains missing values."
+            raise ValueError(msg)
+
+        n_strata = df_patient_strata.groupby("patient")["strata"].nunique()
+        if (n_strata > 1).any():
+            bad = n_strata[n_strata > 1].index.tolist()
+            msg = f"Patients with multiple strata values: {bad}"
+            raise ValueError(msg)
+
+
+        strata_patient = (
+            df_patient_strata.drop_duplicates("patient", keep="first")
+            .sort_index()
+            .set_index("patient")["strata"]
+        )
+
+        patient_unique = strata_patient.index.to_numpy()
+        self.strata_patient = strata_patient.to_numpy()
+
+
+
+        self.strata = strata
+        self.patient_unique = patient_unique
+
+
 
         # Checks for batch --------------------------------------------------------------
         # Default value for batch is [0, 0, 0, ...]: all patients belong to the same batch.
         if batch is None:
-            batch = np.zeros((self.n_patients,), dtype=np.int64)
+            batch = np.zeros(patient_unique.shape[0], dtype=np.int64)
 
-        if batch.shape != (self.n_patients,):
+        patient_to_index = {id: i for i, id in enumerate(patient_unique)}
+        batch_interval =  batch[np.array([patient_to_index[p] for p in patient])]
+        self.batch_interval = batch_interval
+
+        if batch.shape != patient_unique.shape:
             msg = (
-                "Batch must be a vector of length n_patients = max(patient) + 1. "
-                f"Got {batch.shape} instead of {self.n_patients}."
+                "Batch must be a vector of the length of the number of patients. "
+                f"Got {batch.shape} instead of {patient_unique.shape}."
             )
             raise ValueError(msg)
 
-        self.strata = strata
         self.batch = batch
+
+
 
     @typecheck
     def to_torch(self, device: TorchDevice) -> TorchSurvivalDataset:
@@ -239,8 +277,11 @@ class SurvivalDataset:
             start=to_int(self.start),
             event=to_int(self.event),
             patient=to_int(self.patient),
+            patient_unique=to_int(self.patient_unique),
             strata=to_int(self.strata),
+            strata_patient=to_int(self.strata_patient),
             batch=to_int(self.batch),
+            batch_interval=to_int(self.batch_interval),
             covariates=to_float(self.covariates),
         )
 

@@ -90,7 +90,7 @@ class CoxPHSurvivalAnalysis:
         event: Int64Array["intervals"] | None = None,
         patient: Int64Array["intervals"] | None = None, # patient Id is needed for bootstraps purposes
         strata: Int64Array["intervals"] | None = None,
-        batch: Int64Array["intervals"] | None = None,
+        batch: Int64Array["patient"] | None = None,
         init: Float64Array["covariates"] | None = None,
         n_bootstraps: Int | None = None,
         batch_size: Int | None = None,
@@ -103,10 +103,6 @@ class CoxPHSurvivalAnalysis:
             y (array-like): Survival times and event indicators.
             sample_weight (array-like): Sample weights.
         """
-
-        print("inside fitting")
-        print()
-
         # Pre-process the input data: ----------------------------------------------------
         # Create a dataset object: this enforces checks on the input data
         dataset = SurvivalDataset(
@@ -118,7 +114,6 @@ class CoxPHSurvivalAnalysis:
             strata=strata,
             batch=batch,
         )
-
 
 
         # Re-encode the data arrays as PyTorch tensors on the correct device,
@@ -201,7 +196,6 @@ class CoxPHSurvivalAnalysis:
             init_tensor = torch.tensor(init, dtype=float32, device=device)
             assert init_tensor.shape == (n_covariates,)
             init_tensor = init_tensor.repeat(n_batch, 1)
-
         res = newton(
             loss=loss(bootstrap=dataset.original_sample()),
             start=init_tensor,
@@ -278,6 +272,7 @@ class CoxPHSurvivalAnalysis:
         coef_shape = (n_batch, n_covariates)
         hessian_shape = (n_batch, n_covariates, n_covariates)
 
+
         assert self.means_.shape == (n_covariates,)  # TODO batch this...: coef_shape
         assert self.coef_.shape == coef_shape
         assert self.std_.shape == coef_shape
@@ -290,8 +285,10 @@ class CoxPHSurvivalAnalysis:
         assert self.hessian_.shape == hessian_shape
         assert self.imat_.shape == hessian_shape
 
+
         if (n_bootstraps is not None) and (n_bootstraps >0 ):
             assert self.bootstrap_coef_.shape == (n_bootstraps, n_batch, n_covariates)
+
 
 
     @typecheck
@@ -412,7 +409,6 @@ def coxph_numpy(
 
     # mock use of strata to avoid unused argument warning
 
-    print("fitting model")
 
     model.fit(
         covariates=x,
@@ -517,9 +513,6 @@ def coxph_R(
 
         cov = [data[covar] for covar in covars]
         x = np.array(cov).T.reshape([N, len(cov)])
-
-        print("launch numpy")
-
 
 
         res = coxph_numpy(

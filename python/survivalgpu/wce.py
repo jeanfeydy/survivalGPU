@@ -247,8 +247,8 @@ class WCESurvivalAnalysis:
         event: Int64Array["intervals"],
         patient: Int64Array["intervals"],
         covariates: Float64Array["intervals covariates"] | None = None,
-        strata: Int64Array["patients"] | None = None,
-        batch: Int64Array["patients"] | None = None,
+        strata: Int64Array["intervals"] | None = None,
+        batch: Int64Array["intervals"] | None = None,
         init: Float64Array["fullcovariates"] | None = None,
         n_bootstraps: Int | None = None,
         batch_size: Int | None = None,
@@ -377,8 +377,6 @@ class WCESurvivalAnalysis:
 
         cutoff = self.cutoff
 
-        print("starting HR")
-
 
         if (len(vecnum) != cutoff) or (len(vecdenom) != cutoff):
             msg = f"vecnum and vecdenom should have length {cutoff}."
@@ -403,13 +401,14 @@ def wce_numpy(
     covariates,
     doses,
     events,
-    times,
+    start,
+    stop,
     cutoff: Int,
     n_knots: Int = 1,
     order: Int = 3,
     constrained: Literal["right", "left"] | None = None,
-    strata: Int64Array["patients"] | None = None,
-    batch: Int64Array["patients"] | None = None,
+    strata: Int64Array["intervals"] | None = None,
+    batch: Int64Array["intervals"] | None = None,
     init: Float64Array["fullcovariates"] | None = None,
     n_bootstraps: Int | None = None,
     batch_size: Int | None = None,
@@ -430,8 +429,8 @@ def wce_numpy(
 
     model.fit(
         dose=doses,
-        stop=times,
-        start=times - 1,
+        stop=stop,
+        start=start,
         event=events,
         patient=ids,
         covariates=covariates,
@@ -468,14 +467,6 @@ def wce_numpy(
         iter=model.iter_,
     )
 
-    # print("printing of covariates inside wce_numpy")
-    # print("covariates shape:", covariates.shape)
-    # print("covariates type:", type(covariates))
-    # print(covariates)
-
-    # print("end of covariate")
-
-    # quit()
 
     if n_bootstraps is not None:
         output.update(
@@ -494,6 +485,7 @@ def wce_R(
     data,
     ids,
     covars,
+    start,
     stop,
     doses,
     events,
@@ -513,8 +505,6 @@ def wce_R(
     strata = None,
     device = None
 ):
-    print("Ok")
-
 
     if constrained == "None":
         constrained = None
@@ -558,9 +548,10 @@ def wce_R(
 
     ids = np.array(data[ids], dtype = np.int64)
     doses = np.array(data[doses], dtype = np.float64)
-    times = np.array(data[stop], dtype = np.int64)
+    start = np.array(data[start], dtype = np.int64)
+    stop = np.array(data[stop], dtype = np.int64)
     events = np.array(data[events], dtype = np.int64)
-    N = len(times)
+    N = len(stop)
 
 
 
@@ -589,7 +580,8 @@ def wce_R(
             covariates=covariates,
             doses=doses,
             events=events,
-            times=times,
+            start=start,
+            stop=stop,
             cutoff=int(cutoff),
             n_knots=int(n_knots),
             order=int(order),

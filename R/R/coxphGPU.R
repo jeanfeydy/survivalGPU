@@ -77,7 +77,7 @@ coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 0,
 #' @method coxphGPU default
 #' @exportS3Method coxphGPU default
 coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
-                             bootstrap = 1, batchsize = 0, init,
+                             bootstrap = 0, batchsize = 0, init,
                              all.results = FALSE, control, singular.ok = TRUE,
                              model = FALSE, x = FALSE, y = TRUE, ..., weights,
                              subset, na.action, robust, tt, method = ties, id,

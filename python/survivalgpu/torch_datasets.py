@@ -71,23 +71,28 @@ class TorchSurvivalDataset:
         start: Int64Tensor["intervals"],
         event: Int64Tensor["intervals"],
         patient: Int64Tensor["intervals"],
-        strata: Int64Tensor["patients"],
-        batch: Int64Tensor["patients"],
+        patient_unique: Int64Tensor["patient"],
+        strata: Int64Tensor["intervals"],
+        strata_patient: Int64Tensor["patient"],
+        batch: Int64Tensor["patient"],
+        batch_interval: Int64Tensor["intervals"],
         covariates: Float32Tensor["intervals covariates"],
     ):
         self.stop = stop
         self.start = start
         self.event = event
         self.patient = patient
-        self.strata = strata
+        self.patient_unique = patient_unique
+        self.strata = strata_patient
         self.batch = batch
         self.covariates = covariates
+        self.batch_intervals = batch_interval
 
-        self.batch_intervals = self.batch[self.patient]
-        self.strata_intervals = self.strata[self.patient]
-
+        # self.batch_intervals = self.batch[self.patient]
+        self.strata_intervals = strata
         assert self.batch_intervals.shape == self.stop.shape
         assert self.strata_intervals.shape == self.stop.shape
+
 
         self.is_sorted = False
 
@@ -101,7 +106,7 @@ class TorchSurvivalDataset:
     @typecheck
     def n_patients(self) -> int:
         """Number of patients that are referenced in the dataset."""
-        return int(self.patient.max() + 1)
+        return int(len(self.patient_unique))
 
     @property
     @typecheck
@@ -442,7 +447,9 @@ class TorchSurvivalDataset:
 
         # Step 1: create stratifications groups for the sampling =========================
         if stratify:
+            print("crash cause ? ")
             strata = torch.stack((self.batch, self.strata), dim=1)
+            print("no")
         else:
             strata = self.batch.view(-1, 1)
 
