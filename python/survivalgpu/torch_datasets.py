@@ -128,6 +128,71 @@ class TorchSurvivalDataset:
         """Number of covariates that are referenced in the dataset."""
         return 0 if self.covariates is None else self.covariates.shape[1]
 
+    def show(self, max_rows=None):
+        """
+        Pretty-print the dataset in tabular form.
+
+        Args:
+            max_rows (int or None):
+                - None → print ALL rows
+                - int  → print at most max_rows rows
+        """
+        print(self._tabulate(max_rows=max_rows))
+
+
+    def __str__(self):
+        # Default print behaviour: show 10 rows
+        return self._tabulate(max_rows=10)
+
+    def _tabulate(self, max_rows=None):
+
+        I = self.n_intervals
+        rows_to_show = I if max_rows is None else min(I, max_rows)
+
+        # Interval-level columns
+        interval_columns = {
+            "stop": self.stop,
+            "start": self.start,
+            "event": self.event,
+            "patient": self.patient,
+            "batch": self.batch_intervals,
+            "strata": self.strata_intervals,
+        }
+
+        # Covariates: short names c0, c1, ...
+        if self.covariates is not None:
+            for j in range(self.covariates.shape[1]):
+                interval_columns[f"c{j}"] = self.covariates[:, j]
+
+        col_names = list(interval_columns.keys())
+
+        # Compute column widths dynamically
+        widths = {name: max(len(name), 6) for name in col_names}
+
+        # Header
+        header = " ".join(f"{name:<{widths[name]}}" for name in col_names)
+        sep = "-" * len(header)
+
+        lines = [header, sep]
+
+        # Rows
+        for i in range(rows_to_show):
+            row = []
+            for name in col_names:
+                val = interval_columns[name][i].item()
+                row.append(f"{val:<{widths[name]}.5g}")
+            lines.append(" ".join(row))
+
+        if rows_to_show < I:
+            lines.append(f"... showing {rows_to_show}/{I} rows")
+
+        return "\n".join(lines)
+
+
+
+
+
+
     def sort(self):
         """Re-orders the input arrays by lexicographical order on (batch > strata > stop > event)."""
         # N.B.: the numpy convention is to sort by the last row first.

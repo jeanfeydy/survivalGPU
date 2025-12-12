@@ -88,9 +88,9 @@ class CoxPHSurvivalAnalysis:
         *,
         start: Int64Array["intervals"] | None = None,
         event: Int64Array["intervals"] | None = None,
-        patient: Int64Array["intervals"] | None = None,
-        strata: Int64Array["patients"] | None = None,
-        batch: Int64Array["patients"] | None = None,
+        # patient: Int64Array["intervals"] | None = None, # removed for now, in the future can be used for clustering
+        strata: Int64Array["intervals"] | None = None,
+        batch: Int64Array["intervals"] | None = None,
         init: Float64Array["covariates"] | None = None,
         n_bootstraps: Int | None = None,
         batch_size: Int | None = None,
@@ -111,7 +111,7 @@ class CoxPHSurvivalAnalysis:
             stop=stop,
             start=start,
             event=event,
-            patient=patient,
+            # patient=patient,
             strata=strata,
             batch=batch,
         )
@@ -456,6 +456,8 @@ def coxph_R(
     profile=None,
     device=None,
 ):
+    if isinstance(covars, str):
+        covars = [covars]
 
     if start == "None":
         start = None
