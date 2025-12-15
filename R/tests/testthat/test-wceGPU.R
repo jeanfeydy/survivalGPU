@@ -32,48 +32,54 @@ wce <- WCE::WCE(
 # Check weight function between WCE GPU and original WCE
 test_that("WCE mat", {
   expect_equal(
-    round(as.vector(wce$WCEmat), 1),
-    round(as.vector(wce_gpu$WCEmat), 1)
+    as.vector(wce$WCEmat),
+    as.vector(wce_gpu$WCEmat),
+    tolerance = 1e-2
   )
 })
 
 # Check coefs between WCE GPU and original WCE
 test_that("coef covariates", {
   expect_equal(
-    round(as.vector(wce$beta.hat.covariates), 1),
-    round(as.vector(wce_gpu$beta.hat.covariates), 1)
+    as.vector(wce$beta.hat.covariates),
+    as.vector(wce_gpu$beta.hat.covariates),
+    tolerance = 1e-2
   )
 })
 
 # Check SE between WCE GPU and original WCE
 test_that("SE covariates", {
   expect_equal(
-    round(as.vector(wce$se.covariates), 1),
-    round(as.vector(wce_gpu$se.covariates), 1)
+    as.vector(wce$se.covariates),
+    as.vector(wce_gpu$se.covariates),
+    tolerance = 1e-2
   )
 })
 
 # Check covariance matrix between WCE GPU and original WCE
 test_that("Vcovmat", {
   expect_equal(
-    round(wce$vcovmat[[1]], 2),
-    round(wce_gpu$vcovmat[[1]], 2)
+    wce$vcovmat[[1]],
+    wce_gpu$vcovmat[[1]],
+    tolerance = 1e-2
   )
 })
 
 # Check ll between WCE GPU and original WCE
 test_that("Partial ll", {
   expect_equal(
-    round(as.vector(wce$loglik), 1),
-    round(as.vector(wce_gpu$loglik), 1)
+    as.vector(wce$loglik),
+    as.vector(wce_gpu$loglik),
+    tolerance = 1e-2
   )
 })
 
 # Check AIC/BIC between WCE GPU and original WCE
 test_that("info.criterion", {
   expect_equal(
-    round(as.numeric(wce$info.criterion), 0),
-    round(as.numeric(wce_gpu$info.criterion), 0)
+    as.numeric(wce$info.criterion),
+    as.numeric(wce_gpu$info.criterion),
+    tolerance = 1e-2
   )
 })
 
@@ -82,11 +88,11 @@ test_that("info.criterion", {
 exposed   <- rep(1, 90)
 unexposed <- rep(0, 90)
 
-test_that("HR",
-{
+test_that("HR", {
   expect_equal(
-    round(HR(wce_gpu_bootstrap, exposed, unexposed)[1], 1),
-    round(WCE::HR.WCE(wce, exposed, unexposed)[1], 1)
+    HR(wce_gpu_bootstrap, exposed, unexposed)[1],
+    WCE::HR.WCE(wce, exposed, unexposed)[1],
+    tolerance = 1e-2
   )
 })
 
