@@ -8,6 +8,116 @@ from scipy.stats import norm
 
 from .utils import device
 
+# Generation data
+
+
+# def cox_permalgo(
+#         num_subjects
+# ):
+
+
+# def wce_permalgo(
+#         n_patients,
+#         max_time,
+#         events,
+#         final_times,
+#         cox_Xmat,
+#         cox_betas,
+#         cox_names=None,
+#         WCE_Xmat=None,
+#         WCE_betas=None,
+#         WCE_scenarios=None,
+#         WCE_names=None):
+
+
+#     X_column_length = n_patients * max_time
+
+#     # get if this is a dataset containing WCE covariates
+#     if WCE_Xmat is not None:
+#         is_WCE = True
+
+
+#     else:
+#         is_WCE = False
+
+#     #check the length of the Xmat
+#     if cox_Xmat.shape[0] != X_column_length:
+#         msg = f"The cox_Xmat has a wrong number of rows, expected {X_column_length}, got {cox_Xmat.shape[0]}"
+#         raise ValueError(msg)
+
+
+
+# def permalgo(
+#         n_patients,
+#         max_time,
+#         events,
+#         final_times,
+#         Xmat,
+#         betas,
+#         X_names=None):
+#     """
+#     Docstring for cex_permalgo
+
+#     :param n_patients: the number of patients
+#     :param max_time: the maximum follow-up time
+#     :param events: the event indicators
+#     :param final_times: the final follow-up times
+#     :param Xmat: the covariate matrix, with shape (n_patients * max_time, n_covariates)
+#     :param betas: the regression coefficients
+
+#     :return: a dataframe containing the simulated dataset with the iindependant
+#         covariates and the event indicators associated with a probability density
+#         function corresponding to the likelihood of the covariates and betas
+#     """
+
+#     X_column_length = n_patients * max_time
+
+#     #check the length of the Xmat
+#     if Xmat.shape[0] != X_column_length:
+#         msg = f"The Xmat has a wrong number of rows, expected {X_column_length}, got {Xmat.shape[0]}"
+#         raise ValueError(msg)
+
+#     # check that the number of betas is equal to the number of covariates, defined by the number of columns in the Xmat
+#     if Xmat.shape[1] != len(betas):
+#         msg = f"The number of betas is not equal to the number of covariates, expected {Xmat.shape[1]}, got {len(betas)}"
+#         raise ValueError(msg)
+
+#     # check the
+
+#     # check that the length of events and final_times is equal to n_patients
+#     if len(events) != n_patients:
+#         msg = f"The length of events is not equal to the number of patients, expected {n_patients}, got {len(events)}"
+#         raise ValueError(msg)
+
+#     # check that the number of names is equal to the number of covariates, if names are given
+#     if X_names is not None:
+#         if len(X_names) != Xmat.shape[1]:
+#             msg = f"The number of names is not equal to the number of covariates, expected {Xmat.shape[1]}, got {len(X_names)}"
+#             raise ValueError(msg)
+
+
+#     # convert betas to numpy array
+#     betas = np.asarray(betas)
+
+
+#     wce_id_selected = matching_algo(Xmat = Xmat,
+#                                     HR_target_list=HR_target_list,
+#                                     max_time=max_time,
+#                                     n_patients=n_patients,
+#                                     events=events,
+#                                     FUP_tis = FUP_tis)
+
+
+
+#     cox_betas = np.asarray(cox_betas)
+#     if WCE_betas is not None:
+#         WCE_betas = np.asarray(WCE_betas)
+#         beta_list = np.concatenate([cox_betas, WCE_betas])
+#     else:
+#         beta_list = cox_betas
+
+#     return beta_list
+
 
 # TODO : modify the TDhist to be able to manage a bigger variety of cases,
 # maybe create another  TDhist that is more in tune with the kind of data given by the SNDS
@@ -111,23 +221,24 @@ class ConstantCovariate(Covariate):
         self.weights = weights
         self.coef = coef
 
+
     def initialize_experiment(self, n_patients, max_time):
         self.n_patients = n_patients
         self.max_time = max_time
         self.generate_Xvector()
         return self
 
-def generate_Xvector(self):
+    def generate_Xvector(self):
 
-    proba = self.weights / np.sum(self.weights)
+        proba = self.weights / np.sum(self.weights)
 
-    rng = np.random.default_rng()
+        rng = np.random.default_rng()
 
-    Xvect = rng.choice(self.values, size=self.n_patients, p=proba)
-    Xvector = np.repeat(Xvect, self.max_time)
+        Xvect = rng.choice(self.values, size=self.n_patients, p=proba)
+        Xvector = np.repeat(Xvect, self.max_time)
 
-    self.Xvector = Xvector
-    return self
+        self.Xvector = Xvector
+        return self
 
 
 class TimeDependentCovariate(Covariate):
@@ -230,6 +341,8 @@ class CoxCovariate(Covariate):
         self.max_time = max_time
 
         return self
+
+
 
     # def generate_Xvector(self):
 
