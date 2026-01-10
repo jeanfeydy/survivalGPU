@@ -6,7 +6,6 @@ from .simulations import (
     ConstantCovariate,
     TimeDependentCovariate,
     WCECovariate,
-    permalgo,
     simulate_dataset,
     simulate_for_experiment,
 )
