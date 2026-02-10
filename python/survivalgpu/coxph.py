@@ -365,6 +365,7 @@ def coxph_numpy(
     alpha=0,
     verbosity=0,
     doscale=False,
+    device,
 ):
     """Implements the Cox Proportional Hazards model.
 
@@ -420,6 +421,7 @@ def coxph_numpy(
         n_bootstraps=bootstrap,
         batch_size=batchsize,
         init=init,
+        device = device
     )
 
     print(model.coef_)
@@ -463,6 +465,8 @@ def coxph_R(
     profile=None,
     device=None,
 ):
+
+
     if patient_id == "None":
         patient_id = None
     if isinstance(covars, str):
@@ -480,6 +484,10 @@ def coxph_R(
     if device == "cuda" and not use_cuda:
         msg = "CUDA device requested but no GPU available."
         raise ValueError(msg)
+
+
+    print("######## DEVICE: ", device )
+
 
     if profile is not None:
         print("Profile trace:", profile)
@@ -524,6 +532,7 @@ def coxph_R(
             # survtype=survtype,
             strata=strata,
             patient_id=patient_id,
+            device = device,
             bootstrap=int(bootstrap),
             batchsize=int(batchsize) if batchsize > 0 else None,
             maxiter=int(maxiter) if profile is None else 1,
