@@ -790,7 +790,8 @@ def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
 
 
 def simulate_dataset(max_time, n_patients,
-                     list_covariates: list[WCECovariate, TimeDependentCovariate, ConstantCovariate]):
+                     list_covariates: list[WCECovariate, TimeDependentCovariate, ConstantCovariate],
+                     compress = True):
 
 
     list_wce_covariates = []
@@ -875,14 +876,73 @@ def simulate_dataset(max_time, n_patients,
 
     # df_wce = pd.DataFrame(numpy_wce, columns = ["patients","start","stop","events","doses"])
 
-
-    return get_dataset(Xmat = Xmat,
+    dataset = get_dataset(Xmat = Xmat,
                       covariate_names = covariate_names,
                       n_patients =n_patients,
                       FUP_tis = FUP_tis,
                       events = events,
                       wce_id_indexes = wce_id_selected,
                       max_time =max_time)
+
+
+    if compress:
+        return compress_dataset(dataset)
+
+    return dataset
+
+def compress_dataset(dataset):
+    covariate_cols = dataset.columns[5:]
+    shifted = dataset.groupby('patients')[covariate_cols].shift()
+    dataset['any_change'] = (dataset[covariate_cols] != shifted).any(axis=1)
+    dataset['group_id'] = dataset.groupby('patients')['any_change'].cumsum()
+    dataset = dataset.drop(columns=['any_change'])
+    return dataset.groupby(['patients', 'group_id']).agg({
+        'start': 'first',
+        'stop': 'last',
+        'events': 'last',
+        **{col: 'first' for col in covariate_cols}
+    }).reset_index()
+
+
+def simulate_dataset_batch( max_time, n_patients, list_covariates, batchsize = None, compress = True):
+
+    print(batchsize)
+    print(n_patients)
+    print(batchsize % n_patients)
+
+    if batchsize is None:
+        batchsize = n_patients
+
+    if n_patients % batchsize != 0:
+        msg = "The batch size must be proportional to the number of patients, in order to have a complete batch"
+        raise ValueError(msg)
+
+    n_batches = batchsize // n_patients
+
+    dataset = simulate_dataset(max_time = max_time, n_patients = n_patients, list_covariates = list_covariates, compress = compress)
+
+
+    for i in range(1,n_batches):
+
+        batch_dataset = simulate_dataset(max_time = max_time, n_patients = n_patients, list_covariates = list_covariates, compress = compress)
+
+        batch_dataset["patients"] += batchsize * i
+
+        dataset = pd.concat((dataset, batch_dataset))
+
+    return dataset
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

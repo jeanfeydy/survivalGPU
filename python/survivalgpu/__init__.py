@@ -7,6 +7,7 @@ from .simulations import (
     TimeDependentCovariate,
     WCECovariate,
     simulate_dataset,
+    simulate_dataset_batch,
     simulate_for_experiment,
 )
 from .utils import device, float32, int32, int64, use_cuda
@@ -30,7 +31,8 @@ __all__ = [
         "WCECovariate",
         "ConstantCovariate",
         "TimeDependentCovariate",
-        "permalgo"
+        "permalgo",
+        "simulate_dataset_batch"
     ]
 
 __version__ = "0.1.0"
