@@ -467,7 +467,6 @@ def coxph_R(
     device=None,
 ):
 
-
     if patient_id == "None":
         patient_id = None
     if isinstance(covars, str):

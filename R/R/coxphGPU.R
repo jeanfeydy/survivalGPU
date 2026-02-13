@@ -973,14 +973,14 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     event <- ytemp[3]
 
 
-    data_processed <- data.frame(start = y1,
+    data_Y <- data.frame(start = y1,
                        stop = y2,
                        status = Y[,3])
 
 
-    names(data_processed)[1] <- start
-    names(data_processed)[2] <- stop
-    names(data_processed)[3] <- event
+    names(data_Y)[1] <- start
+    names(data_Y)[2] <- stop
+    names(data_Y)[3] <- event
 
 
 
@@ -992,16 +992,16 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     event <- ytemp[2]
 
 
-    data_processed <- data.frame(stop = time,
+    data_Y <- data.frame(stop = time,
                        status = status)
 
-    names(data_processed)[1] <- stop
-    names(data_processed)[2] <- event
+    names(data_Y)[1] <- stop
+    names(data_Y)[2] <- event
   }
 
 
 
-  # data_processed <- cbind(data_processed,X)
+  # data_Y <- cbind(data_Y,X)
 
 
   # Add patient_id data if defined for bootstrap purposes
@@ -1025,8 +1025,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
 
   if (!is.null(patient_id)){
-    data_processed <- cbind(data[patient_id],data_processed)
-    names(data_processed[1]) = patient_id
+    data_Y <- cbind(data[patient_id],data_Y)
+    names(data_Y[1]) = patient_id
   }
 
 
@@ -1069,8 +1069,12 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   coxph_R <- survivalgpu$coxph_R
 
 
-   coxfit <- coxph_R(data_Y = data_processed,
-                    data_X = X,
+  data_X <- as.data.frame(X)
+  # names(data_X) <- colnames(X)
+
+   coxfit <- coxph_R(
+                    data_Y = data_Y,
+                    data_X = data_X,
                     start = start,
                     stop = stop,
                     death = event,
