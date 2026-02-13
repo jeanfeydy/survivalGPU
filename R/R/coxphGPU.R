@@ -628,6 +628,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # Routines over strata, offset, and weights
   ##############################################################################
 
+
   # Routine strata
 
   # dropterms if stratification : remove strata attr in terms, and remove strata
@@ -858,6 +859,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
   # 2021 change: pass in per covariate centering.  This gives
   #  us more freedom to experiment.  Default is to leave 0/1 variables alone
+
+  # It seems y,
   if (is.null(nocenter)) zero.one <- rep(FALSE, ncol(X))
   zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
 
@@ -996,7 +999,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     names(data_processed)[2] <- event
   }
 
-  data_processed <- cbind(data_processed,X)
+
+
+  # data_processed <- cbind(data_processed,X)
 
 
   # Add patient_id data if defined for bootstrap purposes
@@ -1064,7 +1069,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   coxph_R <- survivalgpu$coxph_R
 
 
-   coxfit <- coxph_R(data = data_processed,
+   coxfit <- coxph_R(data_Y = data_processed,
+                    data_X = X,
                     start = start,
                     stop = stop,
                     death = event,

@@ -448,7 +448,8 @@ def coxph_numpy(
 
 
 def coxph_R(
-    data,
+    data_X,
+    data_Y,
     start,
     stop,
     death,
@@ -502,24 +503,24 @@ def coxph_R(
     with myprof as prof:
 
         if start is not None:
-            start = np.array(data[start], dtype=np.int64)
+            start = np.array(data_Y[start], dtype=np.int64)
             assert start.dtype == np.int64
 
 
         if patient_id is not None:
-            patient_id = np.array(data[patient_id], dtype =np.int64)
+            patient_id = np.array(data_Y[patient_id], dtype =np.int64)
             assert patient_id.dtype == np.int64
 
 
-        stop = np.array(data[stop], dtype=np.int64)
-        deaths = np.array(data[death], dtype=np.int64)
+        stop = np.array(data_Y[stop], dtype=np.int64)
+        deaths = np.array(data_Y[death], dtype=np.int64)
         N = len(stop)
 
 
         assert stop.dtype == np.int64
         assert deaths.dtype == np.int64
 
-        cov = [data[covar] for covar in covars]
+        cov = [data_X[covar] for covar in covars]
         x = np.array(cov).T.reshape([N, len(cov)])
 
 
