@@ -95,6 +95,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   ##############################################################################
   ##############################################################################
 
+  library(data.table)
+
   ties <- match.arg(ties)
 
   # To save in memory all coxph inputs
@@ -973,7 +975,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     event <- ytemp[3]
 
 
-    data_Y <- data.frame(start = y1,
+    data_Y <- data.table(start = y1,
                        stop = y2,
                        status = Y[,3])
 
@@ -992,7 +994,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     event <- ytemp[2]
 
 
-    data_Y <- data.frame(stop = time,
+    data_Y <- data.table(stop = time,
                        status = status)
 
     names(data_Y)[1] <- stop
@@ -1069,7 +1071,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   coxph_R <- survivalgpu$coxph_R
 
 
-  data_X <- as.data.frame(X)
+  data_X <- as.data.table(X)
   # names(data_X) <- colnames(X)
 
    coxfit <- coxph_R(
