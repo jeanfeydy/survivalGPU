@@ -484,7 +484,7 @@ def coxph_R(
     if device == "cuda" and not use_cuda:
         msg = "CUDA device requested but no GPU available."
         raise ValueError(msg)
-
+    
 
     print("######## DEVICE: ", device )
 
@@ -519,12 +519,16 @@ def coxph_R(
         assert stop.dtype == np.int64
         assert deaths.dtype == np.int64
 
-        cov = [data_X[covar] for covar in covars]
-        x = np.array(cov).T.reshape([N, len(cov)])
+
+        
+
+        # cov = [data_X[covar] for covar in covars]
+        # x = np.array(cov).T.reshape([N, len(cov)])
+
 
 
         res = coxph_numpy(
-            x=x,
+            x=data_X,
             start=start,
             stop=stop,
             deaths=deaths,

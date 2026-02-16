@@ -862,9 +862,17 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # 2021 change: pass in per covariate centering.  This gives
   #  us more freedom to experiment.  Default is to leave 0/1 variables alone
 
+  time_start = Sys.time()
   # It seems y,
   if (is.null(nocenter)) zero.one <- rep(FALSE, ncol(X))
-  zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
+  # zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
+  mat <- as.matrix(X)
+  zero.one <- colSums(!array(mat %in% nocenter, dim(mat))) == 0
+  time_stop = Sys.time()
+
+  print("time of regulatisation")
+
+  print(difftime(time_start, time_stop))
 
   # the returned value of agfit$coef starts as a copy of init, so make sure
   #  is is a vector and not a matrix; as.double suffices.
@@ -966,6 +974,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # if(robust == TRUE)
   #   stop("Robust variance is not implemented yet in coxphGPU")
 
+  time_start = Sys.time()
+
   # Variable 'Stop' and 'Event' for coxph_R
   if (type == "counting") { # if Surv object is counting type
 
@@ -1001,7 +1011,12 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     names(data_Y)[2] <- event
   }
 
+  time_stop = Sys.time()
 
+  time_data_Y = difftime(time_start, time_stop)
+
+  print("####### Time data_Y")
+  print(time_data_Y)
 
   # data_Y <- cbind(data_Y,X)
 
@@ -1070,13 +1085,18 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # survivalgpu <- use_survivalGPU() # change due to .onload
   coxph_R <- survivalgpu$coxph_R
 
+  # time_start = Sys.time()
+  # data_X <- as.data.table(X)
+  # time_stop = Sys.time()
+  # time_data_X = difftime(time_stop, time_start)
+  # print("####### Time data_X")
+  # print(time_data_X)
 
-  data_X <- as.data.table(X)
   # names(data_X) <- colnames(X)
 
    coxfit <- coxph_R(
                     data_Y = data_Y,
-                    data_X = data_X,
+                    data_X = X,
                     start = start,
                     stop = stop,
                     death = event,
