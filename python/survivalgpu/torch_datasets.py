@@ -14,7 +14,7 @@ import torch
 
 from .bootstrap import Resampling
 from .typecheck import (
-    Float32Tensor,
+    FloatTensor,
     Int64Tensor,
     List,
     Literal,
@@ -76,7 +76,7 @@ class TorchSurvivalDataset:
         strata_patient: Int64Tensor["patient"],
         batch: Int64Tensor["patient"],
         batch_interval: Int64Tensor["intervals"],
-        covariates: Float32Tensor["intervals covariates"],
+        covariates: FloatTensor["intervals covariates"],
     ):
         self.stop = stop
         self.start = start
@@ -223,7 +223,7 @@ class TorchSurvivalDataset:
     @typecheck
     def scale(
         self, *, rescale: bool
-    ) -> Tuple[Float32Tensor["covariates"], Float32Tensor["covariates"] | None]:
+    ) -> Tuple[FloatTensor["covariates"], FloatTensor["covariates"] | None]:
         """Computes the mean and scale (= L1 norm) of each covariate.
 
         If rescale is False, we simply return the means and None.

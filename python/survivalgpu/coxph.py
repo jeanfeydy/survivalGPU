@@ -28,8 +28,8 @@ from .datasets import SurvivalDataset
 from .optimizers import newton
 from .typecheck import (
     Bool,
-    Float32Tensor,
     Float64Array,
+    FloatTensor,
     Int,
     Int64Array,
     Literal,
@@ -38,7 +38,7 @@ from .typecheck import (
     typecheck,
 )
 from .utils import device as default_device
-from .utils import float32, numpy, use_cuda
+from .utils import float32, float64, numpy, use_cuda
 
 
 class CoxPHSurvivalAnalysis:
@@ -95,6 +95,8 @@ class CoxPHSurvivalAnalysis:
         n_bootstraps: Int | None = None,
         batch_size: Int | None = None,
         device: TorchDevice | None = None,
+        double_precision: Bool = True
+
     ):
         """Fit the model.
 
@@ -185,15 +187,17 @@ class CoxPHSurvivalAnalysis:
 
         # Run the Newton optimizer: ------------------------------------------------------
 
+        float_dtype = float64 if double_precision else float32
+
         # Vector of initial values of the Newton iteration.
         # Zero for all variables by default.
         if init is None:
             init_tensor = torch.zeros(
-                (n_batch, n_covariates), dtype=float32, device=device
+                (n_batch, n_covariates), dtype=float_dtype, device=device
             )
 
         else:
-            init_tensor = torch.tensor(init, dtype=float32, device=device)
+            init_tensor = torch.tensor(init, dtype=float_dtype, device=device)
             assert init_tensor.shape == (n_covariates,)
             init_tensor = init_tensor.repeat(n_batch, 1)
         res = newton(
@@ -239,11 +243,11 @@ class CoxPHSurvivalAnalysis:
                 if init is None:
                     init_tensor = torch.zeros(
                         (len(bootstrap) * n_batch, n_covariates),
-                        dtype=float32,
+                        dtype=float_dtype,
                         device=device,
                     )
                 else:
-                    init_tensor = torch.tensor(init, dtype=float32, device=device)
+                    init_tensor = torch.tensor(init, dtype=float_dtype, device=device)
                     assert init_tensor.shape == (n_covariates,)
                     init_tensor = init_tensor.repeat(len(bootstrap) * n_batch, 1)
 
@@ -295,7 +299,7 @@ class CoxPHSurvivalAnalysis:
     def _rescale(
         self,
         *,
-        scales: Float32Tensor["covariates"] | None,
+        scales: FloatTensor["covariates"] | None,
         n_covariates: int,
     ):
         """Restores proper scaling for the parameters of the CoxPH model.
@@ -366,6 +370,7 @@ def coxph_numpy(
     verbosity=0,
     doscale=False,
     device,
+    double_precision = True
 ):
     """Implements the Cox Proportional Hazards model.
 
@@ -421,7 +426,8 @@ def coxph_numpy(
         n_bootstraps=bootstrap,
         batch_size=batchsize,
         init=init,
-        device = device
+        device = device,
+        double_precision = double_precision
     )
 
     print(model.coef_)
@@ -465,6 +471,7 @@ def coxph_R(
     doscale=False,
     profile=None,
     device=None,
+    double_precision = True
 ):
 
     if patient_id == "None":
@@ -484,7 +491,7 @@ def coxph_R(
     if device == "cuda" and not use_cuda:
         msg = "CUDA device requested but no GPU available."
         raise ValueError(msg)
-    
+
 
     print("######## DEVICE: ", device )
 
@@ -513,14 +520,14 @@ def coxph_R(
 
         stop = np.array(data_Y[stop], dtype=np.int64)
         deaths = np.array(data_Y[death], dtype=np.int64)
-        N = len(stop)
+        # N = len(stop)
 
 
         assert stop.dtype == np.int64
         assert deaths.dtype == np.int64
 
 
-        
+
 
         # cov = [data_X[covar] for covar in covars]
         # x = np.array(cov).T.reshape([N, len(cov)])
@@ -544,6 +551,7 @@ def coxph_R(
             verbosity=0,
             alpha=0.0,
             doscale=doscale,
+            double_precision=double_precision
         )
 
     if profile is not None:

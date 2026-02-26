@@ -1,7 +1,13 @@
 # Use PyTorch for fast array manipulations (on the GPU):
 import torch
 
-from .typecheck import BoolTensor, Float32Tensor, Int64Tensor, Literal, typecheck
+from .typecheck import (
+    BoolTensor,
+    FloatTensor,
+    Int64Tensor,
+    Literal,
+    typecheck,
+)
 
 LOG0 = float("-inf")  # replace with float(-1e20) for debugging
 MINFLOAT = torch.finfo(torch.float).min
@@ -35,7 +41,7 @@ def clip_zero(x):
 def make_2d(
         *,
         groups: Int64Tensor["values"] | Int64Tensor["bootstraps values"],
-        values: Int64Tensor["bootstraps values"] | Float32Tensor["bootstraps values"],
+        values: Int64Tensor["bootstraps values"] | FloatTensor["bootstraps values"],
     ) -> Int64Tensor["bootstraps values"]:
     """Makes sure that the groups tensor is 2D and has the same shape as the values tensor.
 
@@ -64,10 +70,10 @@ class SumTorch(torch.autograd.Function):
     @typecheck
     def forward(
             ctx,
-            values: Int64Tensor["bootstraps values"] | Float32Tensor["bootstraps values"],
+            values: Int64Tensor["bootstraps values"] | FloatTensor["bootstraps values"],
             groups: Int64Tensor["values"] | Int64Tensor["bootstraps values"],
             output_size: int,
-        ) -> Int64Tensor["bootstraps {output_size}"] | Float32Tensor["bootstraps {output_size}"]:
+        ) -> Int64Tensor["bootstraps {output_size}"] | FloatTensor["bootstraps {output_size}"]:
         """Forward pass for the group-wise sum reduction."""
 
         ctx.save_for_backward(groups)
@@ -84,7 +90,7 @@ class SumTorch(torch.autograd.Function):
     @typecheck
     def backward(
             ctx,
-            grad_output: Int64Tensor["bootstraps output_size"] | Float32Tensor["bootstraps output_size"],
+            grad_output: Int64Tensor["bootstraps output_size"] | FloatTensor["bootstraps output_size"],
         ):
         """Fast but non-deterministic backward pass for the group-wise sum reduction."""
 
@@ -98,11 +104,11 @@ class SumTorch(torch.autograd.Function):
 @typecheck
 def group_reduce(
         *,
-        values: Int64Tensor["bootstraps values"] | Float32Tensor["bootstraps values"],
+        values: Int64Tensor["bootstraps values"] | FloatTensor["bootstraps values"],
         groups: Int64Tensor["values"] | Int64Tensor["bootstraps values"],
         reduction: Literal["max", "sum", "sum_forward_pass"],
         output_size: int,
-    ) -> Int64Tensor["bootstraps {output_size}"] | Float32Tensor["bootstraps {output_size}"]:
+    ) -> Int64Tensor["bootstraps {output_size}"] | FloatTensor["bootstraps {output_size}"]:
     """Group-wise reduction of the values tensor.
 
     This is a wrapper around the torch.scatter_reduce_ function.
@@ -160,10 +166,10 @@ def group_expand(*, values, groups, output_size):  # noqa: ARG001
 @typecheck
 def group_sum(
         *,
-        values: Int64Tensor["bootstraps values"] | Float32Tensor["bootstraps values"],
+        values: Int64Tensor["bootstraps values"] | FloatTensor["bootstraps values"],
         groups: Int64Tensor["values"] | Int64Tensor["bootstraps values"],
         output_size: int,
-    ) -> Int64Tensor["bootstraps {output_size}"] | Float32Tensor["bootstraps {output_size}"]:
+    ) -> Int64Tensor["bootstraps {output_size}"] | FloatTensor["bootstraps {output_size}"]:
     """Group-wise sum reduction.
 
     This is a wrapper around group_reduce with reduction="sum".
@@ -361,9 +367,9 @@ def keys_to_segments(
 @typecheck
 def segment_cumsum(
     *,
-    values: Float32Tensor["bootstraps values"],
+    values: FloatTensor["bootstraps values"],
     segments: Int64Tensor["values"],
-) -> Float32Tensor["bootstraps values"]:
+) -> FloatTensor["bootstraps values"]:
     """Computes the cumulative sum over segments, i.e. groups of consecutive indices.
 
     .. testcode::

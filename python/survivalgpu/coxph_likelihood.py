@@ -66,7 +66,7 @@ from .group_reduction import (
     rank_in_segment,
     segment_cumsum,
 )
-from .typecheck import Float32Tensor, Int64Tensor, Literal, typecheck
+from .typecheck import FloatTensor, Int64Tensor, Literal, typecheck
 
 
 @typecheck
@@ -154,21 +154,144 @@ def _compute_unique_batch_strata_time(
 
     return unique_batch_strata_time, index_start, index_stop
 
+# @typecheck
+# def _compute_unique_batch_strata_time(
+#     *,
+#     batch: Int64Tensor["intervals"],
+#     strata: Int64Tensor["intervals"],
+#     start: Int64Tensor["intervals"],
+#     stop: Int64Tensor["intervals"],
+# ) -> tuple[Int64Tensor["3 times"], Int64Tensor["intervals"], Int64Tensor["intervals"]]:
+#     """Collapses the intervals of the dataset into unique (batch, strata, time) values.
+
+#     .. testcode::
+
+#         import torch
+#         from survivalgpu.coxph_likelihood import _compute_unique_batch_strata_time
+
+#         batch = torch.tensor([0, 0, 0, 0, 0, 0, 1, 1, 1])
+#         strata = torch.tensor([0, 0, 0, 1, 1, 1, 0, 0, 0])
+#         start = torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0])
+#         stop = torch.tensor([1, 2, 3, 1, 2, 3, 1, 2, 3])
+
+#         unique_batch_strata_time, index_start, index_stop = _compute_unique_batch_strata_time(
+#             batch=batch,
+#             strata=strata,
+#             start=start,
+#             stop=stop,
+#         )
+#         print(unique_batch_strata_time)
+
+#     .. testoutput::
+
+#         tensor([[0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+#                 [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+#                 [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]])
+
+#     .. testcode::
+
+#         print(index_start)
+
+#     .. testoutput::
+
+#         tensor([0, 0, 0, 4, 4, 4, 8, 8, 8])
+
+#     .. testcode::
+
+#         print(index_stop)
+
+#     .. testoutput::
+
+#         tensor([ 1,  2,  3,  5,  6,  7,  9, 10, 11])
+
+#     """
+
+#     I = batch.shape[0]
+#     device = batch.device
+
+#     # batch and strata define independent groups,
+#     # while start and stop refer to time values.
+#     # Working in parallel over (batch, strata) groups,
+#     # we need to sort by time (handling both start and stop)
+#     # and find the number of unique (batch, strata, time) values.
+
+#     # Encode each triplet (batch, strata, time) as a single scalar
+#     # so we can use GPU-native sort instead of torch.unique(dim=1)
+#     # which has a hidden CPU transfer for 2D inputs.
+#     # We need max_val > max of all values to ensure unique encoding.
+#     max_val = int(max(batch.max(), strata.max(), start.max(), stop.max()).item()) + 1
+
+#     # Concatenate start and stop into a single flat array of 2*I time values,
+#     # mirroring the former batch_strata_start_stop of shape (3, 2*I).
+#     all_times  = torch.cat([start, stop])          # (2*I,)
+#     all_batch  = torch.cat([batch, batch])          # (2*I,)
+#     all_strata = torch.cat([strata, strata])        # (2*I,)
+#     assert all_times.shape == (2 * I,)
+#     assert all_batch.shape == (2 * I,)
+#     assert all_strata.shape == (2 * I,)
+
+#     # Scalar encoding: each triplet maps to a unique int64 value.
+#     # Lexicographic order is preserved: batch first, then strata, then time.
+#     encoded = all_batch * (max_val ** 2) + all_strata * max_val + all_times
+#     assert encoded.shape == (2 * I,)
+
+#     # GPU-native sort — stays entirely on GPU, no CPU round-trip.
+#     sorted_encoded, sort_idx = torch.sort(encoded)
+#     assert sorted_encoded.shape == (2 * I,)
+
+#     # Find unique values via consecutive diff — fully GPU, no transfer.
+#     is_unique = torch.cat([
+#         torch.ones(1, dtype=torch.bool, device=device),
+#         sorted_encoded[1:] != sorted_encoded[:-1],
+#     ])
+#     assert is_unique.shape == (2 * I,)
+
+#     # unique_rank[i] = index of encoded[i] in the unique sorted list,
+#     # equivalent to the inverse_indices returned by torch.unique.
+#     # cumsum(is_unique) - 1 gives the rank of each sorted element.
+#     unique_rank_sorted = torch.cumsum(is_unique, dim=0) - 1  # (2*I,)
+
+#     # Undo the sort to recover the rank of each original element
+#     # (first I elements = start, last I = stop).
+#     inverse_indices = torch.empty_like(unique_rank_sorted)
+#     inverse_indices[sort_idx] = unique_rank_sorted
+#     assert inverse_indices.shape == (2 * I,)
+
+#     # Decode the unique encoded values back into (batch, strata, time) rows.
+#     unique_encoded = sorted_encoded[is_unique]
+#     T = unique_encoded.shape[0]
+#     assert T <= 2 * I
+
+#     unique_time   =  unique_encoded % max_val
+#     unique_strata = (unique_encoded // max_val) % max_val
+#     unique_batch  =  unique_encoded // (max_val ** 2)
+
+#     # Stack back into shape (3, T) to match the original output contract.
+#     unique_batch_strata_time = torch.stack(
+#         (unique_batch, unique_strata, unique_time), dim=0
+#     )
+#     assert unique_batch_strata_time.shape == (3, T)
+
+#     index_start = inverse_indices[:I]
+#     index_stop  = inverse_indices[I:]
+
+#     return unique_batch_strata_time, index_start, index_stop
+
 
 @typecheck
 def _compute_time_data(
     *,
     interval_counts: Int64Tensor["bootstraps intervals"],
-    interval_weights: Float32Tensor["bootstraps intervals"],
-    interval_weighted_risks: Float32Tensor["bootstraps intervals"],
+    interval_weights: FloatTensor["bootstraps intervals"],
+    interval_weighted_risks: FloatTensor["bootstraps intervals"],
     index_start: Int64Tensor["intervals"],
     index_stop: Int64Tensor["intervals"],
     event: Int64Tensor["intervals"],
     T: int,
 ) -> tuple[
     Int64Tensor["bootstraps times 2 2"],
-    Float32Tensor["bootstraps times 2 2"],
-    Float32Tensor["bootstraps times 2 2"]
+    FloatTensor["bootstraps times 2 2"],
+    FloatTensor["bootstraps times 2 2"]
 ]:
     """Aggregates the interval data ("bootstrap" counts, weights, scores) into time data.
 
@@ -302,8 +425,8 @@ def _compute_time_data(
 def _intervals_to_time_data(
     *,
     interval_counts: Int64Tensor["bootstraps intervals"],
-    interval_weights: Float32Tensor["bootstraps intervals"],
-    interval_risks: Float32Tensor["bootstraps intervals"],
+    interval_weights: FloatTensor["bootstraps intervals"],
+    interval_risks: FloatTensor["bootstraps intervals"],
     batch: Int64Tensor["intervals"],
     strata: Int64Tensor["intervals"],
     start: Int64Tensor["intervals"],
@@ -311,8 +434,8 @@ def _intervals_to_time_data(
     event: Int64Tensor["intervals"],
 ) -> tuple[
     Int64Tensor["bootstraps times 2 2"],  # Counts of intervals at each time
-    Float32Tensor["bootstraps times 2 2"],  # Weights of intervals at each time
-    Float32Tensor["bootstraps times 2 2"],  # Weighted risks at each time
+    FloatTensor["bootstraps times 2 2"],  # Weights of intervals at each time
+    FloatTensor["bootstraps times 2 2"],  # Weighted risks at each time
     Int64Tensor["3 times"],  # Unique (batch, strata, time) values
 ]:
     """Aggregates interval data into a table indexed by time.
@@ -412,9 +535,9 @@ def _intervals_to_time_data(
 @typecheck
 def _compute_time_risks(
     *,
-    time_weighted_risks: Float32Tensor["bootstraps times 2 2"],
+    time_weighted_risks: FloatTensor["bootstraps times 2 2"],
     unique_batch_strata_time: Int64Tensor["3 times"],
-) -> Float32Tensor["bootstraps times"]:
+) -> FloatTensor["bootstraps times"]:
     """Computes the "sum" risk over the full risk set of observed patients at each time point.
 
     .. warning::
@@ -546,7 +669,7 @@ def _compute_efron_data(
     Int64Tensor["events"],  # indices in [0, B*T)
     Int64Tensor["events"],  # bootstraps in [0, B)
     Int64Tensor["events"],  # event_counts
-    Float32Tensor["events"],  # offsets, i.e. k / {number of deaths at t}
+    FloatTensor["events"],  # offsets, i.e. k / {number of deaths at t}
 ]:
     """Computes the information required to re-index our time tables for Efron summation.
 
@@ -616,7 +739,7 @@ def _compute_efron_data(
 
     efron_offsets = rank_in_segment(efron_indices) / efron_event_counts.float()
     assert efron_offsets.shape == (E,)
-    assert efron_offsets.dtype == torch.float32
+    assert efron_offsets.dtype in (torch.float32, torch.float64)
 
     return efron_indices, efron_bootstraps, efron_event_counts, efron_offsets
 
@@ -626,12 +749,12 @@ def _compute_efron_data(
 def _breslow_efron_logsumexp_term(
     *,
     time_counts: Int64Tensor["bootstraps times 2 2"],
-    time_weights: Float32Tensor["bootstraps times 2 2"],
-    time_weighted_risks: Float32Tensor["bootstraps times 2 2"],
+    time_weights: FloatTensor["bootstraps times 2 2"],
+    time_weighted_risks: FloatTensor["bootstraps times 2 2"],
     unique_batch_strata_time: Int64Tensor["3 times"],
     ties: Literal["efron", "breslow"],
     n_batches: int,
-) -> Float32Tensor["bootstraps {n_batches}"]:
+) -> FloatTensor["bootstraps {n_batches}"]:
     """Computes the log-sum-exp term for the Breslow or Efron approximation.
 
     The format of the input is explained in the docstring of _compute_time_data().
@@ -826,7 +949,7 @@ def _breslow_efron_logsumexp_term(
         # 1 on the 4th dimension corresponds to "event".
         dead_risks = time_weighted_risks[:, :, 0, 1]
         assert dead_risks.shape == (B, T)
-        assert dead_risks.dtype == torch.float32
+        assert dead_risks.dtype in (torch.float32, torch.float64)
 
         # We use repeat_interleave to re-index our dataset.
         # E is the total number of deaths on the full table.
@@ -849,14 +972,14 @@ def _breslow_efron_logsumexp_term(
             index=efron_indices,
         )
         assert efron_dead_risks.shape == (E,)
-        assert efron_dead_risks.dtype == torch.float32
+        assert efron_dead_risks.dtype in (torch.float32, torch.float64)
 
         # The Efron offsets correspond to "k / {number of deaths at t}".
         # We use them to compute
         # (k / {number of deaths at t}) * Sum_{dead at t} r[i]
         efron_dead_risks = efron_dead_risks * efron_offsets
         assert efron_dead_risks.shape == (E,)
-        assert efron_dead_risks.dtype == torch.float32
+        assert efron_dead_risks.dtype in (torch.float32, torch.float64)
         assert not efron_dead_risks.isnan().any()
 
         # Likewise, we compute the "Sum_{observed at t} r[i]"
@@ -866,7 +989,7 @@ def _breslow_efron_logsumexp_term(
             index=efron_indices,
         )
         assert efron_observed_risks.shape == (E,)
-        assert efron_observed_risks.dtype == torch.float32
+        assert efron_observed_risks.dtype in (torch.float32, torch.float64)
 
         # Compute log(
         #             Sum_{observed at t} r[i]
@@ -877,7 +1000,7 @@ def _breslow_efron_logsumexp_term(
         #         )
         efron_log_risks = (efron_observed_risks - efron_dead_risks).log()
         assert efron_log_risks.shape == (E,)
-        assert efron_log_risks.dtype == torch.float32
+        assert efron_log_risks.dtype in (torch.float32, torch.float64)
         assert not efron_log_risks.isnan().any()
 
         # Compute the weight factor
@@ -888,11 +1011,11 @@ def _breslow_efron_logsumexp_term(
             index=efron_indices,
         )
         assert efron_dead_weights.shape == (E,)
-        assert efron_dead_weights.dtype == torch.float32
+        assert efron_dead_weights.dtype in (torch.float32, torch.float64)
 
         efron_factor = efron_dead_weights / efron_event_counts.float()
         assert efron_factor.shape == (E,)
-        assert efron_factor.dtype == torch.float32
+        assert efron_factor.dtype in (torch.float32, torch.float64)
         assert not efron_factor.isnan().any()
 
         # Compute the contributions at each sub-time, i.e.
@@ -906,7 +1029,7 @@ def _breslow_efron_logsumexp_term(
         #       )
         efron_contributions = efron_factor * efron_log_risks
         assert efron_contributions.shape == (E,)
-        assert efron_contributions.dtype == torch.float32
+        assert efron_contributions.dtype in (torch.float32, torch.float64)
 
         # When efron_factor == 0, the contribution is 0, even if efron_log_risks is -inf.
         # If we don't mask things out, we would end up with -inf * 0 == NaN.
@@ -943,12 +1066,12 @@ def _breslow_efron_logsumexp_term(
 @typecheck
 def _linear_term(
     *,
-    scores: Float32Tensor["bootstraps intervals"],
-    interval_weights: Float32Tensor["bootstraps intervals"],
+    scores: FloatTensor["bootstraps intervals"],
+    interval_weights: FloatTensor["bootstraps intervals"],
     event: Int64Tensor["intervals"],
     batch: Int64Tensor["intervals"],
     n_batches: int,
-) -> Float32Tensor["bootstraps batches"]:
+) -> FloatTensor["bootstraps batches"]:
     """Computes the term "Sum_{all dead samples} w[i] * dot(x[i], b)"
 
     .. testcode::
@@ -987,7 +1110,7 @@ def _linear_term(
     B, I = scores.shape
     weighted_scores = interval_weights * scores * event.float().view(1, I)
     assert weighted_scores.shape == (B, I)
-    assert weighted_scores.dtype == torch.float32
+    assert weighted_scores.dtype in (torch.float32, torch.float64)
 
     linear_term = group_sum(
         values=weighted_scores,
@@ -995,19 +1118,19 @@ def _linear_term(
         output_size=n_batches,
     )
     assert linear_term.shape == (B, n_batches)
-    assert linear_term.dtype == torch.float32
+    assert linear_term.dtype in (torch.float32, torch.float64)
     return linear_term
 
 
 @typecheck
 def coxph_objective_from_scores(
     *,
-    scores: Float32Tensor["bootstraps intervals"],
+    scores: FloatTensor["bootstraps intervals"],
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
     bootstrap: Resampling,
     mode: Literal["unit length", "start zero", "any"] = "any",
-) -> Float32Tensor["bootstraps batches"]:
+) -> FloatTensor["bootstraps batches"]:
     """Implements the CoxPH loss function.
 
     This function takes as input a batch of score values scores[i, j],
@@ -1220,9 +1343,9 @@ def coxph_objective_from_scores(
 @typecheck
 def linear_risk_scores(
     *,
-    coef: Float32Tensor["bootstraps batches covariates"],
+    coef: FloatTensor["bootstraps batches covariates"],
     dataset, #: TorchSurvivalDataset, omitted to avoid circular import
-) -> Float32Tensor["bootstraps intervals"]:
+) -> FloatTensor["bootstraps intervals"]:
     """Standard function to compute risks in the CoxPH model: dot(beta, x[i])."""
     B, n_batches, D = coef.shape
     I = dataset.n_intervals
@@ -1260,14 +1383,14 @@ def linear_risk_scores(
 @typecheck
 def coxph_objective(
     *,
-    coef: Float32Tensor["bootstraps batches covariates"],
-    scales: Float32Tensor["covariates"] | None,
+    coef: FloatTensor["bootstraps batches covariates"],
+    scales: FloatTensor["covariates"] | None,
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
     bootstrap: Resampling,
     l2_reg: int | float,
     mode: Literal["unit length", "start zero", "any"] = "any",
-) -> Float32Tensor["bootstraps batches"]:
+) -> FloatTensor["bootstraps batches"]:
     """Implements the CoxPH objective.
 
     This function is a wrapper around coxph_objective_from_scores() that computes

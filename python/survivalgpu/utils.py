@@ -18,5 +18,8 @@ use_cuda = torch.cuda.is_available()  # Is a GPU available?
 device = "cuda" if use_cuda else "cpu"
 
 float32 = torch.float32
+float64 = torch.float64
 int32 = torch.int32
 int64 = torch.int64
+
+float  = float64 or float32

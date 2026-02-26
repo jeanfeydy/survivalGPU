@@ -152,7 +152,7 @@ class Resampling:
         # TODO: handle user-defined patient weights
         self.patient_weights = self.patient_counts.float()
         assert self.patient_weights.shape == (B, P)
-        assert self.patient_weights.dtype == torch.float32
+        assert self.patient_weights.dtype in (torch.float32, torch.float64)
         # Equivalent to:
         # self.patient_weights
         # = torch.stack([torch.bincount(b_ind, minlength=P) for b_ind in indices])

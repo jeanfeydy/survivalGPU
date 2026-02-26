@@ -125,7 +125,7 @@ wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
 wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                            aic = FALSE, id, event, start, stop, expos,
                            covariates = NULL, nbootstraps = 0, batchsize = 0,
-                           confint = 0.95, controls = NULL, device = NULL, ...) {
+                           confint = 0.95, controls = NULL, device = NULL, double_precision = TRUE, ...) {
   # survivalgpu <- use_survivalGPU()
 
   wce_R <- survivalgpu$wce_R
@@ -152,7 +152,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     data = data, ids = id, covars = py_covariates, start = start, stop = stop,
     doses = expos, events = event, n_knots = nknots,
     constrained = py_constrained, cutoff = cutoff,
-    bootstrap = nbootstraps, batchsize = batchsize, device = device
+    bootstrap = nbootstraps, batchsize = batchsize, device = device, double_precision = double_precision,
   )
 
 
@@ -221,6 +221,10 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   )
 
 
+  print("BIC :")
+  print(BIC)
+
+
 
 
   # List to return
@@ -243,6 +247,9 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     nbootstraps = nbootstraps,
     is_bootstraps = is_bootstraps
   )
+
+
+  print(results$se.covariates)
 
 
   if (is_bootstraps) {

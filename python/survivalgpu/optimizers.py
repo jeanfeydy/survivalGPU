@@ -8,7 +8,7 @@ import torch
 
 # Wrapper to compute the gradient and Hessian of our objective:
 from .autodiff import derivatives_012
-from .typecheck import Float32Tensor, typecheck
+from .typecheck import FloatTensor, typecheck
 from .utils import numpy
 
 
@@ -17,12 +17,12 @@ class NewtonResult:
     def __init__(
         self,
         *,
-        fun: Float32Tensor["batch"],
-        fun_init: Float32Tensor["batch"],
-        x: Float32Tensor["batch dim"],
-        jac: Float32Tensor["batch dim"],
-        hess: Float32Tensor["batch dim dim"],
-        score_test_init: Float32Tensor["batch"],
+        fun: FloatTensor["batch"],
+        fun_init: FloatTensor["batch"],
+        x: FloatTensor["batch dim"],
+        jac: FloatTensor["batch dim"],
+        hess: FloatTensor["batch dim dim"],
+        score_test_init: FloatTensor["batch"],
         iterations,
     ):
         self.fun = fun

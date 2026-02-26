@@ -19,7 +19,7 @@ from .typecheck import (
     TorchDevice,
     typecheck,
 )
-from .utils import device, float32, int32, numpy, timer, use_cuda
+from .utils import device, float32, float64, int32, numpy, timer, use_cuda
 from .wce_features import bspline_atoms, wce_features_batch
 
 # Our main, object-oriented API ==========================================================
@@ -214,6 +214,7 @@ class WCESurvivalAnalysis:
         patient: Int64Array["intervals"],
         dose: Float64Array["intervals"],
         time: Int64Array["intervals"],
+        double_precision: bool = True,
     ):
         """Computes the WCE B-Spline covariates on a batch of patients and drugs."""
 
@@ -228,6 +229,7 @@ class WCESurvivalAnalysis:
             nknots=self.n_knots,
             cutoff=self.cutoff,
             order=self.order,
+            double_precision=double_precision
         )
 
         wce_features = wce_features.cpu().numpy()
@@ -253,6 +255,7 @@ class WCESurvivalAnalysis:
         n_bootstraps: Int | None = None,
         batch_size: Int | None = None,
         device: TorchDevice | None = None,
+        double_precision: bool = True,
     ):
         if not np.all(stop == start + 1):
             msg = "Currently, we only support unit length intervals."
@@ -286,6 +289,7 @@ class WCESurvivalAnalysis:
             n_bootstraps=n_bootstraps,
             batch_size=batch_size,
             device=device,
+            double_precision=double_precision,
         )
 
         # Step 3: Save the results in the expected format
@@ -347,10 +351,11 @@ class WCESurvivalAnalysis:
                 self.n_atoms,
             )
 
+            float_dtype = float64 if double_precision else float32
+
             # Estimated risk function:
             # (n_bootstraps, n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_bootstraps, n_batch, cutoff)
-            self.bootstrap_risk_functions_ = torch.tensor(self.bootstrap_WCE_coef_, dtype=float32)@ self.atoms.T
-
+            self.bootstrap_risk_functions_ = torch.tensor(self.bootstrap_WCE_coef_, dtype=float_dtype)@ self.atoms.T
         # Usual CoxPH results: -------------------------------------------------
         self.means_ = self.survival_model.means_
         self.score_ = self.survival_model.score_
@@ -413,6 +418,7 @@ def wce_numpy(
     n_bootstraps: Int | None = None,
     batch_size: Int | None = None,
     device: TorchDevice | None = None,
+    double_precision: bool = True,
     **kwargs,
 ):
     if n_bootstraps == 0:
@@ -440,6 +446,7 @@ def wce_numpy(
         n_bootstraps=n_bootstraps,
         batch_size=batch_size,
         device=device,
+        double_precision=double_precision
     )
 
     # # Estimate the standard deviations of the coefficients for the covariates:
@@ -503,7 +510,8 @@ def wce_R(
     init=None,
     doscale=False,
     strata = None,
-    device = None
+    device = None,
+    double_precision = True,
 ):
 
     if constrained == "None":
@@ -595,6 +603,7 @@ def wce_R(
             maxiter=int(maxiter),
             ties=ties,
             doscale=doscale,
+            double_precision=double_precision,
         )
 
 

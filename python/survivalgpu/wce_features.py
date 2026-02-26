@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from pykeops.torch import LazyTensor
 
-from .utils import device, float32, int32
+from .utils import device, float32, float64, int32
 
 
 def place_knots(*, cutoff, nknots, order):
@@ -178,7 +178,7 @@ def bspline_conv(
     return full_ij.sum(1)  # (N,K-order-1)
 
 
-def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None):
+def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None, double_precision=True):
     """This function is equivalent to a parallel application of the .wcecalc method from the WCE package.
 
     The number of B-spline covariates is equal to
@@ -236,13 +236,15 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
 
     # 1.b: create the knots and cutoff window ----------------------------------
 
+    float_dtype = float64 if double_precision else float32
+
     # Use quantiles for knots placement:
     if knots is None:
         knots = place_knots(cutoff=cutoff, nknots=nknots, order=order)
-        knots = torch.tensor(knots, device=device, dtype=float32)
+        knots = torch.tensor(knots, device=device, dtype=float_dtype)
 
     # The window is a (2,) tensor:
-    window = torch.tensor([1.0, cutoff + 1.0], device=device, dtype=float32)
+    window = torch.tensor([1.0, cutoff + 1.0], device=device, dtype=float_dtype)
 
     # Step 2: actual computation ===============================================
     # features_i is a (N,F) tensor:
@@ -293,7 +295,7 @@ def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None):
     ids = torch.zeros(N, device=device, dtype=int32)
 
     # Doses:
-    doses = torch.zeros(N, device=device, dtype=float32)
+    doses = torch.zeros(N, device=device, dtype=float_dtype)
     doses[times == 0] = 1
 
     features, knots = wce_features_batch(

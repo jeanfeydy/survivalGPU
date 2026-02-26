@@ -82,7 +82,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
                              model = FALSE, x = FALSE, y = TRUE, ..., weights,
                              subset, na.action, robust, tt, method = ties, id,
                              cluster, istate, statedata,
-                             nocenter = c(-1, 0, 1), device = NULL) {
+                             nocenter = c(-1, 0, 1), device = NULL, double_precision = TRUE) {
 
   if (!missing(weights)) stop("weights are not yet implemented in coxphGPU")
   if (!missing(tt)) stop("tt process is not yet implemented in coxphGPU")
@@ -1108,7 +1108,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
                     bootstrap = bootstrap,
                     batchsize = batchsize,
                     maxiter = maxiter,
-                    device = device#,
+                    device = device,
+                    double_precision = double_precision
                     #init = init
   )
   # maxiter = maxiter (add maxiter argument in coxph_R)
