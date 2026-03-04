@@ -122,35 +122,73 @@ def _compute_unique_batch_strata_time(
     """
 
     I = batch.shape[0]
+    device = batch.device
 
     # batch and strata define independent groups,
     # while start and stop refer to time values.
     # Working in parallel over (batch, strata) groups,
     # we need to sort by time (handling both start and stop)
     # and find the number of unique (batch, strata, time) values.
-    batch_strata_start = torch.stack((batch, strata, start), dim=0)
-    batch_strata_stop = torch.stack((batch, strata, stop), dim=0)
-    assert batch_strata_start.shape == (3, I)
-    assert batch_strata_stop.shape == (3, I)
 
-    batch_strata_start_stop = torch.cat(
-        (batch_strata_start, batch_strata_stop), dim=1
-    )
-    assert batch_strata_start_stop.shape == (3, 2 * I)
+    # Encode each triplet (batch, strata, time) as a single scalar
+    # so we can use GPU-native sort instead of torch.unique(dim=1)
+    # which has a hidden CPU transfer for 2D inputs.
+    # We need max_val > max of all values to ensure unique encoding.
+    max_val = int(max(batch.max(), strata.max(), start.max(), stop.max()).item()) + 1
 
-    # Find the unique (batch, strata, time) values
-    unique_batch_strata_time, inverse_indices = torch.unique(
-        batch_strata_start_stop, sorted=True, return_inverse=True, dim=1
-    )
-    T = unique_batch_strata_time.shape[1]
-    assert unique_batch_strata_time.shape == (3, T)
+    # Concatenate start and stop into a single flat array of 2*I time values,
+    # mirroring the former batch_strata_start_stop of shape (3, 2*I).
+    all_times  = torch.cat([start, stop])          # (2*I,)
+    all_batch  = torch.cat([batch, batch])          # (2*I,)
+    all_strata = torch.cat([strata, strata])        # (2*I,)
+    assert all_times.shape == (2 * I,)
+    assert all_batch.shape == (2 * I,)
+    assert all_strata.shape == (2 * I,)
+
+    # Scalar encoding: each triplet maps to a unique int64 value.
+    # Lexicographic order is preserved: batch first, then strata, then time.
+    encoded = all_batch * (max_val ** 2) + all_strata * max_val + all_times
+    assert encoded.shape == (2 * I,)
+
+    # GPU-native sort — stays entirely on GPU, no CPU round-trip.
+    sorted_encoded, sort_idx = torch.sort(encoded)
+    assert sorted_encoded.shape == (2 * I,)
+
+    # Find unique values via consecutive diff — fully GPU, no transfer.
+    is_unique = torch.cat([
+        torch.ones(1, dtype=torch.bool, device=device),
+        sorted_encoded[1:] != sorted_encoded[:-1],
+    ])
+    assert is_unique.shape == (2 * I,)
+
+    # unique_rank[i] = index of encoded[i] in the unique sorted list,
+    # equivalent to the inverse_indices returned by torch.unique.
+    # cumsum(is_unique) - 1 gives the rank of each sorted element.
+    unique_rank_sorted = torch.cumsum(is_unique, dim=0) - 1  # (2*I,)
+
+    # Undo the sort to recover the rank of each original element
+    # (first I elements = start, last I = stop).
+    inverse_indices = torch.empty_like(unique_rank_sorted)
+    inverse_indices[sort_idx] = unique_rank_sorted
+    assert inverse_indices.shape == (2 * I,)
+
+    # Decode the unique encoded values back into (batch, strata, time) rows.
+    unique_encoded = sorted_encoded[is_unique]
+    T = unique_encoded.shape[0]
     assert T <= 2 * I
 
-    assert inverse_indices.shape == (2 * I,)
-    assert unique_batch_strata_time.shape[1] <= 2 * I
+    unique_time   =  unique_encoded % max_val
+    unique_strata = (unique_encoded // max_val) % max_val
+    unique_batch  =  unique_encoded // (max_val ** 2)
+
+    # Stack back into shape (3, T) to match the original output contract.
+    unique_batch_strata_time = torch.stack(
+        (unique_batch, unique_strata, unique_time), dim=0
+    )
+    assert unique_batch_strata_time.shape == (3, T)
 
     index_start = inverse_indices[:I]
-    index_stop = inverse_indices[I:]
+    index_stop  = inverse_indices[I:]
 
     return unique_batch_strata_time, index_start, index_stop
 

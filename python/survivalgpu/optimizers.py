@@ -59,6 +59,8 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
 
     B, D = start.shape
 
+    dtype = start.dtype
+
     # Current "candidates" at a given iteration:
     candidates = start.clone()  # (B,D)
     # best_params are the best observed candidates so far
@@ -71,6 +73,7 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
 
     # Current estimates for the best values - we keep B values in parallel:
     best_values = torch.ones(B, device=candidates.device) * float("inf")  # (B,)
+    best_values = best_values.to(dtype)
     # Step size "dampener" - once again, B values in parallel:
     rejections = torch.zeros(B, device=candidates.device)  # (B,)
     # Break - (B,) vector of bool:
@@ -89,6 +92,7 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
     for it in range(maxiter + 1):
         # Compute the value of the convex objective, its gradient and its Hessian:
         # (We perform this step in parallel over the B bootstrap samples.)
+
         values, grads, hessians = loss_grad_hessian(candidates)
 
         # values is (B,)
@@ -108,12 +112,26 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
         #      are always available. This sensitive step is thus done in float64
         #      it is important to put it on the cpu before putting it in f64
 
-        grads_cpu    = grads.cpu().to(torch.float64)
-        hessians_cpu = hessians.cpu().to(torch.float64)
+
+        if dtype == torch.float32:
+            grads_cpu = grads.cpu().to(torch.float64)
+            hessians_cpu = hessians.cpu().to(torch.float64)
+        else:
+            grads_cpu = grads.cpu()
+            hessians_cpu = hessians.cpu()
+
+
         steps = torch.linalg.solve(hessians_cpu, grads_cpu)
 
         # we then send the steps in f32 the nto the device
-        steps = steps.to(torch.float32).to(grads.device)
+
+        if dtype == torch.float32:
+            steps = steps.to(torch.float32).to(grads.device)
+        else:
+            steps = steps.to(grads.device)
+
+
+
 
         # The R survival package returns the score test statistic at iteration 0,
         # so we do the same:
@@ -140,7 +158,7 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
             print("Gradient:", numpy(grads))
             print("Hessian:", numpy(hessians))
             print("Step:", numpy(steps))
-            print("")
+            print("Dtype of steps:", steps.dtype)
 
         # Update the "best values" and "best params" seen so far:
         best_values[accept] = values[accept]
@@ -163,6 +181,7 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
             1 + rejections.view(B, 1)
         )
         candidates.data[~accept] = closer_steps[~accept]
+
 
     # Recompute the local descriptors at the optimum:
     if maxiter > 0:

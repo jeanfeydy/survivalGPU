@@ -64,7 +64,7 @@ class Float32Tensor:
         return jxt.Float32[Tensor, shape]
 
 class FloatTensor:
-    """Torch tensor of any float dtype (float32 or float64)."""
+    """Torch tensor of any float dtype ( float64)."""
     def __class_getitem__(cls, shape):
         return jxt.Float[Tensor, shape]
 

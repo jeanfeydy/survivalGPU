@@ -34,7 +34,6 @@ from .typecheck import (
     Int64Array,
     Literal,
     Real,
-    TorchDevice,
     typecheck,
 )
 from .utils import device as default_device
@@ -70,6 +69,10 @@ class CoxPHSurvivalAnalysis:
         doscale: Bool = False,
         verbosity: Int = 0,
         mode: Literal["unit length", "start zero", "any"] | None = None,
+        dtype = float64,
+        device = None,
+        n_bootstraps: Int | None = None,
+        batch_size: Int | None = None,
     ):
         self.alpha = alpha
         self.ties = ties
@@ -78,6 +81,13 @@ class CoxPHSurvivalAnalysis:
         self.doscale = doscale
         self.verbosity = verbosity
         self.mode = mode
+        if dtype == np.float32:
+            self.dtype = float32
+        if dtype == np.float64:
+            self.dtype = float64
+        self.device = device
+        self.n_bootstraps = n_bootstraps
+        self.batch_size = batch_size
 
 
     @typecheck
@@ -92,10 +102,6 @@ class CoxPHSurvivalAnalysis:
         strata: Int64Array["intervals"] | None = None,
         batch: Int64Array["patient"] | None = None,
         init: Float64Array["covariates"] | None = None,
-        n_bootstraps: Int | None = None,
-        batch_size: Int | None = None,
-        device: TorchDevice | None = None,
-        double_precision: Bool = True
 
     ):
         """Fit the model.
@@ -118,10 +124,11 @@ class CoxPHSurvivalAnalysis:
         )
 
 
+        device = self.device if self.device is not None else default_device
+
         # Re-encode the data arrays as PyTorch tensors on the correct device,
         # with the correct dtype (float64 -> float32)
-        if device is None:
-            device = default_device
+
         dataset = dataset.to_torch(device)
 
         # Re-order the input arrays by lexicographical order on (batch, strata, stop, event):
@@ -135,7 +142,7 @@ class CoxPHSurvivalAnalysis:
 
         # Filter out the times that have no impact on the CoxPH model
         # (e.g. censoring that occurs before the first death):
-        dataset.prune(mode=self.mode)
+        # dataset.prune(mode=self.mode)
 
         n_batch, n_covariates = dataset.n_batch, dataset.n_covariates
 
@@ -187,19 +194,19 @@ class CoxPHSurvivalAnalysis:
 
         # Run the Newton optimizer: ------------------------------------------------------
 
-        float_dtype = float64 if double_precision else float32
 
         # Vector of initial values of the Newton iteration.
         # Zero for all variables by default.
         if init is None:
             init_tensor = torch.zeros(
-                (n_batch, n_covariates), dtype=float_dtype, device=device
+                (n_batch, n_covariates), dtype=self.dtype, device=device
             )
 
         else:
-            init_tensor = torch.tensor(init, dtype=float_dtype, device=device)
+            init_tensor = torch.tensor(init, dtype=self.dtype, device=device)
             assert init_tensor.shape == (n_covariates,)
             init_tensor = init_tensor.repeat(n_batch, 1)
+
         res = newton(
             loss=loss(bootstrap=dataset.original_sample()),
             start=init_tensor,
@@ -233,21 +240,21 @@ class CoxPHSurvivalAnalysis:
         self.iter_ = res.iterations
 
         # If required, compute a distribution of the coefficients using bootstrap: -------
-        if (n_bootstraps is not None) and (n_bootstraps >0):
+        if (self.n_bootstraps is not None) and (self.n_bootstraps >0):
             bootstrap_coef = []
             for bootstrap in dataset.bootstraps(
-                n_bootstraps=n_bootstraps, batch_size=batch_size
+                n_bootstraps=self.n_bootstraps, batch_size=self.batch_size
             ):
                 # Vector of initial values of the Newton iteration.
                 # Zero for all variables by default.
                 if init is None:
                     init_tensor = torch.zeros(
                         (len(bootstrap) * n_batch, n_covariates),
-                        dtype=float_dtype,
+                        dtype=self.dtype,
                         device=device,
                     )
                 else:
-                    init_tensor = torch.tensor(init, dtype=float_dtype, device=device)
+                    init_tensor = torch.tensor(init, dtype=self.dtype, device=device)
                     assert init_tensor.shape == (n_covariates,)
                     init_tensor = init_tensor.repeat(len(bootstrap) * n_batch, 1)
 
@@ -261,7 +268,7 @@ class CoxPHSurvivalAnalysis:
                 bootstrap_coef.append(res.x)
 
             self.bootstrap_coef_ = torch.stack(bootstrap_coef).view(
-                n_bootstraps, n_batch, n_covariates
+                self.n_bootstraps, n_batch, n_covariates
             )
 
         # If the covariates have been normalized for the sake of stability,
@@ -290,8 +297,8 @@ class CoxPHSurvivalAnalysis:
         assert self.imat_.shape == hessian_shape
 
 
-        if (n_bootstraps is not None) and (n_bootstraps >0 ):
-            assert self.bootstrap_coef_.shape == (n_bootstraps, n_batch, n_covariates)
+        if (self.n_bootstraps is not None) and (self.n_bootstraps >0 ):
+            assert self.bootstrap_coef_.shape == (self.n_bootstraps, n_batch, n_covariates)
 
 
 
@@ -370,7 +377,7 @@ def coxph_numpy(
     verbosity=0,
     doscale=False,
     device,
-    double_precision = True
+    dtype = np.float64,
 ):
     """Implements the Cox Proportional Hazards model.
 
@@ -408,7 +415,11 @@ def coxph_numpy(
         eps=eps,
         doscale=doscale,
         verbosity=verbosity,
-    )
+        dtype = dtype,
+        device = device,
+        n_bootstraps=bootstrap,
+        batch_size=batchsize
+   )
 
     # Configure 'start' according to survtype ('counting' or 'right')
     # start = times - 1 if survtype == "counting" else None
@@ -423,11 +434,7 @@ def coxph_numpy(
         event=deaths,
         strata=strata,
         patient=patient_id,
-        n_bootstraps=bootstrap,
-        batch_size=batchsize,
         init=init,
-        device = device,
-        double_precision = double_precision
     )
 
     print(model.coef_)
@@ -492,10 +499,6 @@ def coxph_R(
         msg = "CUDA device requested but no GPU available."
         raise ValueError(msg)
 
-
-    print("######## DEVICE: ", device )
-
-
     if profile is not None:
         print("Profile trace:", profile)
         print("use_cuda:", use_cuda)
@@ -532,6 +535,8 @@ def coxph_R(
         # cov = [data_X[covar] for covar in covars]
         # x = np.array(cov).T.reshape([N, len(cov)])
 
+        dtype = np.float64 if double_precision else np.float32
+
 
 
         res = coxph_numpy(
@@ -551,7 +556,7 @@ def coxph_R(
             verbosity=0,
             alpha=0.0,
             doscale=doscale,
-            double_precision=double_precision
+            dtype=dtype
         )
 
     if profile is not None:
