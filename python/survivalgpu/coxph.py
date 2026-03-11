@@ -124,6 +124,8 @@ class CoxPHSurvivalAnalysis:
         )
 
 
+
+
         device = self.device if self.device is not None else default_device
 
         # Re-encode the data arrays as PyTorch tensors on the correct device,
@@ -142,7 +144,9 @@ class CoxPHSurvivalAnalysis:
 
         # Filter out the times that have no impact on the CoxPH model
         # (e.g. censoring that occurs before the first death):
+
         # dataset.prune(mode=self.mode)
+
 
         n_batch, n_covariates = dataset.n_batch, dataset.n_covariates
 
@@ -206,6 +210,8 @@ class CoxPHSurvivalAnalysis:
             init_tensor = torch.tensor(init, dtype=self.dtype, device=device)
             assert init_tensor.shape == (n_covariates,)
             init_tensor = init_tensor.repeat(n_batch, 1)
+
+
 
         res = newton(
             loss=loss(bootstrap=dataset.original_sample()),
@@ -436,8 +442,6 @@ def coxph_numpy(
         patient=patient_id,
         init=init,
     )
-
-    print(model.coef_)
 
     # Step 5: turn the list of dicts into a dicts of concatenated results ==========
     output = {

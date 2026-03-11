@@ -133,7 +133,7 @@ class TorchSurvivalDataset:
         """Number of covariates that are referenced in the dataset."""
         return 0 if self.covariates is None else self.covariates.shape[1]
 
-    def show(self, max_rows=None):
+    def show(self, max_rows=50):
         """
         Pretty-print the dataset in tabular form.
 
@@ -388,12 +388,10 @@ class TorchSurvivalDataset:
     @typecheck
     def original_sample(self) -> Resampling:
         """Returns a Resampling object that corresponds to the original sample."""
-        indices = torch.arange(
-            self.n_patients,
-            dtype=torch.int64,
-            device=self.device,
-        )
+
+        indices = torch.unique(self.patient)
         indices = indices.view(1, -1)
+
         return Resampling(
             indices=indices,
             patient=self.patient,
@@ -447,9 +445,7 @@ class TorchSurvivalDataset:
 
         # Step 1: create stratifications groups for the sampling =========================
         if stratify:
-            print("crash cause ? ")
             strata = torch.stack((self.batch, self.strata), dim=1)
-            print("no")
         else:
             strata = self.batch.view(-1, 1)
 

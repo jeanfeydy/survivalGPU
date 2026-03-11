@@ -93,7 +93,13 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
         # Compute the value of the convex objective, its gradient and its Hessian:
         # (We perform this step in parallel over the B bootstrap samples.)
 
-        values, grads, hessians = loss_grad_hessian(candidates)
+        # Replace with (float32 mode only)
+        if dtype == torch.float32:
+            values, grads, hessians = loss_grad_hessian(candidates.to(torch.float64))
+            values = values.to(torch.float32)
+            # grads and hessians stay float64 → existing cast at lines 117-118 becomes a no-op
+        else:
+            values, grads, hessians = loss_grad_hessian(candidates)
 
         # values is (B,)
         # grads is (B,D)
@@ -113,12 +119,9 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
         #      it is important to put it on the cpu before putting it in f64
 
 
-        if dtype == torch.float32:
-            grads_cpu = grads.cpu().to(torch.float64)
-            hessians_cpu = hessians.cpu().to(torch.float64)
-        else:
-            grads_cpu = grads.cpu()
-            hessians_cpu = hessians.cpu()
+
+        grads_cpu = grads.cpu()
+        hessians_cpu = hessians.cpu()
 
 
         steps = torch.linalg.solve(hessians_cpu, grads_cpu)
