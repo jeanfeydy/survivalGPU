@@ -14,7 +14,6 @@ We provide:
 
 
 import numpy as np
-import pandas as pd
 import torch
 from matplotlib import pyplot as plt
 
@@ -206,30 +205,24 @@ class SurvivalDataset:
             )
             raise ValueError(msg)
 
-        df_patient_strata = pd.DataFrame({
-            "patient": patient,
-            "strata": strata
-        })
-
-        if df_patient_strata["strata"].isna().any():
-            msg = "Strata variable contains missing values."
-            raise ValueError(msg)
-
-        n_strata = df_patient_strata.groupby("patient")["strata"].nunique()
-        if (n_strata > 1).any():
-            bad = n_strata[n_strata > 1].index.tolist()
+        # Sort intervals by patient to group same-patient rows together, then check
+        # that each patient maps to exactly one strata value.
+        order_strata = np.argsort(patient, kind="stable")
+        sorted_patient = patient[order_strata]
+        sorted_strata = strata[order_strata]
+        same_patient = sorted_patient[1:] == sorted_patient[:-1]
+        if np.any(same_patient & (sorted_strata[1:] != sorted_strata[:-1])):
+            bad = np.unique(
+                sorted_patient[1:][same_patient & (sorted_strata[1:] != sorted_strata[:-1])]
+            ).tolist()
             msg = f"Patients with multiple strata values: {bad}"
             raise ValueError(msg)
 
-
-        strata_patient = (
-            df_patient_strata.drop_duplicates("patient", keep="first")
-            .sort_index()
-            .set_index("patient")["strata"]
-        )
-
-        patient_unique = strata_patient.index.to_numpy()
-        self.strata_patient = strata_patient.to_numpy()
+        # Extract one strata value per patient. np.unique returns patients in sorted
+        # order, so patient_unique[i] == i for the standard 0-indexed case.
+        _, first_idx = np.unique(patient, return_index=True)
+        patient_unique = patient[first_idx]
+        self.strata_patient = strata[first_idx]
 
 
 
