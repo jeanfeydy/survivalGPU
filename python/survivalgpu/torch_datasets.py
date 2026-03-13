@@ -10,6 +10,7 @@ We provide a TorchSurvivalDataset object with methods that implement:
 """
 
 
+import numpy as np
 import torch
 
 from .bootstrap import Resampling
@@ -26,6 +27,18 @@ from .typecheck import (
 
 @typecheck
 def torch_lexsort(a: Int64Tensor["keys indices"]) -> Int64Tensor["indices"]:
+    """Lexicographical sort using numpy.lexsort (native C, single pass).
+
+    np.lexsort sorts by last row first, which matches the numpy convention
+    used by the callers of this function (they stack keys with highest-priority
+    last, i.e. batch_intervals is passed as the last row).
+    """
+    ind = np.lexsort(a.cpu().numpy())
+    return torch.tensor(ind, dtype=torch.int64, device=a.device)
+
+
+@typecheck
+def torch_lexsort_old(a: Int64Tensor["keys indices"]) -> Int64Tensor["indices"]:
     """PyTorch implementation of np.lexsort.
 
     N.B.: This function relies on the fact that torch.unique implements
@@ -95,6 +108,8 @@ class TorchSurvivalDataset:
 
 
         self.is_sorted = False
+        # Cache n_batch once: batch.max() + 1, avoids recomputing on every Newton call.
+        self._n_batch = int(self.batch.max() + 1)
 
     @property
     @typecheck
@@ -125,7 +140,7 @@ class TorchSurvivalDataset:
     @typecheck
     def n_batch(self) -> int:
         """Number of batches that are referenced in the dataset."""
-        return int(self.batch.max() + 1)
+        return self._n_batch
 
     @property
     @typecheck

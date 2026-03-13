@@ -236,8 +236,10 @@ class SurvivalDataset:
         if batch is None:
             batch = np.zeros(patient_unique.shape[0], dtype=np.int64)
 
-        patient_to_index = {id: i for i, id in enumerate(patient_unique)}
-        batch_interval =  batch[np.array([patient_to_index[p] for p in patient])]
+        # patient_unique is sorted (from np.unique), so searchsorted is O(I log P)
+        # and avoids the Python loop over all intervals.
+        patient_idx = np.searchsorted(patient_unique, patient)
+        batch_interval = batch[patient_idx]
         self.batch_interval = batch_interval
 
         if batch.shape != patient_unique.shape:
