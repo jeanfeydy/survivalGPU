@@ -19,7 +19,8 @@ from .typecheck import (
     TorchDevice,
     typecheck,
 )
-from .utils import device, float32, float64, int32, numpy, timer, use_cuda
+from .utils import device as default_device
+from .utils import float32, float64, int32, numpy, timer, use_cuda
 from .wce_features import bspline_atoms, wce_features_batch
 
 # Our main, object-oriented API ==========================================================
@@ -35,6 +36,11 @@ class WCESurvivalAnalysis:
         order: Int = 3,
         constrained: Literal["right", "left"] | None = None,
         survival_model=None,
+        dtype = np.float64,
+        device = None,
+        n_bootstraps: Int | None = None,
+        batch_size: Int | None = None,
+
     ):
         """Weighted Cumulative Exposure Model that combines B-spline time-varying features with a CoxPH analysis.
 
@@ -88,7 +94,33 @@ class WCESurvivalAnalysis:
 
         if survival_model is None:
             survival_model = CoxPHSurvivalAnalysis()
+
+        if isinstance(survival_model, CoxPHSurvivalAnalysis):
+            survival_model = CoxPHSurvivalAnalysis(
+                ties="breslow", maxiter=20, device=device, n_bootstraps=n_bootstraps, batch_size=batch_size, dtype = dtype
+            )
+
+
         self.survival_model = survival_model
+
+
+
+        if dtype == np.float32:
+            self.dtype = float32
+        elif dtype == np.float64:
+            self.dtype = float64
+        else:
+            msg = f"dtype should be np.float32 or np.float64. Received {dtype}."
+            raise ValueError(msg)
+
+        self.device = device
+
+        self.n_bootstraps = n_bootstraps
+        self.batch_size = batch_size
+
+
+
+
 
     def set_non_negative_int(self, value, name):
         if int(value) != value:
@@ -192,7 +224,7 @@ class WCESurvivalAnalysis:
     def atoms(self):
         """Samples the B-spline basis functions on the interval [0, cutoff-1]."""
         atoms, _ = bspline_atoms(
-            cutoff=self.cutoff, order=self.order, nknots=self.n_knots
+            cutoff=self.cutoff, order=self.order, nknots=self.n_knots, dtype=self.dtype
         )
         atoms = self._constrain(atoms)
         assert atoms.shape == (self.cutoff, self.n_atoms)
@@ -214,10 +246,10 @@ class WCESurvivalAnalysis:
         patient: Int64Array["intervals"],
         dose: Float64Array["intervals"],
         time: Int64Array["intervals"],
-        double_precision: bool = True,
     ):
         """Computes the WCE B-Spline covariates on a batch of patients and drugs."""
 
+        device = self.device if self.device is not None else default_device
         patient = torch.from_numpy(patient).to(device)
         dose = torch.from_numpy(dose).to(device)
         time = torch.from_numpy(time).to(device)
@@ -229,7 +261,7 @@ class WCESurvivalAnalysis:
             nknots=self.n_knots,
             cutoff=self.cutoff,
             order=self.order,
-            double_precision=double_precision
+            dtype=self.dtype
         )
 
         wce_features = wce_features.cpu().numpy()
@@ -252,11 +284,11 @@ class WCESurvivalAnalysis:
         strata: Int64Array["intervals"] | None = None,
         batch: Int64Array["intervals"] | None = None,
         init: Float64Array["fullcovariates"] | None = None,
-        n_bootstraps: Int | None = None,
-        batch_size: Int | None = None,
-        device: TorchDevice | None = None,
-        double_precision: bool = True,
     ):
+
+        device = self.device if self.device is not None else default_device
+
+
         if not np.all(stop == start + 1):
             msg = "Currently, we only support unit length intervals."
 
@@ -277,6 +309,7 @@ class WCESurvivalAnalysis:
             self.n_covariates = covariates.shape[-1]
             covariates = np.concatenate((covariates, exposures), axis=-1)
 
+
         self.survival_model.fit(
             covariates=covariates,
             start=start,
@@ -286,10 +319,6 @@ class WCESurvivalAnalysis:
             strata=strata,
             batch=batch,
             init=init,
-            n_bootstraps=n_bootstraps,
-            batch_size=batch_size,
-            device=device,
-            double_precision=double_precision,
         )
 
         # Step 3: Save the results in the expected format
@@ -312,7 +341,8 @@ class WCESurvivalAnalysis:
         assert self.WCE_coef_.shape == (n_batch, self.n_atoms)
         # Estimated risk function:
         # (n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_batch, cutoff)
-        self.risk_function_ = torch.from_numpy(self.WCE_coef_).to(device) @ self.atoms.T
+
+        self.risk_function_ = torch.from_numpy(self.WCE_coef_).to(device) @ self.atoms.to(self.dtype).T
         assert self.risk_function_.shape == (n_batch, self.cutoff)
 
         # Standard deviations for the coefficients:
@@ -324,9 +354,9 @@ class WCESurvivalAnalysis:
         assert self.SED_.shape == (n_batch, self.n_atoms)
 
         # Batch coefficients: --------------------------------------------------
-        if n_bootstraps is not None:
+        if self.n_bootstraps is not None:
             assert self.survival_model.bootstrap_coef_.shape == (
-                n_bootstraps,
+                self.n_bootstraps,
                 n_batch,
                 self.n_covariates + self.n_atoms,
             )
@@ -336,7 +366,7 @@ class WCESurvivalAnalysis:
                 :, :, : self.n_covariates
             ]
             assert self.bootstrap_coef_.shape == (
-                n_bootstraps,
+                self.n_bootstraps,
                 n_batch,
                 self.n_covariates,
             )
@@ -346,16 +376,15 @@ class WCESurvivalAnalysis:
                 :, :, self.n_covariates :
             ]
             assert self.bootstrap_WCE_coef_.shape == (
-                n_bootstraps,
+                self.n_bootstraps,
                 n_batch,
                 self.n_atoms,
             )
 
-            float_dtype = float64 if double_precision else float32
 
             # Estimated risk function:
             # (n_bootstraps, n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_bootstraps, n_batch, cutoff)
-            self.bootstrap_risk_functions_ = torch.tensor(self.bootstrap_WCE_coef_, dtype=float_dtype)@ self.atoms.T
+            self.bootstrap_risk_functions_ = torch.tensor(self.bootstrap_WCE_coef_, dtype=self.dtype) @ self.atoms.to(self.dtype).T
         # Usual CoxPH results: -------------------------------------------------
         self.means_ = self.survival_model.means_
         self.score_ = self.survival_model.score_
@@ -418,7 +447,7 @@ def wce_numpy(
     n_bootstraps: Int | None = None,
     batch_size: Int | None = None,
     device: TorchDevice | None = None,
-    double_precision: bool = True,
+    dtype = np.float64,
     **kwargs,
 ):
     if n_bootstraps == 0:
@@ -431,6 +460,10 @@ def wce_numpy(
         order=order,
         constrained=constrained,
         survival_model=surv_model,
+        n_bootstraps=n_bootstraps,
+        batch_size=batch_size,
+        device=device,
+        dtype=dtype
     )
 
     model.fit(
@@ -443,10 +476,6 @@ def wce_numpy(
         strata=strata,
         batch=batch,
         init=init,
-        n_bootstraps=n_bootstraps,
-        batch_size=batch_size,
-        device=device,
-        double_precision=double_precision
     )
 
     # # Estimate the standard deviations of the coefficients for the covariates:
@@ -501,7 +530,7 @@ def wce_R(
     n_knots=1,
     order=3,
     constrained=None,
-    bootstrap=1,
+    bootstrap=None,
     # Cox parameters:
     profile=None,
     batchsize=0,
@@ -552,6 +581,8 @@ def wce_R(
         msg = "CUDA device requested but no GPU available."
         raise ValueError(msg)
 
+    dtype = np.float64 if double_precision else np.float32
+
 
 
     ids = np.array(data[ids], dtype = np.int64)
@@ -582,6 +613,8 @@ def wce_R(
     if strata is not None:
         strata = np.array(strata, dtype=np.int64)
 
+
+
     with myprof as prof:
         res = wce_numpy(
             ids=ids,
@@ -603,7 +636,7 @@ def wce_R(
             maxiter=int(maxiter),
             ties=ties,
             doscale=doscale,
-            double_precision=double_precision,
+            dtype=dtype,
         )
 
 

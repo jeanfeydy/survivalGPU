@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from pykeops.torch import LazyTensor
 
-from .utils import device, float32, float64, int32
+from .utils import device, float64, int32, int64
 
 
 def place_knots(*, cutoff, nknots, order):
@@ -60,9 +60,9 @@ def place_knots(*, cutoff, nknots, order):
 # KeOps computation of the B-Spline covariates ===========================================
 
 
-def ranges_slices(batch):
+def ranges_slices(batch, minlength=0):
     """Helper function for the diagonal ranges function."""
-    Ns = batch.bincount()
+    Ns = batch.bincount(minlength=minlength)
     indices = Ns.cumsum(0)
     ranges = torch.cat((0 * indices[:1], indices))
     ranges = (
@@ -81,8 +81,13 @@ def diagonal_ranges(batch_x=None, batch_y=None):
     elif batch_y is None:
         batch_y = batch_x  # "symmetric" case
 
-    ranges_x, slices_x = ranges_slices(batch_x)
-    ranges_y, slices_y = ranges_slices(batch_y)
+    # Both sides must have the same number of groups for KeOps block-diagonal ranges.
+    # Use the combined max so that patients present in one but not the other (e.g.
+    # patients with all-zero doses that appear in target but not in source) still
+    # produce aligned range tensors.
+    n_groups = int(max(batch_x.max(), batch_y.max())) + 1
+    ranges_x, slices_x = ranges_slices(batch_x, minlength=n_groups)
+    ranges_y, slices_y = ranges_slices(batch_y, minlength=n_groups)
 
     return ranges_x, slices_x, ranges_y, ranges_y, slices_y, ranges_x
 
@@ -178,7 +183,7 @@ def bspline_conv(
     return full_ij.sum(1)  # (N,K-order-1)
 
 
-def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None, double_precision=True):
+def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None, dtype):
     """This function is equivalent to a parallel application of the .wcecalc method from the WCE package.
 
     The number of B-spline covariates is equal to
@@ -236,15 +241,14 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
 
     # 1.b: create the knots and cutoff window ----------------------------------
 
-    float_dtype = float64 if double_precision else float32
-
     # Use quantiles for knots placement:
     if knots is None:
         knots = place_knots(cutoff=cutoff, nknots=nknots, order=order)
-        knots = torch.tensor(knots, device=device, dtype=float_dtype)
+        knots = torch.tensor(knots, device=device, dtype=dtype)
 
     # The window is a (2,) tensor:
-    window = torch.tensor([1.0, cutoff + 1.0], device=device, dtype=float_dtype)
+    window = torch.tensor([1.0, cutoff + 1.0], device=device, dtype=dtype)
+
 
     # Step 2: actual computation ===============================================
     # features_i is a (N,F) tensor:
@@ -267,7 +271,7 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
     return features, knots
 
 
-def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None):
+def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None, dtype, device=device):
     """Returns a set of B-Spline functions sampled on [0, cutoff-1].
 
     The number of B-spline covariates is equal to
@@ -288,14 +292,16 @@ def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None):
             - Positions of the knots.
     """
 
-    times = torch.arange(0, cutoff, device=device, dtype=int32)
+    int_dtype = int64 if dtype == float64 else int32
+
+    times = torch.arange(0, cutoff, device=device, dtype=int_dtype)
     N = len(times)
 
     # Dummy vector of "ids" (we create one patient only):
     ids = torch.zeros(N, device=device, dtype=int32)
 
     # Doses:
-    doses = torch.zeros(N, device=device, dtype=float_dtype)
+    doses = torch.zeros(N, device=device, dtype=dtype)
     doses[times == 0] = 1
 
     features, knots = wce_features_batch(
@@ -306,6 +312,7 @@ def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None):
         cutoff=cutoff,
         order=order,
         knots=knots,
+        dtype=dtype,
     )
 
     return features, knots
