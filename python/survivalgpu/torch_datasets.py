@@ -10,6 +10,8 @@ We provide a TorchSurvivalDataset object with methods that implement:
 """
 
 
+from collections.abc import Iterator
+
 import numpy as np
 import torch
 
@@ -17,7 +19,6 @@ from .bootstrap import Resampling
 from .typecheck import (
     FloatTensor,
     Int64Tensor,
-    List,
     Literal,
     TorchDevice,
     Tuple,
@@ -419,8 +420,8 @@ class TorchSurvivalDataset:
         n_bootstraps: int,
         batch_size: int | None,
         stratify: bool = True,
-    ) -> List[Resampling]:
-        """Returns a list of Resampling objects that correspond to bootstrap samples.
+    ) -> Iterator[Resampling]:
+        """Returns a generator of Resampling objects that correspond to bootstrap samples.
 
         This method generates bootstrap sampling indices which are similar to:
         indices = torch.randint(P, (B, P)),
@@ -538,7 +539,6 @@ class TorchSurvivalDataset:
         # i.e. strata_values[...] will be a uniform distribution in the set of patient
         # ids that belong to the strata.
 
-        bootstrap_list = []
         if batch_size is None:
             batch_size = n_bootstraps
         for s in range(0, n_bootstraps, batch_size):
@@ -552,10 +552,9 @@ class TorchSurvivalDataset:
                 strata_offset + (rnd * strata_cardinal).long()
             ]
 
-            bootstrap_list.append(
+            yield(
                 Resampling(
                     indices=bootstrap_indices,
                     patient=self.patient,
                 )
             )
-        return bootstrap_list
