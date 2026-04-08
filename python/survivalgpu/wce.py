@@ -97,7 +97,7 @@ class WCESurvivalAnalysis:
 
         if isinstance(survival_model, CoxPHSurvivalAnalysis):
             survival_model = CoxPHSurvivalAnalysis(
-                ties="breslow", maxiter=20, device=device, n_bootstraps=n_bootstraps, batch_size=batch_size, dtype = dtype
+                maxiter=20, device=device, n_bootstraps=n_bootstraps, batch_size=batch_size, dtype = dtype,
             )
 
 
@@ -309,13 +309,22 @@ class WCESurvivalAnalysis:
             self.n_covariates = covariates.shape[-1]
             covariates = np.concatenate((covariates, exposures), axis=-1)
 
+        # print("\n\nNote: the WCE features are computed on the stop times of the intervals.")
+
+        # print("Covariates shape:", covariates)
+        print("Covariates:", covariates)
+        print("Start:", start)
+        print("Stop:", stop)
+        print("Event:", event)
+        print("Patient:", patient)
+
 
         self.survival_model.fit(
             covariates=covariates,
             start=start,
             stop=stop,
             event=event,
-            patient=patient,
+            # patient=patient,
             strata=strata,
             batch=batch,
             init=init,
@@ -534,7 +543,7 @@ def wce_R(
     # Cox parameters:
     profile=None,
     batchsize=0,
-    ties="efron",
+    ties="breslow", #
     maxiter=20,
     init=None,
     doscale=False,
