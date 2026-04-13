@@ -23,6 +23,11 @@ from .utils import device as default_device
 from .utils import float32, float64, int32, numpy, timer, use_cuda
 from .wce_features import bspline_atoms, wce_features_batch
 
+def compute_wce_bic(*, loglik, n_events, n_knots, constrained, n_covariates):
+    # Mirrors WCE::my_bic_c with aic = FALSE.
+    spline_dof = n_knots + 4 if constrained is None else n_knots + 2
+    return -2 * np.asarray(loglik) + (spline_dof + n_covariates) * np.log(n_events)
+
 # Our main, object-oriented API ==========================================================
 
 
@@ -399,6 +404,14 @@ class WCESurvivalAnalysis:
         self.hessian_ = self.survival_model.hessian_
         self.imat_ = self.survival_model.imat_
         self.iter_ = self.survival_model.iter_
+        self.n_events_ = int(np.sum(event))
+        self.BIC_ = compute_wce_bic(
+            loglik=self.loglik_,
+            n_events=self.n_events_,
+            n_knots=self.n_knots,
+            constrained=self.constrained,
+            n_covariates=self.n_covariates,
+        )
 
 
     def HR(self,
@@ -498,6 +511,7 @@ def wce_numpy(
         WCE_coef=model.WCE_coef_,
         SED=model.SED_,
         risk_function=model.risk_function_.cpu().numpy(),
+        BIC=model.BIC_,
         means=model.means_,
         score=model.score_,
         sctest_init=model.sctest_init_,
@@ -643,8 +657,6 @@ def wce_R(
             doscale=doscale,
             dtype=dtype,
         )
-
-
 
     if profile is not None:
         prof.export_chrome_trace(profile)
