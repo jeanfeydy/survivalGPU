@@ -347,6 +347,7 @@ class WCESurvivalAnalysis:
         # (n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_batch, cutoff)
 
         self.risk_function_ = torch.from_numpy(self.WCE_coef_).to(device) @ self.atoms.to(self.dtype).T
+        self.risk_function_ = self.risk_function_.cpu().numpy()
         assert self.risk_function_.shape == (n_batch, self.cutoff)
 
         # Standard deviations for the coefficients:
