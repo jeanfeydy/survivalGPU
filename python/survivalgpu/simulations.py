@@ -791,7 +791,7 @@ def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
 
 def simulate_dataset(max_time, n_patients,
                      list_covariates: list[WCECovariate, TimeDependentCovariate, ConstantCovariate],
-                     compress = True):
+                     compress = False):
 
 
     list_wce_covariates = []
@@ -1096,7 +1096,7 @@ def get_scenario(scenario_name: int, max_time: int):
     scenario_list = []
     normalization_factor = 0
 
-    for i in range(365):
+    for i in range(max_time):
         normalization_factor += scenario_function(i)
 
     for i in range(max_time):
