@@ -13,9 +13,7 @@ import numpy as np
 import torch
 from pykeops.torch import LazyTensor
 
-from utils import device as default_device
-
-from .utils import float64, int32, int64
+from .utils import default_device, float64, int32, int64
 
 
 def place_knots(*, cutoff, nknots, order):
@@ -275,7 +273,7 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
     return features, knots
 
 
-def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None, dtype, device=device):
+def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None, dtype, device=default_device):
     """Returns a set of B-Spline functions sampled on [0, cutoff-1].
 
     The number of B-spline covariates is equal to
@@ -317,6 +315,7 @@ def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None, dtype, device=device
         order=order,
         knots=knots,
         dtype=dtype,
+        device=device,
     )
 
     return features, knots

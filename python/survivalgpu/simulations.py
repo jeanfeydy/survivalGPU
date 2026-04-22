@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 from scipy.stats import norm
 
-from .utils import device
+from .utils import default_device
 
 # Generation data
 
@@ -619,12 +619,12 @@ def matching_algo(WCEmat: np.ndarray,
 
 
 
-    selected_indices = torch.zeros(n_patients,dtype = int).to(device)
+    selected_indices = torch.zeros(n_patients,dtype = int).to(default_device)
 
-    non_selected_indices = torch.arange(0,n_patients).to(device)
+    non_selected_indices = torch.arange(0,n_patients).to(default_device)
 
-    WCEmat_current = torch.from_numpy(WCEmat).to(device)
-    HR_target_tensor = torch.from_numpy(HR_target_list).to(device)
+    WCEmat_current = torch.from_numpy(WCEmat).to(default_device)
+    HR_target_tensor = torch.from_numpy(HR_target_list).to(default_device)
 
 
 
@@ -773,7 +773,7 @@ def simulate_dataset(max_time, n_patients,
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)
-        torch_generator = torch.Generator(device=device)
+        torch_generator = torch.Generator(device=default_device)
         torch_generator.manual_seed(seed)
 
 

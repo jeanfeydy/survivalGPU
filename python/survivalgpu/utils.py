@@ -15,7 +15,7 @@ def timer():
 
 # Tensor types:
 use_cuda = torch.cuda.is_available()  # Is a GPU available?
-device = "cuda" if use_cuda else "cpu"
+default_device = "cuda" if use_cuda else "cpu"
 
 float32 = torch.float32
 float64 = torch.float64

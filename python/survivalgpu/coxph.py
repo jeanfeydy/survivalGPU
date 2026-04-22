@@ -36,8 +36,7 @@ from .typecheck import (
     Real,
     typecheck,
 )
-from .utils import device as default_device
-from .utils import float32, float64, numpy, use_cuda
+from .utils import default_device, float32, float64, numpy, use_cuda
 
 
 class CoxPHSurvivalAnalysis:

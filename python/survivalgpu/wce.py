@@ -19,8 +19,7 @@ from .typecheck import (
     TorchDevice,
     typecheck,
 )
-from .utils import device as default_device
-from .utils import float32, float64, int32, numpy, timer, use_cuda
+from .utils import default_device, float32, float64, int32, numpy, timer, use_cuda
 from .wce_features import bspline_atoms, wce_features_batch
 
 
