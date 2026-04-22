@@ -89,6 +89,8 @@ class WCESurvivalAnalysis:
         self.n_knots = n_knots
         self.constrained = constrained
 
+
+
         if survival_model is None:
             survival_model = CoxPHSurvivalAnalysis()
 
@@ -110,7 +112,7 @@ class WCESurvivalAnalysis:
             msg = f"dtype should be np.float32 or np.float64. Received {dtype}."
             raise ValueError(msg)
 
-        self.device = device
+        self.device = device if device is not None else default_device
 
         if n_bootstraps == 0:
             n_bootstraps = None
@@ -224,7 +226,8 @@ class WCESurvivalAnalysis:
     def atoms(self):
         """Samples the B-spline basis functions on the interval [0, cutoff-1]."""
         atoms, _ = bspline_atoms(
-            cutoff=self.cutoff, order=self.order, nknots=self.n_knots, dtype=self.dtype
+            cutoff=self.cutoff, order=self.order, nknots=self.n_knots, dtype=self.dtype,
+            device=self.device,
         )
         atoms = self._constrain(atoms)
         assert atoms.shape == (self.cutoff, self.n_atoms)
@@ -249,10 +252,9 @@ class WCESurvivalAnalysis:
     ):
         """Computes the WCE B-Spline covariates on a batch of patients and drugs."""
 
-        device = self.device if self.device is not None else default_device
-        patient = torch.from_numpy(patient).to(device)
-        dose = torch.from_numpy(dose).to(device)
-        time = torch.from_numpy(time).to(device)
+        patient = torch.from_numpy(patient).to(self.device)
+        dose = torch.from_numpy(dose).to(self.device)
+        time = torch.from_numpy(time).to(self.device)
 
         wce_features, knots = wce_features_batch(
             ids=patient,
@@ -262,7 +264,7 @@ class WCESurvivalAnalysis:
             cutoff=self.cutoff,
             order=self.order,
             dtype=self.dtype,
-            device=device,
+            device=self.device,
         )
 
         wce_features = wce_features.cpu().numpy()
@@ -286,9 +288,6 @@ class WCESurvivalAnalysis:
         batch: Int64Array["intervals"] | None = None,
         init: Float64Array["fullcovariates"] | None = None,
     ):
-
-        device = self.device if self.device is not None else default_device
-
 
         if not np.all(stop == start + 1):
             msg = "Currently, we only support unit length intervals."
@@ -344,8 +343,7 @@ class WCESurvivalAnalysis:
         # Estimated risk function:
         # (n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_batch, cutoff)
 
-        self.risk_function_ = torch.from_numpy(self.WCE_coef_).to(device) @ self.atoms.to(self.dtype).T
-        self.risk_function_ = self.risk_function_.cpu().numpy()
+        self.risk_function_ = torch.from_numpy(self.WCE_coef_).to(self.device) @ self.atoms.to(self.dtype).T
         assert self.risk_function_.shape == (n_batch, self.cutoff)
 
         # Standard deviations for the coefficients:
@@ -398,12 +396,9 @@ class WCESurvivalAnalysis:
         self.imat_ = self.survival_model.imat_
         self.iter_ = self.survival_model.iter_
         self.n_events_ = int(np.sum(event))
-
-
-        # Compute the BIC for the WCE model:
+         # Compute the BIC for the WCE model:
         total_number_knots = self.n_knots + 4 if self.constrained is None else self.n_knots + 2
         self.BIC_ = -2 * np.asarray(self.loglik_) + (total_number_knots + self.n_covariates) * np.log(self.n_events_)
-
 
 
     def HR(self,
@@ -488,6 +483,14 @@ def wce_numpy(
         init=init,
     )
 
+    # # Estimate the standard deviations of the coefficients for the covariates:
+    # variances = torch.diagonal(result["imat"], dim1=1, dim2=2)
+    # stds = torch.sqrt(variances)
+    # result["std"] = stds[:, :ncovariates]
+    # result["SED"] = stds[:, ncovariates:]
+
+
+
     output = dict(
         knotsmat=model.knots_,
         coef=model.coef_,
@@ -567,6 +570,18 @@ def wce_R(
     if device == "cuda" and not use_cuda:
         msg = "CUDA device requested but no GPU available."
         raise ValueError(msg)
+
+
+
+    # if device is not None:
+    #     if device == "cpu":
+    #         device = torch.device("cpu")
+    #     elif device == "cuda":
+    #         device = torch.device("cuda")
+    #     else:
+    #         msg = f"device should be 'cpu' or 'cuda'. Received {device}."
+    #         raise ValueError(msg)
+    #     torch.cuda.set_device(device)
 
     if device == torch.device("cuda") and not use_cuda:
         msg = "CUDA device requested but no GPU available."

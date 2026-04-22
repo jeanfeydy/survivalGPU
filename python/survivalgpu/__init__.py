@@ -10,7 +10,7 @@ from .simulations import (
     simulate_dataset_batch,
     simulate_for_experiment,
 )
-from .utils import default_device, float32, int32, int64, use_cuda
+from .utils import float32, int32, int64, use_cuda
 from .wce import WCESurvivalAnalysis, wce_numpy, wce_R
 
 # On Ampere+ GPUs, the default behaviour of PyTorch is to sacrifice
@@ -42,4 +42,4 @@ SUPPORTED_TIES = ["breslow", "efron"]
 
 # Warm up the GPU:
 if use_cuda:
-    _ = torch.zeros(1, device=default_device)
+    _ = torch.zeros(1, device="cuda" if use_cuda else "cpu")

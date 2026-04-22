@@ -273,7 +273,7 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
     return features, knots
 
 
-def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None, dtype, device=default_device):
+def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None, dtype, device=None):
     """Returns a set of B-Spline functions sampled on [0, cutoff-1].
 
     The number of B-spline covariates is equal to

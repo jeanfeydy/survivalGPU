@@ -84,7 +84,7 @@ class CoxPHSurvivalAnalysis:
             self.dtype = float32
         if dtype == np.float64:
             self.dtype = float64
-        self.device = device
+        self.device = device if device is not None else default_device
         self.n_bootstraps = n_bootstraps
         self.batch_size = batch_size
 
@@ -125,12 +125,10 @@ class CoxPHSurvivalAnalysis:
 
 
 
-        device = self.device if self.device is not None else default_device
-
         # Re-encode the data arrays as PyTorch tensors on the correct device,
         # with the correct dtype (float64 -> float32)
 
-        dataset = dataset.to_torch(device)
+        dataset = dataset.to_torch(self.device)
 
         # Re-order the input arrays by lexicographical order on (batch, strata, stop, event):
         dataset.sort()
