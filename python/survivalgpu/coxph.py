@@ -200,11 +200,11 @@ class CoxPHSurvivalAnalysis:
         # Zero for all variables by default.
         if init is None:
             init_tensor = torch.zeros(
-                (n_batch, n_covariates), dtype=self.dtype, device=device
+                (n_batch, n_covariates), dtype=self.dtype, device=self.device
             )
 
         else:
-            init_tensor = torch.tensor(init, dtype=self.dtype, device=device)
+            init_tensor = torch.tensor(init, dtype=self.dtype, device=self.device)
             assert init_tensor.shape == (n_covariates,)
             init_tensor = init_tensor.repeat(n_batch, 1)
 
@@ -254,10 +254,10 @@ class CoxPHSurvivalAnalysis:
                     init_tensor = torch.zeros(
                         (len(bootstrap) * n_batch, n_covariates),
                         dtype=self.dtype,
-                        device=device,
+                        device=self.device,
                     )
                 else:
-                    init_tensor = torch.tensor(init, dtype=self.dtype, device=device)
+                    init_tensor = torch.tensor(init, dtype=self.dtype, device=self.device)
                     assert init_tensor.shape == (n_covariates,)
                     init_tensor = init_tensor.repeat(len(bootstrap) * n_batch, 1)
 
