@@ -422,14 +422,14 @@ class WCESurvivalAnalysis:
             raise ValueError(msg)
 
         if hasattr(self, "bootstrap_risk_functions_"):
-            hr_boot = np.exp((self.bootstrap_risk_functions_.squeeze(1) @ (vecnum - vecdenom)).cpu()).tolist()
+            hr_boot = np.exp(self.bootstrap_risk_functions_.squeeze(1).cpu().numpy() @ (vecnum - vecdenom)).tolist()
             lower = np.quantile(hr_boot, (1-level)/2).tolist()
             upper = np.quantile(hr_boot, 1-(1-level)/2).tolist()
-            hr = np.exp(self.risk_function_.reshape(-1).cpu() @ (vecnum - vecdenom)).tolist()
+            hr = np.exp(self.risk_function_.reshape(-1).cpu().numpy() @ (vecnum - vecdenom)).tolist()
             return {"HR" : hr, "CI_lower": lower, "CI_upper": upper}
 
         else:
-            hr = np.exp(self.risk_function_.reshape(-1) @ (vecnum - vecdenom)).tolist()
+            hr = np.exp(self.risk_function_.reshape(-1).cpu().numpy() @ (vecnum - vecdenom)).tolist()
             return {"HR" : hr}
 
 
