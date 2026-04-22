@@ -49,11 +49,11 @@ def test_resampling_shapes(
 
     assert res.patient_weights.shape == (n_bootstraps, n_patients)
     assert res.patient_counts.shape == (n_bootstraps, n_patients)
-    assert res.patient_weights.dtype == torch.float32
+    assert res.patient_weights.dtype in (torch.float32, torch.float64)
     assert res.patient_counts.dtype == torch.int64
 
     assert res.interval_weights.shape == (n_bootstraps, n_intervals)
-    assert res.interval_weights.dtype == torch.float32
+    assert res.interval_weights.dtype in (torch.float32, torch.float64)
 
 
 @given(

@@ -152,7 +152,8 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     data = data, ids = id, covars = py_covariates, start = start, stop = stop,
     doses = expos, events = event, n_knots = nknots,
     constrained = py_constrained, cutoff = cutoff,
-    bootstrap = nbootstraps, batchsize = batchsize, device = device, double_precision = double_precision,
+    bootstrap = nbootstraps, batchsize = batchsize,
+    device = device, double_precision = double_precision,
   )
 
 
@@ -215,14 +216,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   names(data)[names(data) == event] <- "Event"
   nevents <- length(data$Event[data$Event == 1])
 
-  BIC <- sapply(wce$loglik, BIC_for_wce,
-                n.events = nevents, n.knots = nknots,
-                cons = constrained, aic = aic, covariates = covariates
-  )
-
-
-  print("BIC :")
-  print(BIC)
+  BIC <- c(wce$BIC)
 
 
 
@@ -240,7 +234,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     loglik = loglik,
     constrained = constrained,
     nevents = nevents,
-    aic = aic,
+    aic = FALSE,
     info.criterion = BIC,
     nknots = nknots,
     confint = confint,
@@ -290,41 +284,6 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
 
 ## Other functions ------------------------
-
-# Estimate BIC for different models
-BIC_for_wce <- function(PL, n.events, n.knots, cons = F, aic = FALSE, covariates) {
-  if (is.null(covariates == T)) {
-    if (cons == FALSE) {
-      if (aic == TRUE) {
-        bic <- -2 * PL + (n.knots + 4) * 2
-      } else {
-        bic <- -2 * PL + (n.knots + 4) * log(n.events)
-      }
-    } else {
-      if (aic == TRUE) {
-        bic <- -2 * PL + (n.knots + 2) * 2
-      } else {
-        bic <- -2 * PL + (n.knots + 2) * log(n.events)
-      }
-    }
-  } else {
-    pp <- length(covariates)
-    if (cons == FALSE) {
-      if (aic == TRUE) {
-        bic <- -2 * PL + (n.knots + 4 + pp) * 2
-      } else {
-        bic <- -2 * PL + (n.knots + 4 + pp) * log(n.events)
-      }
-    } else {
-      if (aic == TRUE) {
-        bic <- -2 * PL + (n.knots + 2 + pp) * 2
-      } else {
-        bic <- -2 * PL + (n.knots + 2 + pp) * log(n.events)
-      }
-    }
-  }
-  return(bic)
-}
 
 
 

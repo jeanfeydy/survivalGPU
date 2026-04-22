@@ -23,13 +23,6 @@ from .utils import device as default_device
 from .utils import float32, float64, int32, numpy, timer, use_cuda
 from .wce_features import bspline_atoms, wce_features_batch
 
-def compute_wce_bic(*, loglik, n_events, n_knots, constrained, n_covariates):
-    # Mirrors WCE::my_bic_c with aic = FALSE.
-    spline_dof = n_knots + 4 if constrained is None else n_knots + 2
-    return -2 * np.asarray(loglik) + (spline_dof + n_covariates) * np.log(n_events)
-
-# Our main, object-oriented API ==========================================================
-
 
 class WCESurvivalAnalysis:
     @typecheck
@@ -405,13 +398,12 @@ class WCESurvivalAnalysis:
         self.imat_ = self.survival_model.imat_
         self.iter_ = self.survival_model.iter_
         self.n_events_ = int(np.sum(event))
-        self.BIC_ = compute_wce_bic(
-            loglik=self.loglik_,
-            n_events=self.n_events_,
-            n_knots=self.n_knots,
-            constrained=self.constrained,
-            n_covariates=self.n_covariates,
-        )
+
+
+        # Compute the BIC for the WCE model:
+        total_number_knots = self.n_knots + 4 if self.constrained is None else self.n_knots + 2
+        self.BIC_ = -2 * np.asarray(self.loglik_) + (total_number_knots + self.n_covariates) * np.log(self.n_events_)
+
 
 
     def HR(self,
@@ -496,14 +488,6 @@ def wce_numpy(
         init=init,
     )
 
-    # # Estimate the standard deviations of the coefficients for the covariates:
-    # variances = torch.diagonal(result["imat"], dim1=1, dim2=2)
-    # stds = torch.sqrt(variances)
-    # result["std"] = stds[:, :ncovariates]
-    # result["SED"] = stds[:, ncovariates:]
-
-
-
     output = dict(
         knotsmat=model.knots_,
         coef=model.coef_,
@@ -583,18 +567,6 @@ def wce_R(
     if device == "cuda" and not use_cuda:
         msg = "CUDA device requested but no GPU available."
         raise ValueError(msg)
-
-
-
-    # if device is not None:
-    #     if device == "cpu":
-    #         device = torch.device("cpu")
-    #     elif device == "cuda":
-    #         device = torch.device("cuda")
-    #     else:
-    #         msg = f"device should be 'cpu' or 'cuda'. Received {device}."
-    #         raise ValueError(msg)
-    #     torch.cuda.set_device(device)
 
     if device == torch.device("cuda") and not use_cuda:
         msg = "CUDA device requested but no GPU available."

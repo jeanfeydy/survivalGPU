@@ -1,4 +1,3 @@
-import random
 from pathlib import Path
 
 import numpy as np
@@ -119,46 +118,28 @@ from .utils import device
 #     return beta_list
 
 
-# TODO : modify the TDhist to be able to manage a bigger variety of cases,
-# maybe create another  TDhist that is more in tune with the kind of data given by the SNDS
-def TDhist(max_time,doses):
+def TDhist(max_time, doses, rng):
     """
     This function is used to generate individual time-dependant exposure history
     Generate prescription of different duration and doses
     """
 
-
-
-    rng = np.random.default_rng()
-    duration     = int(7 + 7 * np.round(rng.lognormal(mean=0.5, sigma=0.8, size=1)).item())
+    duration = int(7 + 7 * np.round(rng.lognormal(mean=0.5, sigma=0.8, size=1)).item())
     # duration is in weeks *
 
-    dose = random.choice(doses)
-    exposure_vector = np.repeat(dose,repeats = duration)
-
+    dose = rng.choice(doses)
+    exposure_vector = np.repeat(dose, repeats=duration)
 
     while len(exposure_vector) <= max_time:
-
-
-        # Old RNG seeding (legacy API)
-
-        # intermission = int(7 + 7 * np.round(np.random.lognormal(mean=0.5, sigma=0.8, size=1)).item())
-        # duration     = int(7 + 7 * np.round(np.random.lognormal(mean=0.5, sigma=0.8, size=1)).item())
-
-        # # New RNG seeding (modern Generator API)
-        # rng = np.random.default_rng(seed)
-
         intermission = int(7 + 7 * np.round(rng.lognormal(mean=0.5, sigma=0.8, size=1)).item())
-        duration     = int(7 + 7 * np.round(rng.lognormal(mean=0.5, sigma=0.8, size=1)).item())
-
-        # print("Intermission (new)     :", intermission)
-        # print("Intermission (old)     :", old_intermission)
-        # print("Duration (new)         :", duration)
-        # print("Duration (old)         :", old_duration)
-
-
-        exposure_vector = np.concatenate((exposure_vector,np.repeat(0,repeats = intermission),np.repeat(dose,repeats = duration)))
-    # print(exposure_vector)
+        duration = int(7 + 7 * np.round(rng.lognormal(mean=0.5, sigma=0.8, size=1)).item())
+        exposure_vector = np.concatenate(
+            (
+                exposure_vector,
+                np.repeat(0, repeats=intermission),
+                np.repeat(dose, repeats=duration),
+            )
+        )
     return exposure_vector[:max_time]
 
 
@@ -174,7 +155,7 @@ def event_FUP_Ti_generation(eventRandom, censorRandom):
     return events, FUP_Ti
 
 
-def event_censor_generation(max_time, n_patients, censoring_ratio):
+def event_censor_generation(max_time, n_patients, censoring_ratio, rng):
     if censoring_ratio > 1:
         msg = "The censoring ratio must be inferior to 1"
         raise ValueError(msg)
@@ -182,8 +163,6 @@ def event_censor_generation(max_time, n_patients, censoring_ratio):
     if censoring_ratio < 0:
         msg = "The censoring ratio must be positive"
         raise ValueError(msg)
-
-    rng = np.random.default_rng()
 
     eventRandom = np.round(
         rng.uniform(low=1, high=max_time, size=n_patients)
@@ -222,17 +201,15 @@ class ConstantCovariate(Covariate):
         self.coef = coef
 
 
-    def initialize_experiment(self, n_patients, max_time):
+    def initialize_experiment(self, n_patients, max_time, rng):
         self.n_patients = n_patients
         self.max_time = max_time
-        self.generate_Xvector()
+        self.generate_Xvector(rng=rng)
         return self
 
-    def generate_Xvector(self):
+    def generate_Xvector(self, rng):
 
         proba = self.weights / np.sum(self.weights)
-
-        rng = np.random.default_rng()
 
         Xvect = rng.choice(self.values, size=self.n_patients, p=proba)
         Xvector = np.repeat(Xvect, self.max_time)
@@ -264,24 +241,21 @@ class TimeDependentCovariate(Covariate):
         self.cumulative = cumulative
         self.cutoff = cutoff
 
-    def initialize_experiment(self, n_patients, max_time):
+    def initialize_experiment(self, n_patients, max_time, rng):
         self.n_patients = n_patients
         self.max_time = max_time
-        self.generate_Xvector()
-
-
+        self.generate_Xvector(rng=rng)
 
         if self.cumulative:
-            if  self.cutoff is None:
+            if self.cutoff is None:
                 self.cutoff = self.max_time
-            self.cumulate_exposure(cutoff = self.cutoff)
+            self.cumulate_exposure(cutoff=self.cutoff)
 
         return self
 
-    def generate_Xvector(self):
+    def generate_Xvector(self, rng):
 
-
-        Xvector = np.array([TDhist(self.max_time,self.values) for i in range(self.n_patients)],dtype=float).flatten()
+        Xvector = np.array([TDhist(self.max_time, self.values, rng) for i in range(self.n_patients)],dtype=float).flatten()
         self.Xvector = Xvector
 
         return self
@@ -405,12 +379,11 @@ class WCECovariate_new(Covariate):
 
         return self
 
-    def generate_Xvector(self):
+    def generate_Xvector(self, rng):
         """
         Generate the Xmat of TDHist for each individual patient
         """
-
-        Xvector = np.array([TDhist(self.max_time,self.values) for i in range(self.n_patients)],dtype=float).flatten()
+        Xvector = np.array([TDhist(self.max_time, self.values, rng) for i in range(self.n_patients)],dtype=float).flatten()
         self.Xvector = Xvector
         return self
 
@@ -430,14 +403,9 @@ class WCECovariate_new(Covariate):
         n_patients = self.n_patients
         max_time = self.max_time
 
-
-
-
         covariate_Xmat = Xvector.reshape(self.n_patients,self.max_time).transpose()
 
         scenario_shape = get_scenario(self.scenario_name, self.max_time)
-
-
 
         def generate_wce_vector(u, scenario_shape, covariate_Xmat):
             t_array = np.arange(1,u+1)
@@ -481,20 +449,19 @@ class WCECovariate(Covariate):
         self.HR_target = HR_target
 
 
-    def initialize_experiment(self, n_patients, max_time):
+    def initialize_experiment(self, n_patients, max_time, rng):
         self.n_patients = n_patients
         self.max_time = max_time
-        self.generate_Xvector()
+        self.generate_Xvector(rng=rng)
         self.generate_WCEvector()
 
         return self
 
-    def generate_Xvector(self):
+    def generate_Xvector(self, rng):
         """
         Generate the Xmat of TDHist for each individual patient
         """
-
-        Xvector = np.array([TDhist(self.max_time,self.values) for i in range(self.n_patients)],dtype=float).flatten()
+        Xvector = np.array([TDhist(self.max_time, self.values, rng) for i in range(self.n_patients)],dtype=float).flatten()
         self.Xvector = Xvector
         return self
 
@@ -638,7 +605,8 @@ def matching_algo(WCEmat: np.ndarray,
                   max_time:int,
                   n_patients:int,
                   events: list[int],
-                  FUP_tis: list[int]):
+                  FUP_tis: list[int],
+                  torch_generator: torch.Generator | None = None):
 
 
 
@@ -673,7 +641,13 @@ def matching_algo(WCEmat: np.ndarray,
 
         if event == 0:
 
-            id_index = torch.randint(0,len(non_selected_indices),(1,))
+            id_index = torch.randint(
+                0,
+                len(non_selected_indices),
+                (1,),
+                device=non_selected_indices.device,
+                generator=torch_generator,
+            )
             WCEmat_current = torch.cat((WCEmat_current[:id_index*max_time] , WCEmat_current[(id_index+1)*max_time:]))
             wce_id = non_selected_indices[id_index]
             non_selected_indices = non_selected_indices[non_selected_indices != wce_id]
@@ -687,7 +661,7 @@ def matching_algo(WCEmat: np.ndarray,
 
             WCEmat_time_event = get_WCEmat_time_event(WCEmat_current, time_event, max_time)
             probas = get_probas(WCEmat_time_event, HR_target_tensor)
-            id_index = torch.multinomial(input = probas, num_samples= 1)
+            id_index = torch.multinomial(input = probas, num_samples= 1, generator=torch_generator)
             wce_id = non_selected_indices[id_index]
             WCEmat_current = torch.cat((WCEmat_current[:id_index*max_time] , WCEmat_current[(id_index+1)*max_time:]))
             non_selected_indices = non_selected_indices[non_selected_indices != wce_id]
@@ -791,7 +765,17 @@ def save_dataframe(numpy_wce, n_patients,HR_target, scenario):
 
 def simulate_dataset(max_time, n_patients,
                      list_covariates: list[WCECovariate, TimeDependentCovariate, ConstantCovariate],
-                     compress = False):
+                     compress = False,
+                     seed: int | None = None):
+    rng = np.random.default_rng(seed)
+    torch_generator = None
+    if seed is not None:
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        torch_generator = torch.Generator(device=device)
+        torch_generator.manual_seed(seed)
+
 
 
     list_wce_covariates = []
@@ -822,14 +806,11 @@ def simulate_dataset(max_time, n_patients,
 
 
     for covariate in list_wce_covariates:
-        covariate.initialize_experiment(max_time = max_time,n_patients = n_patients)
+        covariate.initialize_experiment(max_time=max_time, n_patients=n_patients, rng=rng)
     for covariate in list_cox_covariates:
-        if type(covariate) is TimeDependentCovariate:
-            covariate.initialize_experiment(max_time = max_time,n_patients = n_patients)
-        covariate.initialize_experiment(max_time = max_time,n_patients = n_patients)
+        covariate.initialize_experiment(max_time=max_time, n_patients=n_patients, rng=rng)
 
-
-    eventRandom, censorRandom = event_censor_generation(max_time, n_patients, censoring_ratio=0.5)
+    eventRandom, censorRandom = event_censor_generation(max_time, n_patients, censoring_ratio=0.5, rng=rng)
     events, FUP_tis = event_FUP_Ti_generation(eventRandom, censorRandom)
 
     Xmat = generate_Xmat(list_wce_covariates,
@@ -866,7 +847,8 @@ def simulate_dataset(max_time, n_patients,
                                     max_time=max_time,
                                     n_patients=n_patients,
                                     events=events,
-                                    FUP_tis = FUP_tis)
+                                    FUP_tis = FUP_tis,
+                                    torch_generator=torch_generator)
 
 
 
@@ -904,7 +886,7 @@ def compress_dataset(dataset):
     }).reset_index()
 
 
-def simulate_dataset_batch( max_time, n_patients, list_covariates, batchsize = None, compress = True):
+def simulate_dataset_batch( max_time, n_patients, list_covariates, batchsize = None, compress = True, seed: int | None = None):
 
     print(batchsize)
     print(n_patients)
@@ -919,12 +901,13 @@ def simulate_dataset_batch( max_time, n_patients, list_covariates, batchsize = N
 
     n_batches = batchsize // n_patients
 
-    dataset = simulate_dataset(max_time = max_time, n_patients = n_patients, list_covariates = list_covariates, compress = compress)
+    dataset = simulate_dataset(max_time = max_time, n_patients = n_patients, list_covariates = list_covariates, compress = compress, seed=seed)
 
 
     for i in range(1,n_batches):
 
-        batch_dataset = simulate_dataset(max_time = max_time, n_patients = n_patients, list_covariates = list_covariates, compress = compress)
+        current_seed = None if seed is None else seed + i
+        batch_dataset = simulate_dataset(max_time = max_time, n_patients = n_patients, list_covariates = list_covariates, compress = compress, seed=current_seed)
 
         batch_dataset["patients"] += batchsize * i
 
@@ -946,7 +929,7 @@ def simulate_dataset_batch( max_time, n_patients, list_covariates, batchsize = N
 
 
 
-def simulate_for_experiment(n_patients, max_time,HR_target, scenario_name):
+def simulate_for_experiment(n_patients, max_time,HR_target, scenario_name, seed: int | None = None):
 
     wce_covariate = WCECovariate(
         name = "dose",
@@ -958,7 +941,8 @@ def simulate_for_experiment(n_patients, max_time,HR_target, scenario_name):
     return simulate_dataset(
         max_time = max_time,
         n_patients = n_patients,
-        list_covariates = [wce_covariate])
+        list_covariates = [wce_covariate],
+        seed=seed)
 
 def WCE_permalgo(n_patients,
                  max_time,

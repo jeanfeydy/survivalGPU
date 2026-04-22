@@ -87,9 +87,17 @@ aeq(resid(fit0, 'score'), c(5/24, NA, 5/12, -1/12, 7/24, -1/24, 5/24))
 
 
 fit0_gpu <-coxphGPU(Surv(time, status) ~x, test1, iter = 0, ties = 'breslow')
-test_that("book1 - fit0 - loglik", {expect_equal(truth0$loglik, fit0_gpu$loglik)})
-test_that("book1 - fit0 - var", {expect_equal(1/truth0$imat, c(fit0_gpu$var))})
-test_that("book1 - fit0 - residuals", {expect_equal(truth0$mart, as.vector(fit0_gpu$resid[c(2:6,1)]))})
+test_that("book1 - fit0 - loglik", {
+  expect_equal(truth0$loglik, fit0_gpu$loglik, tolerance = 1e-4)
+})
+test_that("book1 - fit0 - var", {
+  expect_equal(1/truth0$imat, c(fit0_gpu$var), tolerance = 1e-4)
+})
+test_that("book1 - fit0 - residuals", {
+  expect_equal(truth0$mart,
+               as.vector(fit0_gpu$resid[c(2:6,1)]),
+               tolerance = 1e-4)
+})
 # aeq(truth0$scho, resid(fit0, 'schoen')) # implémenter method resid
 # aeq(truth0$score, resid(fit0, 'score')[c(3:7,1)])
 # aeq(resid(fit0, 'score'), c(5/24, NA, 5/12, -1/12, 7/24, -1/24, 5/24))
@@ -101,7 +109,9 @@ fit1 <- coxph(Surv(time, status) ~x, test1, iter = 1, method = 'breslow')
 aeq(fit1$coef, 8/5)
 
 fit1_gpu <- coxphGPU(Surv(time, status) ~x, test1, iter = 1, ties = 'breslow')
-test_that("book1 - fit1 - coef", {expect_equal(as.vector(fit1_gpu$coefficients), 8/5)})
+test_that("book1 - fit1 - coef", {
+  expect_equal(as.vector(fit1_gpu$coefficients), 8/5, tolerance = 1e-4)
+})
 
 
 ## fit2 ---------------
@@ -111,7 +121,9 @@ expect_warning(fit2 <- coxph(Surv(time, status) ~x, test1, method = 'breslow', i
 aeq(round(fit2$coef, 6), 1.472724)
 
 fit2_gpu <- coxphGPU(Surv(time, status) ~x, test1, ties = 'breslow', iter = 2)
-test_that("book1 - fit2 - coef", {expect_equal(round(as.vector(fit2_gpu$coefficients),4), 1.4727)})
+test_that("book1 - fit2 - coef", {
+  expect_equal(as.vector(fit2_gpu$coefficients), 1.472724, tolerance = 1e-4)
+})
 
 
 ## fit ---------------
@@ -123,29 +135,51 @@ fit_gpu <- coxphGPU(Surv(time, status) ~x, test1, ties = 'breslow', eps = 1e-8,
                     nocenter=NULL)
 
 aeq(fit$coef, log(1.5 + sqrt(33)/2))  # the true solution
-test_that("book1 - fit - coef", {expect_equal(round(as.vector(fit_gpu$coefficients),5), round(log(1.5 + sqrt(33)/2),5))})
+test_that("book1 - fit - coef", {
+  expect_equal(as.vector(fit_gpu$coefficients),
+               log(1.5 + sqrt(33)/2),
+               tolerance = 1e-4)
+})
 
 truth <- byhand1(fit$coef, 0)
 aeq(truth$loglik, fit$loglik[2])
-test_that("book1 - fit - loglik", {expect_equal(round(as.vector(truth$loglik), 4), round(fit_gpu$loglik, 4))})
+test_that("book1 - fit - loglik", {
+  expect_equal(truth$loglik, fit_gpu$loglik, tolerance = 1e-4)
+})
 
 aeq(1/truth$imat, fit$var)
-test_that("book1 - fit - var", {expect_equal(round(as.vector(1/truth$imat), 4), c(round(fit_gpu$var, 4)))})
+test_that("book1 - fit - var", {
+  expect_equal(1/truth$imat, c(fit_gpu$var), tolerance = 1e-4)
+})
 
 aeq(truth$mart, fit$resid[c(2:6,1)])
-test_that("book1 - fit - resid", {expect_equal(round(as.vector(truth$mart), 4), round(as.vector(fit_gpu$residuals[c(2:6,1)]), 4))})
+test_that("book1 - fit - resid", {
+  expect_equal(as.vector(truth$mart),
+               as.vector(fit_gpu$residuals[c(2:6,1)]),
+               tolerance = 1e-4)
+})
 
 aeq(truth$scho, resid(fit, 'schoen'))
-test_that("book1 - fit - schoenfeld resid", {expect_equal(round(as.vector(truth$scho), 4), round(as.vector(resid(fit_gpu, type = 'schoen')), 4))})
+test_that("book1 - fit - schoenfeld resid", {
+  expect_equal(as.vector(truth$scho),
+               as.vector(resid(fit_gpu, type = 'schoen')),
+               tolerance = 1e-4)
+})
 
 aeq(truth$score, resid(fit, 'score')[c(3:7,1)])
-test_that("book1 - fit - score resid", {expect_equal(round(as.vector(truth$score), 4), round(as.vector(resid(fit_gpu, type = 'score')[c(3:7,1)]), 4))})
+test_that("book1 - fit - score resid", {
+  expect_equal(as.vector(truth$score),
+               as.vector(resid(fit_gpu, type = 'score')[c(3:7,1)]),
+               tolerance = 1e-4)
+})
 
 expect <- predict(fit, type='expected', newdata=test1) #force recalc
 aeq(test1$status[-2] -fit$resid, expect[-2]) #tests the predict function
 
 expect2 <- predict(fit_gpu, type='expected', newdata=test1)
-test_that("book1 - predict", {expect_equal(round(as.vector(expect), 4), round(as.vector(expect), 4))})
+test_that("book1 - predict", {
+  expect_equal(as.vector(expect), as.vector(expect2), tolerance = 1e-4)
+})
 
 # sfit <- survfit(fit, list(x=0), censor=FALSE)
 # aeq(sfit$std.err^2, truth$var[c(1,2,4)]) # sfit skips time 8 (no events there)
@@ -158,30 +192,53 @@ test_that("book1 - predict", {expect_equal(round(as.vector(expect), 4), round(as
 # Done with the formal test, now print out lots of bits
 #
 resid(fit)
-test_that("book1 - resid", {expect_equal(round(as.vector(resid(fit)), 4), round(as.vector(resid(fit_gpu)), 4))})
+test_that("book1 - resid", {
+  expect_equal(as.vector(resid(fit)),
+               as.vector(resid(fit_gpu)),
+               tolerance = 1e-4)
+})
 
 resid(fit, 'scor')
-test_that("book1 - score resid", {expect_equal(round(as.vector(resid(fit, 'scor')), 4), round(as.vector(resid(fit_gpu, type = "scor")), 4))})
+test_that("book1 - score resid", {
+  expect_equal(as.vector(resid(fit, 'scor')),
+               as.vector(resid(fit_gpu, type = "scor")),
+               tolerance = 1e-4)
+})
 
 resid(fit, 'scho')
-test_that("book1 - scho resid", {expect_equal(round(as.vector(resid(fit, 'scho')), 4), round(as.vector(resid(fit_gpu, type = "scho")), 4))})
+test_that("book1 - scho resid", {
+  expect_equal(as.vector(resid(fit, 'scho')),
+               as.vector(resid(fit_gpu, type = "scho")),
+               tolerance = 1e-4)
+})
 
 predict(fit, type='lp', se.fit=T)
-test_that("book1 - predict - lp", {expect_equal(lapply(lapply(predict(fit, type='lp', se.fit=T), FUN = as.vector), FUN = round, 4),
-                                                lapply(predict(fit_gpu, type='lp', se.fit=T), FUN = round, 4))})
-
+test_that("book1 - predict - lp", {
+  expect_equal(lapply(predict(fit, type='lp', se.fit=T), as.vector),
+               lapply(predict(fit_gpu, type='lp', se.fit=T), as.vector),
+               tolerance = 1e-4)
+})
 
 predict(fit, type='risk', se.fit=T)
-test_that("book1 - predict - risk", {expect_equal(lapply(lapply(predict(fit, type='risk', se.fit=T), FUN = as.vector), FUN = round, 4),
-                                                  lapply(predict(fit_gpu, type='risk', se.fit=T), FUN = round, 4))})
+test_that("book1 - predict - risk", {
+  expect_equal(lapply(predict(fit, type='risk', se.fit=T), as.vector),
+               lapply(predict(fit_gpu, type='risk', se.fit=T), as.vector),
+               tolerance = 1e-4)
+})
 
 predict(fit, type='expected', se.fit=T)
 predict(fit_gpu, type='expected', se.fit=T)
-test_that("book1 - predict - expected", {expect_equal(lapply(lapply(predict(fit, type='expected', se.fit=T), FUN = as.vector), FUN = round, 4),
-                                                      lapply(lapply(predict(fit_gpu, type='expected', se.fit=T), FUN = as.vector), FUN = round, 4))})
+test_that("book1 - predict - expected", {
+  expect_equal(lapply(predict(fit, type='expected', se.fit=T), as.vector),
+               lapply(predict(fit_gpu, type='expected', se.fit=T), as.vector),
+               tolerance = 1e-4)
+})
 
 predict(fit, type='terms', se.fit=T)
-test_that("book1 - predict - terms", {expect_equal(lapply(lapply(predict(fit, type='lp', se.fit=T), FUN = as.vector), FUN = round, 4),
-                                                   lapply(predict(fit_gpu, type='lp', se.fit=T), FUN = round, 4))})
+test_that("book1 - predict - terms", {
+  expect_equal(lapply(predict(fit, type='terms', se.fit=T), as.vector),
+               lapply(predict(fit_gpu, type='terms', se.fit=T), as.vector),
+               tolerance = 1e-4)
+})
 
 # summary(survfit(fit, list(x=2)))

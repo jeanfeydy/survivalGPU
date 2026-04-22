@@ -98,6 +98,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   library(data.table)
 
   ties <- match.arg(ties)
+  print(double_precision)
 
   # To save in memory all coxph inputs
   Call <- match.call()
@@ -1212,6 +1213,17 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   } else {
     score <- exp(lp)
   }
+
+
+  print("length of Y, score, weights, strata")
+
+
+  print(length(Y))
+  print(length(score))
+  print(length(weights))
+  print(length(strata))
+
+  print("residuals call")
 
   residuals <- .Call(
     "agmart3", nused,
