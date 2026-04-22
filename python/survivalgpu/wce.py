@@ -385,7 +385,7 @@ class WCESurvivalAnalysis:
 
             # Estimated risk function:
             # (n_bootstraps, n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_bootstraps, n_batch, cutoff)
-            self.bootstrap_risk_functions_ = torch.tensor(self.bootstrap_WCE_coef_, dtype=self.dtype) @ self.atoms.to(self.dtype).T
+            self.bootstrap_risk_functions_ = torch.tensor(self.bootstrap_WCE_coef_, dtype=self.dtype).to(self.device) @ self.atoms.to(self.dtype).T
         # Usual CoxPH results: -------------------------------------------------
         self.means_ = self.survival_model.means_
         self.score_ = self.survival_model.score_
