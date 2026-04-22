@@ -262,7 +262,8 @@ class WCESurvivalAnalysis:
             nknots=self.n_knots,
             cutoff=self.cutoff,
             order=self.order,
-            dtype=self.dtype
+            dtype=self.dtype,
+            device=device,
         )
 
         wce_features = wce_features.cpu().numpy()
