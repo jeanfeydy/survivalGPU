@@ -103,12 +103,30 @@ class CoxPHSurvivalAnalysis:
         init: Float64Array["covariates"] | None = None,
 
     ):
-        """Fit the model.
+        """Fits the CoxPH model to the data and stores the results as attributes.
 
         Args:
-            X (array-like): Covariates.
-            y (array-like): Survival times and event indicators.
-            sample_weight (array-like): Sample weights.
+            covariates ((I,D) float64 array): covariate values for each interval.
+            stop ((I,) int64 array): end time of each interval.
+            start ((I,) int64 array, optional): start time of each interval.
+                Defaults to 0 for every interval.
+            event ((I,) int64 array, optional): 1 if the interval ends with an
+                event (death), 0 if it is censored. Defaults to 1 for every interval.
+            patient ((I,) int64 array, optional): patient id for each interval.
+                Required to draw consistent bootstrap samples when several
+                intervals belong to the same patient. Defaults to one interval
+                per patient, i.e. patient = [0, 1, ..., I-1].
+            strata ((I,) int64 array, optional): stratum id for each interval.
+                Defaults to a single stratum for all patients.
+            batch ((P,) int64 array, optional): batch id for each patient.
+                Independent CoxPH models are fitted for each batch.
+                Defaults to a single batch for all patients.
+            init ((D,) float64 array, optional): initial values for the
+                coefficients. Defaults to zeros.
+
+        Results are stored as attributes: coef_, std_, means_, score_, loglik_,
+        loglik_init_, sctest_init_, hessian_, imat_, iter_, and (if
+        n_bootstraps is set) bootstrap_coef_.
         """
         # Pre-process the input data: ----------------------------------------------------
         # Create a dataset object: this enforces checks on the input data

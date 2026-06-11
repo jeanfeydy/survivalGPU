@@ -439,7 +439,23 @@ class WCECovariate(Covariate):
 def generate_Xmat(list_wce_covariates:list[WCECovariate],
                         list_cox_covariates:list[(TimeDependentCovariate, ConstantCovariate)],
                         max_time, n_patients):
+    """Assembles the covariate trajectories of all simulated patients into a single matrix.
 
+    Args:
+        list_wce_covariates (list[WCECovariate]): WCE covariates, already
+            initialized (i.e. with a populated `Xvector` attribute).
+        list_cox_covariates (list[TimeDependentCovariate | ConstantCovariate]):
+            non-WCE covariates, already initialized.
+        max_time (int): number of rows per patient.
+        n_patients (int): number of simulated patients.
+
+    Returns:
+        (max_time * n_patients, 1 + n_covariates) array: column 0 is the
+            patient index (repeated `max_time` times per patient, in
+            max_time-row blocks); the following columns hold each covariate's
+            `Xvector`, in the order of `list_wce_covariates` then
+            `list_cox_covariates`.
+    """
 
     n_wce_covariates = len(list_wce_covariates)
     n_cox_covariates = len(list_cox_covariates)
@@ -467,7 +483,28 @@ def generate_Xmat(list_wce_covariates:list[WCECovariate],
 def generate_WCEmat(list_wce_covariates:list[WCECovariate],
                         list_cox_covariates:list[(TimeDependentCovariate, ConstantCovariate)],
                         max_time, n_patients):
+    """Assembles the WCE/covariate feature trajectories of all simulated patients into a single matrix.
 
+    Like `generate_Xmat`, but WCE covariates contribute their cumulative-exposure
+    `WCEvector` (the weighted sum of past exposures, used by `matching_algo` to
+    drive the hazard-ratio-targeted matching) instead of their raw `Xvector`.
+    Cox covariates still contribute their `Xvector`.
+
+    Args:
+        list_wce_covariates (list[WCECovariate]): WCE covariates, already
+            initialized (i.e. with a populated `WCEvector` attribute).
+        list_cox_covariates (list[TimeDependentCovariate | ConstantCovariate]):
+            non-WCE covariates, already initialized.
+        max_time (int): number of rows per patient.
+        n_patients (int): number of simulated patients.
+
+    Returns:
+        (max_time * n_patients, 1 + n_covariates) array: column 0 is the
+            patient index (repeated `max_time` times per patient, in
+            max_time-row blocks); the following columns hold each WCE
+            covariate's `WCEvector` and each Cox covariate's `Xvector`, in the
+            order of `list_wce_covariates` then `list_cox_covariates`.
+    """
 
     n_wce_covariates = len(list_wce_covariates)
     n_cox_covariates = len(list_cox_covariates)
@@ -725,6 +762,34 @@ def simulate_dataset(max_time, n_patients,
                      list_covariates: list[WCECovariate, TimeDependentCovariate, ConstantCovariate],
                      compress = False,
                      seed: int | None = None):
+    """Simulates a long-format survival dataset with covariates matched to target hazard ratios.
+
+    For each covariate in `list_covariates`, generates a trajectory for `n_patients`
+    simulated patients over `max_time` time points (WCE covariates additionally
+    generate their cumulative-exposure WCEvector). Independently, simulates
+    event/censoring times for `n_patients` output patients (`event_censor_generation`
+    / `event_FUP_Ti_generation`, with a 50% censoring ratio). `matching_algo` then
+    assigns each output patient one of the simulated covariate trajectories, drawn
+    with a probability that depends on the covariate's value at the patient's event
+    time and on `HR_target` (for WCE covariates) or `exp(coef)` (for Cox covariates),
+    so that the resulting dataset reproduces the target hazard ratios. Finally,
+    `get_dataset` assembles the long-format dataset from the matched trajectories.
+
+    Args:
+        max_time (int): the maximum follow-up time.
+        n_patients (int): the number of patients to simulate.
+        list_covariates (list[WCECovariate | TimeDependentCovariate | ConstantCovariate]):
+            the covariates to simulate. Each must be an instance of exactly one
+            of these three classes.
+        compress (bool, optional): if True, collapse consecutive intervals with
+            identical covariate values via `compress_dataset`. Defaults to False.
+        seed (int, optional): random seed, for reproducibility. Defaults to None.
+
+    Returns:
+        pandas.DataFrame: long-format dataset with columns "patients", "fup",
+            "start", "stop", "events", plus one column per covariate (named
+            after `covariate.name`).
+    """
     rng = np.random.default_rng(seed)
     torch_generator = None
     if seed is not None:
@@ -905,6 +970,23 @@ def simulate_dataset_batch( max_time, n_patients, list_covariates, batchsize = N
 
 
 def simulate_for_experiment(n_patients, max_time,HR_target, scenario_name, seed: int | None = None):
+    """Simulates a dataset with a single WCE "dose" covariate, for benchmarking/validation experiments.
+
+    Builds a single WCECovariate named "dose", with possible values
+    [1, 1.5, 2, 2.5, 3], the given `scenario_name` exposure-effect shape, and
+    target hazard ratio `HR_target`, then calls `simulate_dataset` with it.
+
+    Args:
+        n_patients (int): the number of patients to simulate.
+        max_time (int): the maximum follow-up time.
+        HR_target (float): the target hazard ratio for the "dose" covariate.
+        scenario_name (str): name of the exposure-effect scenario (see `get_scenario`).
+        seed (int, optional): random seed, for reproducibility. Defaults to None.
+
+    Returns:
+        pandas.DataFrame: long-format dataset, as returned by `simulate_dataset`
+            (with compress=False).
+    """
 
     wce_covariate = WCECovariate(
         name = "dose",

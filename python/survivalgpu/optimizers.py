@@ -25,6 +25,26 @@ class NewtonResult:
         score_test_init: FloatTensor["batch"],
         iterations,
     ):
+        """Stores the result of a Newton optimization, with the inverse Hessian and standard errors.
+
+        Args:
+            fun ((B,) tensor): value of the objective function at the optimum,
+                for each of the B batches.
+            fun_init ((B,) tensor): value of the objective function at the
+                starting point.
+            x ((B,D) tensor): optimal parameters.
+            jac ((B,D) tensor): gradient of the objective function at the optimum.
+            hess ((B,D,D) tensor): Hessian of the objective function at the optimum.
+            score_test_init ((B,) tensor): score test statistic, computed at the
+                starting point.
+            iterations (int): number of iterations that were performed.
+
+        In addition to storing these arguments as attributes, this computes:
+            imat ((B,D,D) tensor): inverse of the Hessian, symmetrized -
+                an estimate of the variance-covariance matrix of the parameters.
+            std ((B,D) tensor): standard errors of the parameters, i.e. the
+                square root of the diagonal of imat.
+        """
         self.fun = fun
         self.fun_init = fun_init
         self.x = x
@@ -52,6 +72,15 @@ def newton(*, loss, start, maxiter, eps=1e-9, verbosity=0):  # noqa: ARG001
             parameters [beta[0], ..., beta[B-1]] and returns a (B,) vector of
             scalar values [f(beta[0]), ..., f(beta[B-1])].
         start ((B,D) tensor): initial starting values.
+        maxiter (int): maximum number of Newton iterations. If 0, no Newton
+            step is performed: only the score test statistic at `start` is computed.
+        eps (float, optional): unused. Defaults to 1e-9.
+        verbosity (int, optional): level of detail of the logs printed at each
+            iteration. Defaults to 0 (no logs).
+
+    Returns:
+        NewtonResult: the optimization result, with fun, fun_init, x, jac, hess,
+            score_test_init, iterations, imat and std attributes.
     """
 
     # Automatic differentiation wrapper to get the derivatives of order 1 and 2:
