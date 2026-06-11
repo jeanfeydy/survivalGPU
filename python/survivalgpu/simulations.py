@@ -290,19 +290,18 @@ class TimeDependentCovariate(Covariate):
         return self
 
 class CoxCovariate(Covariate):
-    """
-    This class is used to define a time-dependent cox covariate, it's a covariate that impact
-    The values are time-dependant and can be cumulative or not. If they are cumulative the values are summed over a
-    period determined by the cutoff
-    It impact the log-likelihood like in the cox model
+    """A covariate with a precomputed, fixed time-series of values for each patient.
 
-    Attributes :
+    Unlike TimeDependentCovariate, the values are not generated from a random
+    process: they are supplied directly as `Xvector`. This is used to wrap
+    externally-provided covariate trajectories (e.g. one column of an existing
+    Xmat) so that they can be passed to `simulate_dataset`.
+
+    Attributes:
     - name : the name of the covariate
-    - values : the possible values of the covariate
+    - Xvector : the flattened (n_patients * max_time,) array of covariate values
     - coef : the coefficient of the covariate in the cox model (the coefficient is equal to the log of the hazard ratio of the covariate
     for a value of 1 compared to a value of 0)
-    - cumulative : a boolean that indicates if the values are cumulative or not
-    - cutoff : the cutoff period for the cumulative values, if a cumulative covariate is not given a cutoff, the cutoff is set to the max_time
 
     """
     def __init__(self, name, Xvector, coef):
@@ -352,84 +351,6 @@ class CoxCovariate(Covariate):
 
 
     #     return self
-
-class WCECovariate_new(Covariate):
-    """
-    This class is used to define a WCE covariate, it's a covariate that impact the log likelihood following a time-dependent pattern
-    of cumulative exposure. The WCE covariate is defined by a scenario that is used to generate the weight of the covariate at each time point
-
-    Attributes :
-    - name : the name of the covariate
-    - values : the possible values of the covariate
-    - scenario_name : the name of the scenario used to generate the weight of the covariate
-    - HR_target : the target hazard ratio of the covariate given a value of 1 for a time equal to the cutoff compared to a value of 0 for the time of the cutoff
-    """
-    def __init__(self, name, Xvector, scenario_name, HR_target):
-        self.name = name
-        self.scenario_name = scenario_name
-        self.HR_target = HR_target
-        self.Xvector = Xvector
-
-
-    def initialize_experiment(self, n_patients, max_time):
-        self.n_patients = n_patients
-        self.max_time = max_time
-        # self.generate_Xvector()
-        self.generate_WCEvector()
-
-        return self
-
-    def generate_Xvector(self, rng):
-        """
-        Generate the Xmat of TDHist for each individual patient
-        """
-        Xvector = np.array([TDhist(self.max_time, self.values, rng) for i in range(self.n_patients)],dtype=float).flatten()
-        self.Xvector = Xvector
-        return self
-
-
-    def generate_WCEvector(self):
-        """
-        This function generates the WCE matrix that keeps the WCE weight of all
-        patients at all times until the cutoff.
-        """
-
-        try:
-            Xvector = self.Xvector
-        except AttributeError as err:
-            msg = "The Xvector has not been generated yet"
-            raise ValueError(msg) from err
-
-        n_patients = self.n_patients
-        max_time = self.max_time
-
-        covariate_Xmat = Xvector.reshape(self.n_patients,self.max_time).transpose()
-
-        scenario_shape = get_scenario(self.scenario_name, self.max_time)
-
-        def generate_wce_vector(u, scenario_shape, covariate_Xmat):
-            t_array = np.arange(1,u+1)
-            u_t_array = u  - t_array
-            wce = np.multiply(scenario_shape[u_t_array].reshape(u,1),covariate_Xmat[t_array -1,:])
-
-
-
-            return np.sum(wce, axis = 0)
-
-        wce_mat = np.vstack([generate_wce_vector(u, scenario_shape, covariate_Xmat) for u in range(1,max_time+1)])
-
-
-
-        WCEvector = np.zeros(max_time*n_patients)
-
-        for i in range(self.n_patients):
-            WCEvector[i*max_time:(i+1)*max_time] = wce_mat[:,i]
-
-
-        self.WCEvector = WCEvector
-
-        return self
-
 
 class WCECovariate(Covariate):
     """
@@ -607,8 +528,40 @@ def matching_algo(WCEmat: np.ndarray,
                   events: list[int],
                   FUP_tis: list[int],
                   torch_generator: torch.Generator | None = None):
+    """Matches each (event, follow-up time) pair to a simulated covariate trajectory.
 
+    `WCEmat` contains, for `n_patients` simulated patients, `max_time` rows each
+    of WCE/covariate feature values. For every output patient `i`, this function
+    picks (without replacement) one of these `max_time`-row blocks to use as its
+    covariate trajectory:
 
+    - if `events[i] == 1` (the patient dies at `FUP_tis[i]`), the block is drawn
+      with probability proportional to
+      `exp(WCE_features(FUP_tis[i]) . log(HR_target_list))`,
+      i.e. patients whose cumulative exposure at their event time is associated
+      with a higher target hazard ratio are more likely to be selected.
+      This is what makes the simulated dataset reproduce `HR_target_list`.
+    - if `events[i] == 0` (the patient is censored at `FUP_tis[i]`), the block is
+      drawn uniformly at random, since censoring is assumed independent of exposure.
+
+    Args:
+        WCEmat ((max_time * n_patients, 1 + n_covariates) array): covariate/WCE
+            feature matrix for the simulated patients, as produced by `generate_WCEmat`.
+            Column 0 is the patient index; rows are grouped in `max_time`-row blocks,
+            one block per patient.
+        HR_target_list ((n_covariates,) array): target hazard ratios for each covariate.
+        max_time (int): number of rows per patient in `WCEmat`.
+        n_patients (int): number of output patients to match (and the number of
+            `max_time`-row blocks available in `WCEmat`).
+        events (list[int]): 0/1 event indicator for each output patient.
+        FUP_tis (list[int]): follow-up time (1-indexed) for each output patient.
+        torch_generator (torch.Generator, optional): random number generator,
+            for reproducibility. Defaults to None.
+
+    Returns:
+        (n_patients,) int array: for each output patient, the index (in `WCEmat`)
+            of the covariate block that was matched to it.
+    """
 
     events = events.copy()
     FUP_tis = FUP_tis.copy()
@@ -636,9 +589,6 @@ def matching_algo(WCEmat: np.ndarray,
 
         event = events[i]
         time_event = FUP_tis[i]
-
-        event = 1
-
 
         if event == 0:
 
@@ -675,20 +625,27 @@ def matching_algo(WCEmat: np.ndarray,
 
 
 def get_dataset(Xmat,covariate_names, n_patients, FUP_tis, events, wce_id_indexes, max_time):
-    """
-    Generate a dataset based on the given inputs.
+    """Builds a long-format (start, stop] dataframe from simulated covariate matrices.
+
+    For each patient, generates one row per time unit up to its follow-up time,
+    filling in the covariate values selected by `wce_id_indexes` and marking the
+    event on the last row if the patient experienced it.
 
     Args:
-        Xmat (numpy.ndarray): The input matrix.
-        max_time (int): The maximum time.
-        n_patients (int): The number of patients.
-        HR_target (float): The target hazard ratio.
-        FUP_tis (list): The follow-up times.
-        events (list): The events.
-        wce_id_indexes (list): The WCE ID indexes.
+        Xmat ((max_time * n_patients, n_covariates + 1) array): covariate matrix,
+            as produced by `generate_Xmat`. Column 0 is the patient index.
+        covariate_names (list[str]): names of the covariate columns to extract.
+        n_patients (int): number of patients in the output dataset.
+        FUP_tis (list): follow-up time (number of rows) for each patient.
+        events (list): 0/1 event indicator for each patient.
+        wce_id_indexes (list): for each output patient, the index of the
+            simulated patient (in Xmat) whose covariate trajectory should be used.
+        max_time (int): number of time steps per patient in Xmat.
 
     Returns:
-        pandas.DataFrame: The generated dataset.
+        pandas.DataFrame: one row per (patient, time unit), with columns
+            "patients", "fup", "start", "stop", "events", and one column per
+            entry of `covariate_names`.
     """
     FUP_tis = np.array(FUP_tis, dtype=int)
     events = np.array(events, dtype=int)
@@ -888,31 +845,48 @@ def compress_dataset(dataset):
 
 
 def simulate_dataset_batch( max_time, n_patients, list_covariates, batchsize = None, compress = True, seed: int | None = None):
+    """Simulates a dataset of `n_patients` patients by concatenating smaller chunks.
 
-    print(batchsize)
-    print(n_patients)
-    print(batchsize % n_patients)
+    Simulating all `n_patients` at once with `simulate_dataset` can be too slow
+    or memory-intensive for large datasets. Instead, this function simulates
+    successive chunks of `batchsize` patients (with a final, smaller chunk for
+    the remainder, if any) and concatenates the results, offsetting the
+    "patients" column of each chunk so that patient ids remain unique across
+    the full dataset.
 
+    Args:
+        max_time (int): the maximum follow-up time, passed to `simulate_dataset`.
+        n_patients (int): the total number of patients in the final dataset.
+        list_covariates (list): the covariates to simulate, passed to `simulate_dataset`.
+        batchsize (int, optional): the number of patients to simulate per chunk.
+            Defaults to `n_patients`, i.e. a single chunk.
+        compress (bool, optional): whether to compress each chunk, passed to
+            `simulate_dataset`. Defaults to True.
+        seed (int, optional): random seed for the first chunk. Subsequent chunks
+            use `seed + i` for reproducibility. Defaults to None.
+
+    Returns:
+        pandas.DataFrame: the concatenated dataset, with `n_patients` distinct,
+            contiguous patient ids.
+    """
     if batchsize is None:
         batchsize = n_patients
 
-    if n_patients % batchsize != 0:
-        msg = "The batch size must be proportional to the number of patients, in order to have a complete batch"
-        raise ValueError(msg)
+    n_full_batches, remainder = divmod(n_patients, batchsize)
+    chunk_sizes = [batchsize] * n_full_batches
+    if remainder > 0:
+        chunk_sizes.append(remainder)
 
-    n_batches = batchsize // n_patients
-
-    dataset = simulate_dataset(max_time = max_time, n_patients = n_patients, list_covariates = list_covariates, compress = compress, seed=seed)
-
-
-    for i in range(1,n_batches):
-
+    dataset = None
+    patient_offset = 0
+    for i, chunk_size in enumerate(chunk_sizes):
         current_seed = None if seed is None else seed + i
-        batch_dataset = simulate_dataset(max_time = max_time, n_patients = n_patients, list_covariates = list_covariates, compress = compress, seed=current_seed)
+        chunk = simulate_dataset(max_time = max_time, n_patients = chunk_size, list_covariates = list_covariates, compress = compress, seed=current_seed)
 
-        batch_dataset["patients"] += batchsize * i
+        chunk["patients"] += patient_offset
 
-        dataset = pd.concat((dataset, batch_dataset))
+        dataset = chunk if dataset is None else pd.concat((dataset, chunk))
+        patient_offset += chunk_size
 
     return dataset
 
@@ -944,53 +918,6 @@ def simulate_for_experiment(n_patients, max_time,HR_target, scenario_name, seed:
         n_patients = n_patients,
         list_covariates = [wce_covariate],
         seed=seed)
-
-def WCE_permalgo(n_patients,
-                 max_time,
-                 Xmat,
-                 betas,
-                 names,
-                 wce_status: list[bool],
-                 scenarios,
-                #  eventRandom,
-                #  censorRandom
-                 ):
-
-
-    list_covariates = []
-
-    print(wce_status)
-
-    print(Xmat.shape)
-
-    for i in range(len(wce_status)):
-        if wce_status[i]:
-            wce_covariate_name = names[i]
-            scenario_name = scenarios[i]
-            HR_target = betas[i]
-            Xvector = Xmat[:,i]
-            wce_covariate = WCECovariate(name = wce_covariate_name,
-                                         Xvector = Xvector,
-                                         scenario_name = scenario_name,
-                                         HR_target = HR_target)
-            list_covariates.append(wce_covariate)
-
-        elif not wce_status[i]:
-            cox_covariate_name = names[i]
-            coef = betas[i]
-            cox_covariate = CoxCovariate(name = cox_covariate_name,
-                                                   Xvector = Xvector,
-                                                   coef = coef)
-            list_covariates.append(cox_covariate)
-
-
-    print(list_covariates)
-
-
-    return simulate_dataset(max_time = max_time,
-                               n_patients = n_patients,
-                               list_covariates = list_covariates)
-
 
 # def cox_benchmark_simualtion(n_patients, n_intervals, max_time,):
 #     dataset = []
@@ -1055,7 +982,7 @@ def get_scenario(scenario_name: int, max_time: int):
     Get the scenario list based on the given scenario name and maximum time.
 
     Parameters:
-    - scenario_name (int): The name of the scenario to retrieve.
+    - scenario_name (str): The name of the scenario to retrieve.
     - max_time (int): The maximum time for which to clear the scenario list.
     Returns:
     - scenario_list (numpy.ndarray): The generated scenario list.
