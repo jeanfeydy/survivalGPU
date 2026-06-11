@@ -1041,9 +1041,9 @@ def hat_scenario(u_t):
     if u_t < 180:
         return (u_t/180)
     elif (u_t >= 180) and (u_t < 240):
-        return 1
+        return (1 - (u_t-180)/60)
     else:
-        return (1 - (u_t-240)/180)
+        return 0
 
 
 
@@ -1070,6 +1070,8 @@ def get_scenario(scenario_name: int, max_time: int):
         "bi_linear_scenario": bi_linear_scenario,
         "early_peak_scenario": early_peak_scenario,
         "inverted_u_scenario": inverted_u_scenario,
+        "constant_scenario": constant_scenario,
+        "hat_scenario": hat_scenario,
     }
 
     try:

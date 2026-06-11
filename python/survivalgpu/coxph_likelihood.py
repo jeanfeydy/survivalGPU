@@ -924,23 +924,14 @@ def _breslow_efron_logsumexp_term(
         #     *
         #     log( Sum_{observed at t} r[i] )
         #   )
-        # safe_log = (time_risks + 1.2e-7).log() # add a safe value to the log to avoid nan issues
 
-        # When dead_weights == 0, the contribution is 0, even if time_log_risks is -inf.
-        # If we don't mask things out, we would end up with -inf * 0 == NaN.
-        # it is necessary to do it before calculating the time contribution to avoid NaN in the gradient and Hessian
-        safe_time_risks = torch.where(
-            dead_weights != 0,
-            time_risks,
-            torch.ones_like(time_risks)   # anything positive, log(1)=0
-        )
-
-        time_contributions = dead_weights * safe_time_risks
+        # safe_time_risks = time_risks + 1.2e-7
+        # add a safe value to the log to avoid nan issues when value is rounded to O
 
 
-        safe_log = (time_risks + 1.2e-7).log()
+        safe_time_risks = time_risks + 1.2e-7
 
-        time_contributions = dead_weights * safe_log
+        time_contributions = dead_weights * safe_time_risks.log()
 
         # # When dead_weights == 0, the contribution is 0, even if time_log_risks is -inf.
         # # If we don't mask things out, we would end up with -inf * 0 == NaN.
@@ -1036,7 +1027,9 @@ def _breslow_efron_logsumexp_term(
         #             *
         #             Sum_{dead at t} r[i]
         #         )
-        efron_log_risks = (efron_observed_risks - efron_dead_risks).log()
+        efron_risk = efron_observed_risks - efron_dead_risks
+        safe_efron_risk = efron_risk + 1.2e-7
+        efron_log_risks = safe_efron_risk.log()
         assert efron_log_risks.shape == (E,)
         assert efron_log_risks.dtype in (torch.float32, torch.float64)
         assert not efron_log_risks.isnan().any()
@@ -1068,15 +1061,6 @@ def _breslow_efron_logsumexp_term(
         efron_contributions = efron_factor * efron_log_risks
         assert efron_contributions.shape == (E,)
         assert efron_contributions.dtype in (torch.float32, torch.float64)
-
-        # When efron_factor == 0, the contribution is 0, even if efron_log_risks is -inf.
-        # If we don't mask things out, we would end up with -inf * 0 == NaN.
-        efron_contributions = torch.where(
-            efron_factor != 0,
-            efron_contributions,
-            torch.zeros_like(efron_contributions),
-        )
-        assert efron_contributions.shape == (E,)
 
         # Finally, we sum batch-wise over the contributions:
         efron_batch = torch.index_select(
