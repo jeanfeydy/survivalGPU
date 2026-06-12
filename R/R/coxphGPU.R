@@ -4,7 +4,7 @@
 #'   to use (or not) your GPU to speed up calculations, in particular for
 #'   bootstrap.
 #'
-#' @usage coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
+#' @usage coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 0,
 #'          batchsize = 0, init, all.results = FALSE, control,
 #'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
 #'
@@ -1562,7 +1562,7 @@ print.summary.coxphGPU <- function(x, ...,
                                    digits = max(getOption("digits") - 3, 3),
                                    signif.stars = getOption("show.signif.stars")) {
 
-  NextMethod("print", object)
+  NextMethod("print", x)
 
   if (x$nbootstraps > 1) {
     cat(" ---------------- \n")

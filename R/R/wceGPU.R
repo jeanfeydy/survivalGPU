@@ -8,7 +8,7 @@
 #'
 #' @usage
 #' wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
-#'        event, start, stop, expos, covariates = NULL, nbootstraps = 1,
+#'        event, start, stop, expos, covariates = NULL, nbootstraps = 0,
 #'        batchsize = 0, confint = 0.95, controls = NULL, ...)
 #'
 #' @param data A data frame in an interval (long) format, in which each line
@@ -292,7 +292,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
 #' Print method for wceGPU
 #'
-#' @param object wceGPU object
+#' @param x wceGPU object
 #' @param ... additional argument(s) for methods.
 #' @exportS3Method print wceGPU
 #' @noRd
@@ -369,6 +369,12 @@ print.wceGPU <- function(x, ...) {
 }
 
 
+#' Summary method for wceGPU object
+#'
+#' @param object wceGPU object
+#' @param ... additional argument(s) for methods.
+#' @exportS3Method summary wceGPU
+#' @rdname wceGPU
 summary.wceGPU <- function(object, allres = FALSE, ...) {
 
   objname <- deparse(substitute(object))
@@ -457,69 +463,32 @@ get_interior <- function(g){
   g[1:(length(g) - 4)]
 }
 
-#' Summary method for wceGPU object
+
+#' Coef method for wceGPU object
 #'
-#' @param object wceGPU object
+#' @param object wceGPU object.
 #' @param ... additional argument(s) for methods.
-#' @exportS3Method summary wceGPU
-#' @rdname wceGPU
-
-
-# #' Coef method for wceGPU object
-# #'
-# #' @param object wceGPU object.
-# #' @param ... additional argument(s) for methods.
-# #' @exportS3Method coef wceGPU
-# #' @noRd
-# coef.wceGPU <- function(object, ...) {
-#   if (is.null(object$beta.hat.covariate)) {
-#     list(WCEest = object$est)
-#   } else {
-#     if (object$nbootstraps == 1) {
-#       list(
-#         WCEest = object$,
-#         covariates = object$coef[, object$covariates]
-#       )
-#     } else {
-#       list(
-#         coef = list(
-#           WCEest = object$coef[, !colnames(object$coef) %in% object$covariates],
-#           covariates = object$coef[, object$covariates]
-#         ),
-#         CI = list(
-#           WCEest = object$coef_CI[, !colnames(object$coef) %in% object$covariates],
-#           covariates = object$coef_CI[, object$covariates]
-#         )
-#       )
-#     }
-#   }
-# }
-
-
+#' @exportS3Method coef wceGPU
+#' @noRd
 coef.wceGPU <- function(object, ...) {
 
-  ceofs <- list()
+  coefs <- list()
 
   coefs$est <- object$est
 
-  is_bootstraps <- FALSE
-
-
-  if (n_bootstraps > 1) {
-    results$est_CI <- object$est_CI
+  if (object$is_bootstraps) {
+    coefs$est_CI <- object$est_CI
   }
 
   if (!is.null(object$covariates)) {
     coefs$covariates <- object$beta.hat.covariates
 
-    if (n_bootstraps > 1) {
-      results$coef_CI <- object$coef_CI
+    if (object$is_bootstraps) {
+      coefs$coef_CI <- object$coef_CI
     }
   }
 
-
-
-
+  coefs
 }
 
 
@@ -637,12 +606,10 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #' @param vecdenom A vector of time-dependent exposures corresponding to a
 #'   scenario for the reference category (denominator of the HR).
 #' @param level the confidence level required for HR CI. Default to 0.95.
-#' @param without_bootstrap Gaussian approximation for confidence interval.
 #'
 #' @export
 #' @return Returns a HR according to the scenarios. If bootstrap is present
-#' (or without_bootstrap = TRUE) in wceGPU object, this function returns
-#' confidence interval for the HR.
+#' in the wceGPU object, this function returns a confidence interval for the HR.
 #' @examples
 #' \dontrun{
 #' # Dataset
@@ -662,15 +629,6 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #' unexposed <- rep(0, cutoff)
 #'
 #' HR(wce_gpu_bootstrap, exposed, unexposed)
-#'
-#' # Confidence interval with Gaussian approximation when no bootstrap
-#'  wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff, id = "Id",
-#'                    event = "Event", start = "Start", stop = "Stop",
-#'                    expos = "dose", covariates = c("age", "sex"),
-#'                    constrained = FALSE, aic = FALSE, confint = 0.95,
-#'                    batchsize = 0)
-#'
-#' HR(wce_gpu_bootstrap, exposed, unexposed, without_bootstrap = TRUE)
 #' }
 HR <- function(object, vecnum, vecdenom, level = 0.95) {
 
