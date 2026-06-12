@@ -38,19 +38,6 @@ def torch_lexsort(a: Int64Tensor["keys indices"]) -> Int64Tensor["indices"]:
     return torch.tensor(ind, dtype=torch.int64, device=a.device)
 
 
-@typecheck
-def torch_lexsort_old(a: Int64Tensor["keys indices"]) -> Int64Tensor["indices"]:
-    """PyTorch implementation of np.lexsort.
-
-    N.B.: This function relies on the fact that torch.unique implements
-    a lexicographical sort in the background. This is not a fully documented
-    behaviour, so it might break in the future: testing is important!
-    """
-    # To be consistent with numpy, we flip the keys (sort by last row first):
-    a_unq, inv = torch.unique(a.flip(0), dim=-1, sorted=True, return_inverse=True)
-    return torch.argsort(inv)
-
-
 class TorchSurvivalDataset:
     """Object that holds data for the compute-intensive parts of the CoxPH solvers.
 

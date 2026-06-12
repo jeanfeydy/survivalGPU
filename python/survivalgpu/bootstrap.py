@@ -4,10 +4,6 @@ from .group_reduction import group_sum
 from .typecheck import Int64Tensor, typecheck
 
 
-def stable_log(x, eps=1e-8):
-    return (x + eps).log()
-
-
 class Resampling:
     """Holds the pre-computed sample weights that are required for efficient bootstrapping.
 

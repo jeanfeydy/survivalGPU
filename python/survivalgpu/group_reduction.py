@@ -159,10 +159,6 @@ def group_reduce(
     return reduced
 
 
-def group_expand(*, values, groups, output_size):  # noqa: ARG001
-    # return torch.gather(values, 1, groups)
-    return torch.index_select(values, 1, groups)
-
 @typecheck
 def group_sum(
         *,
