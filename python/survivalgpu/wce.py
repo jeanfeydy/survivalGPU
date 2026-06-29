@@ -95,13 +95,12 @@ class WCESurvivalAnalysis:
         self.constrained = constrained
 
 
-
         if survival_model is None:
             survival_model = CoxPHSurvivalAnalysis()
 
         if isinstance(survival_model, CoxPHSurvivalAnalysis):
             survival_model = CoxPHSurvivalAnalysis(
-                maxiter=20, device=device, n_bootstraps=n_bootstraps, batch_size=batch_size, dtype = dtype,
+                maxiter=20, device=device, n_bootstraps=n_bootstraps, batch_size=batch_size, dtype = dtype
             )
 
 
