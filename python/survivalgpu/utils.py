@@ -12,6 +12,9 @@ def timer():
         torch.cuda.synchronize()
     return time.time()
 
+def safe_log(x, eps=1e-8):
+    return torch.log(torch.clamp(x, min=eps))
+
 
 # Tensor types:
 use_cuda = torch.cuda.is_available()  # Is a GPU available?

@@ -67,6 +67,7 @@ from .group_reduction import (
     segment_cumsum,
 )
 from .typecheck import FloatTensor, Int64Tensor, Literal, typecheck
+from .utils import safe_log
 
 
 @typecheck
@@ -802,21 +803,10 @@ def _breslow_efron_logsumexp_term(
         #     log( Sum_{observed at t} r[i] )
         #   )
 
-        # safe_time_risks = time_risks + 1.2e-7
-        # add a safe value to the log to avoid nan issues when value is rounded to O
+        # use the safe log to avoid -inf when time_risks is rounded to 0 on float32. and the rare cases
+        # where the risk is negative
+        time_contributions = dead_weights * safe_log(time_risks)
 
-
-        safe_time_risks = time_risks + 1.2e-7
-
-        time_contributions = dead_weights * safe_time_risks.log()
-
-        # # When dead_weights == 0, the contribution is 0, even if time_log_risks is -inf.
-        # # If we don't mask things out, we would end up with -inf * 0 == NaN.
-        # time_contributions = torch.where(
-        #     dead_weights != 0,
-        #     time_contributions,
-        #     torch.zeros_like(time_contributions),
-        # )
         assert time_contributions.shape == (B, T)
 
         # We sum batch-wise over the time contributions:
@@ -905,8 +895,8 @@ def _breslow_efron_logsumexp_term(
         #             Sum_{dead at t} r[i]
         #         )
         efron_risk = efron_observed_risks - efron_dead_risks
-        safe_efron_risk = efron_risk + 1.2e-7
-        efron_log_risks = safe_efron_risk.log()
+        efron_log_risks = safe_log(efron_risk)
+
         assert efron_log_risks.shape == (E,)
         assert efron_log_risks.dtype in (torch.float32, torch.float64)
         assert not efron_log_risks.isnan().any()
