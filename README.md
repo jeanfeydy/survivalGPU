@@ -65,7 +65,7 @@ See `python/survivalgpu/datasets.py` (e.g. `load_drugs`) for utilities to
 generate larger synthetic datasets, and `python/tests/` for further usage
 examples.
 
-## Run tests
+## Python: run tests
 
 Once the package is installed with the `test` extra (see above), you can run
 the pre-commit hooks with:
@@ -88,9 +88,65 @@ will fail at collection for the whole suite; skip that file instead:
 pytest --ignore=python/tests/test_wce_drugdata.py
 ```
 
-For the R `survivalGPU` package, go to the `survivalGPU/R` folder. Then, launch an R interactive session and run:
+## R: setup
 
-```R
+The R package is a thin wrapper around the Python implementation, calling into
+it via `reticulate`. Set up the Python package first (see "Python: setup"
+above), then install the R-side dependencies:
+
+```r
+install.packages(c("devtools", "pkgload", "testthat", "roxygen2", "reticulate"))
+```
+
+`devtools` depends on `fs`, which links against the system `libuv` library.
+If `install.packages("fs")` fails with "libuv was not found" (no `libuv1-dev`
+on the machine and no permission to install it), build `fs`'s bundled copy of
+libuv instead:
+
+```bash
+USE_BUNDLED_LIBUV=1 Rscript -e 'install.packages("fs")'
+```
+
+By default, `reticulate` picks its own Python interpreter, which may not have
+`survivalgpu` installed. Point it at the virtual environment created in the
+Python setup step by setting `RETICULATE_PYTHON` before launching R:
+
+```bash
+export RETICULATE_PYTHON=/path/to/survivalGPU/.venv/bin/python
+```
+
+## R: quickstart
+
+From the `R/` folder, launch an R interactive session and run:
+
+```r
+devtools::load_all()
+library(survival)
+
+# Three (start, stop] intervals, one covariate:
+my_data <- data.frame(
+  start = c(0, 0, 0),
+  stop  = c(1, 1, 2),
+  event = c(0, 1, 1),
+  x     = c(1.0, 0.0, 4.0)
+)
+
+fit <- coxphGPU(Surv(start, stop, event) ~ x, data = my_data, ties = "efron")
+coef(fit)
+```
+
+## R: run tests
+
+The test suite cross-checks results against the `WCE` R package, listed as a
+`Suggests` dependency in `R/DESCRIPTION`:
+
+```r
+install.packages("WCE")
+```
+
+Then, from the `R/` folder:
+
+```r
 library(devtools)
 load_all()
 test()

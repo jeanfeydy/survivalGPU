@@ -168,12 +168,19 @@ test_that("Use of . in formula - var", {
 
 
 # "." in formula with coxphGPU
+# N.B.: as with fit1/fit2/fit3 above, we cannot compare fit1_gpu directly to
+# a model built from explicit terms: terms() retains the subtracted columns
+# (meal.cal, wt.loss) in its "variables" attribute, so model.frame() still
+# drops rows with NAs in those columns even though they're not in the final
+# formula. update() rebuilds the formula from the resolved terms and avoids
+# this, matching the fit2/fit3 comparison pattern above.
 fit1_gpu <- coxphGPU(Surv(time, status_0_1) ~ . - meal.cal - wt.loss - inst - status, lung, ties = ties)
-fit3_gpu <- coxphGPU(Surv(time, status_0_1) ~ age + sex + ph.ecog + ph.karno + pat.karno, lung, ties = ties)
+fit2_gpu <- update(fit1_gpu, .~. - ph.karno)
+fit3_gpu <- coxphGPU(Surv(time, status_0_1) ~ age + sex + ph.ecog + pat.karno, lung, ties = ties)
 
 test_that("Use of . in right coxphGPU formula - coefs", {
   expect_equal(
-    round(as.vector(coef(fit1_gpu)),5),
+    round(as.vector(coef(fit2_gpu)),5),
     round(as.vector(coef(fit3_gpu)),5)
   )
 })

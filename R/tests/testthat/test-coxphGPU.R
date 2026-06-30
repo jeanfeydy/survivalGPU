@@ -130,11 +130,15 @@ test_that("Coxph right - log likelihood", {
   )
 })
 
-# same lp ? (because not the same colMeans)
+# N.B.: these are per-observation quantities, so they must be compared
+# against a model fit on the same data (drugdata, 1 row per interval).
+# coxphGPU_bootstrap is fit on drugdata2 (1 row per patient), so it has a
+# different number of rows and cannot be compared element-wise; coxphGPU
+# (above) is the right counterpart here.
 test_that("Coxph counting - linears predictors", {
   expect_equal(
     coxph$linear.predictors,
-    c(coxphGPU_bootstrap$linear.predictors),
+    c(coxphGPU$linear.predictors),
     tolerance = 1e-5
   )
 })
@@ -142,7 +146,7 @@ test_that("Coxph counting - linears predictors", {
 test_that("Coxph counting - residuals", {
   expect_equal(
     coxph$residuals,
-    coxphGPU_bootstrap$residuals,
+    coxphGPU$residuals,
     tolerance = 1e-5
   )
 })
@@ -150,7 +154,7 @@ test_that("Coxph counting - residuals", {
 test_that("Coxph counting - resid method", {
   expect_equal(
     resid(coxph),
-    resid(coxphGPU_bootstrap),
+    resid(coxphGPU),
     tolerance = 1e-5
   )
 })
@@ -158,7 +162,7 @@ test_that("Coxph counting - resid method", {
 test_that("Coxph counting - resid method score type", {
   expect_equal(
     resid(coxph, type = "score"),
-    resid(coxphGPU_bootstrap, type = "score"),
+    resid(coxphGPU, type = "score"),
     tolerance = 1e-5
   )
 })
@@ -166,7 +170,7 @@ test_that("Coxph counting - resid method score type", {
 test_that("Coxph counting - resid method schoenfeld type", {
   expect_equal(
     resid(coxph, type = "schoenfeld"),
-    resid(coxphGPU_bootstrap, type = "schoenfeld"),
+    resid(coxphGPU, type = "schoenfeld"),
     tolerance = 1e-5
   )
 })

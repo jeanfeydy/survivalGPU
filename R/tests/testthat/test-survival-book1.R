@@ -88,7 +88,9 @@ aeq(resid(fit0, 'score'), c(5/24, NA, 5/12, -1/12, 7/24, -1/24, 5/24))
 
 fit0_gpu <-coxphGPU(Surv(time, status) ~x, test1, iter = 0, ties = 'breslow')
 test_that("book1 - fit0 - loglik", {
-  expect_equal(truth0$loglik, fit0_gpu$loglik, tolerance = 1e-4)
+  # truth0$loglik is the loglik at the (unconverged, iter=0) coefficients,
+  # i.e. the initial loglik: $loglik[1], as in the aeq() check above.
+  expect_equal(truth0$loglik, fit0_gpu$loglik[1], tolerance = 1e-4)
 })
 test_that("book1 - fit0 - var", {
   expect_equal(1/truth0$imat, c(fit0_gpu$var), tolerance = 1e-4)
@@ -144,12 +146,17 @@ test_that("book1 - fit - coef", {
 truth <- byhand1(fit$coef, 0)
 aeq(truth$loglik, fit$loglik[2])
 test_that("book1 - fit - loglik", {
-  expect_equal(truth$loglik, fit_gpu$loglik, tolerance = 1e-4)
+  # truth$loglik is evaluated at the converged coefficients, i.e. the final
+  # loglik: $loglik[2], as in the aeq() check above. It also carries a stray
+  # name ("x") inherited from fit$coef via byhand1(); strip it.
+  expect_equal(unname(truth$loglik), fit_gpu$loglik[2], tolerance = 1e-4)
 })
 
 aeq(1/truth$imat, fit$var)
 test_that("book1 - fit - var", {
-  expect_equal(1/truth$imat, c(fit_gpu$var), tolerance = 1e-4)
+  # truth$imat carries a stray name ("x") inherited from fit$coef via
+  # byhand1(); strip it so it doesn't affect the comparison.
+  expect_equal(unname(1/truth$imat), c(fit_gpu$var), tolerance = 1e-4)
 })
 
 aeq(truth$mart, fit$resid[c(2:6,1)])
