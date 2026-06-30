@@ -139,10 +139,23 @@ def test_loss_grad_hessian(*, data, ties, device):
         data[ties]["hessian"], dtype=torch.float32, device=device
     )
 
+    # N.B.: patient_data holds one row per patient (batch, strata), with
+    # patient ids implicitly equal to the row index (a dense 0..n_patients-1
+    # range), while intervals[:, 0] gives the patient id of each interval.
+    n_patients = patient_data.shape[0]
+    patient = intervals[:, 0]
+    batch = patient_data[:, 0]
+    strata_patient = patient_data[:, 1]
+
     dataset = TorchSurvivalDataset(
-        batch=patient_data[:, 0],
-        strata=patient_data[:, 1],
-        patient=intervals[:, 0],
+        batch=batch,
+        patient_unique=torch.arange(
+            n_patients, dtype=torch.int64, device=device
+        ),
+        strata_patient=strata_patient,
+        strata=strata_patient[patient],
+        batch_interval=batch[patient],
+        patient=patient,
         start=intervals[:, 1],
         stop=intervals[:, 2],
         event=intervals[:, 3],

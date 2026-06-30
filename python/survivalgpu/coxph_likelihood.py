@@ -134,12 +134,22 @@ def _compute_unique_batch_strata_time(
     # Encode each triplet (batch, strata, time) as a single scalar
     # so we can use GPU-native sort instead of torch.unique(dim=1)
     # which has a hidden CPU transfer for 2D inputs.
+    # The "time" component of the encoding must lie in [0, max_val): since
+    # "any"-mode datasets allow negative start times, we shift all times by
+    # a constant offset to make them non-negative before encoding, and shift
+    # back when decoding below.
+    time_offset = int(min(start.min(), stop.min()).item())
+    shifted_start = start - time_offset
+    shifted_stop = stop - time_offset
+
     # We need max_val > max of all values to ensure unique encoding.
-    max_val = int(max(batch.max(), strata.max(), start.max(), stop.max()).item()) + 1
+    max_val = int(
+        max(batch.max(), strata.max(), shifted_start.max(), shifted_stop.max()).item()
+    ) + 1
 
     # Concatenate start and stop into a single flat array of 2*I time values,
     # mirroring the former batch_strata_start_stop of shape (3, 2*I).
-    all_times  = torch.cat([start, stop])          # (2*I,)
+    all_times  = torch.cat([shifted_start, shifted_stop])  # (2*I,)
     all_batch  = torch.cat([batch, batch])          # (2*I,)
     all_strata = torch.cat([strata, strata])        # (2*I,)
     assert all_times.shape == (2 * I,)
@@ -178,7 +188,7 @@ def _compute_unique_batch_strata_time(
     T = unique_encoded.shape[0]
     assert T <= 2 * I
 
-    unique_time   =  unique_encoded % max_val
+    unique_time   = (unique_encoded % max_val) + time_offset
     unique_strata = (unique_encoded // max_val) % max_val
     unique_batch  =  unique_encoded // (max_val ** 2)
 

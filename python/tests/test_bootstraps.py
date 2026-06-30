@@ -116,8 +116,10 @@ def simple_dataset(use_patient: bool, device: str):
     covariates = np.zeros((len(stop), n_covariates))
     if use_patient:
         start = stop - 1
-        patient = np.array([0, 1, 2, 3, 4, 0, 1, 0, 5, 7])
-        n_patients = 8
+        # N.B.: patient ids must be a dense 0..n_patients-1 range, with no
+        # gaps, since n_patients is inferred as max(patient) + 1.
+        patient = np.array([0, 1, 2, 3, 4, 0, 1, 0, 5, 6])
+        n_patients = 7
     else:
         start = None
         patient = None
@@ -165,8 +167,8 @@ def test_bootstraps_simple(
     """Tests the bootstrap method on a simple handcrafted dataset."""
     dataset, n_patients = simple_dataset(use_patient, device)
 
-    boots = dataset.bootstraps(
-        n_bootstraps=n_bootstraps, batch_size=batch_size
+    boots = list(
+        dataset.bootstraps(n_bootstraps=n_bootstraps, batch_size=batch_size)
     )
     assert len(boots) == ceil(n_bootstraps / batch_size)
     assert sum([len(b) for b in boots]) == n_bootstraps
@@ -220,9 +222,9 @@ def test_bootstraps_stratification_1(
     dataset = dataset.to_torch(device).sort().count_deaths()
 
     # Retrieve our bootstraps in a single Resampling object:
-    boots = dataset.bootstraps(
-        n_bootstraps=n_bootstraps, batch_size=n_bootstraps
-    )[0]
+    boots = next(
+        dataset.bootstraps(n_bootstraps=n_bootstraps, batch_size=n_bootstraps)
+    )
 
     # Simple check on the shapes, as in test_bootstraps_simple():
     assert boots.patient_weights.shape == (n_bootstraps, n_intervals)

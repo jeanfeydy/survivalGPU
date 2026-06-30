@@ -17,6 +17,8 @@ dependencies = [
   "pykeops",
   "beartype",
   "jaxtyping",
+  "pandas",
+  "scipy",
 ]
 keywords = [
   "survival analysis",

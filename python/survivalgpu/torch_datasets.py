@@ -392,8 +392,7 @@ class TorchSurvivalDataset:
     def original_sample(self) -> Resampling:
         """Returns a Resampling object that corresponds to the original sample."""
 
-        indices = torch.unique(self.patient)
-        indices = indices.view(1, -1)
+        indices = self.patient_unique.view(1, -1)
 
         return Resampling(
             indices=indices,

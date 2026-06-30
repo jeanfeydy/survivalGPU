@@ -16,15 +16,59 @@ If you find this work useful, please cite:
 
 
 
-## Run tests
+## Python: setup
 
-In this directory, run:
+The Python package requires Python >= 3.10. From this directory, create and activate a
+virtual environment:
 
 ```bash
-pip install -e .[all]
+python3 -m venv .venv
+source .venv/bin/activate  # on Windows: .venv\Scripts\activate
 ```
 
-Then, you can run the pre-commit hooks with:
+Then install the package. For everyday use:
+
+```bash
+pip install -e .
+```
+
+To also pull in the tools needed to run the test suite and linters (`pytest`,
+`hypothesis`, `rpy2`, `black`, `flake8`, `pre-commit`...), use the `test` extra
+instead:
+
+```bash
+pip install -e .[test]
+```
+
+`pykeops`, one of the core dependencies, just-in-time compiles CUDA/C++ kernels,
+so a working C++ compiler is required; a CUDA-capable GPU is optional (the
+package will fall back to CPU otherwise).
+
+## Python: quickstart
+
+```python
+import numpy as np
+from survivalgpu import CoxPHSurvivalAnalysis
+
+# Three (start, stop] intervals, one covariate:
+stop = np.array([1, 1, 2], dtype=np.int64)
+event = np.array([0, 1, 1], dtype=np.int64)
+covariates = np.array([[1.0], [0.0], [4.0]])
+
+model = CoxPHSurvivalAnalysis(ties="efron")
+model.fit(covariates, stop, event=event)
+
+print(model.coef_)
+```
+
+See `python/survivalgpu/datasets.py` (e.g. `load_drugs`) for utilities to
+generate larger synthetic datasets, and `python/tests/` for further usage
+examples.
+
+## Run tests
+
+Once the package is installed with the `test` extra (see above), you can run
+the pre-commit hooks with:
 ```bash
 pre-commit install
 pre-commit run --all-files
@@ -33,6 +77,15 @@ pre-commit run --all-files
 And run the tests with:
 ```bash
 pytest
+```
+
+Note: `python/tests/test_wce_drugdata.py` cross-checks results against the R
+`WCE` package via `rpy2`, so it requires `WCE` to be installed in your R
+library (`install.packages("WCE")` from an R session; it is also listed as a
+`Suggests` dependency in `R/DESCRIPTION`). If it isn't installed, `pytest`
+will fail at collection for the whole suite; skip that file instead:
+```bash
+pytest --ignore=python/tests/test_wce_drugdata.py
 ```
 
 For the R `survivalGPU` package, go to the `survivalGPU/R` folder. Then, launch an R interactive session and run:
