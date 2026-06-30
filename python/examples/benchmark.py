@@ -1,6 +1,5 @@
 import numpy as np
-import torch
-from survivalgpu import coxph_torch, float32, int32, use_cuda
+from survivalgpu import coxph_numpy, use_cuda
 from survivalgpu.utils import numpy, timer
 
 np.set_printoptions(precision=4)
@@ -13,26 +12,25 @@ def benchmark(data, bootstrap=1, alpha=0.0):
         print(f"Backend: {backend} **************")
 
         for use_gpu in [False] + ([True] if use_cuda else []):
-            data_x = torch.tensor(data[:, 2:], dtype=float32)
-            data_times = torch.tensor(data[:, 0], dtype=int32)
-            data_deaths = torch.tensor(data[:, 1], dtype=int32)
+            data_x = data[:, 2:].astype(np.float64)
+            data_stop = data[:, 0].astype(np.int64)
+            data_deaths = data[:, 1].astype(np.int64)
 
-            if use_gpu:
-                data_x = data_x.cuda()
-                data_times = data_times.cuda()
-                data_deaths = data_deaths.cuda()
+            device = "cuda" if use_gpu else "cpu"
 
             start = timer()
 
-            out = coxph_torch(
+            out = coxph_numpy(
                 x=data_x,
-                times=data_times,
+                start=None,
+                stop=data_stop,
                 deaths=data_deaths,
                 ties="breslow",
                 bootstrap=bootstrap,
                 maxiter=20,
                 verbosity=0,
                 alpha=alpha,
+                device=device,
             )
 
             end = timer()

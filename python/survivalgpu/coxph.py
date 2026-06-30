@@ -56,6 +56,7 @@ class CoxPHSurvivalAnalysis:
         mode (str or None): One of "unit length", "start zero", "any".
             Assumptions made on the (start, stop] intervals.
             Defaults to None, which selects automatically the fastest backend.
+        dtype: np.float32 or np.float64. Defaults to np.float64.
     """
 
     @typecheck
@@ -68,7 +69,7 @@ class CoxPHSurvivalAnalysis:
         doscale: Bool = False,
         verbosity: Int = 0,
         mode: Literal["unit length", "start zero", "any"] | None = None,
-        dtype = float64,
+        dtype = np.float64,
         device = None,
         n_bootstraps: Int | None = None,
         batch_size: Int | None = None,
@@ -82,8 +83,11 @@ class CoxPHSurvivalAnalysis:
         self.mode = mode
         if dtype == np.float32:
             self.dtype = float32
-        if dtype == np.float64:
+        elif dtype == np.float64:
             self.dtype = float64
+        else:
+            msg = f"dtype should be np.float32 or np.float64. Received {dtype}."
+            raise ValueError(msg)
         self.device = device if device is not None else default_device
         self.n_bootstraps = n_bootstraps
         self.batch_size = batch_size

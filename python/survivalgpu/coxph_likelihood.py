@@ -1166,8 +1166,11 @@ def coxph_objective_from_scores(
         # - 1 patient that dies + 1 that is censored in the first strata of batch 1
         dataset = TorchSurvivalDataset(
             patient=torch.tensor([0, 1, 2, 3, 4, 5, 6]),
+            patient_unique=torch.tensor([0, 1, 2, 3, 4, 5, 6]),
             batch=torch.tensor([0, 0, 0, 0, 0, 1, 1]),
+            batch_interval=torch.tensor([0, 0, 0, 0, 0, 1, 1]),
             strata=torch.tensor([0, 0, 0, 1, 1, 0, 0]),
+            strata_patient=torch.tensor([0, 0, 0, 1, 1, 0, 0]),
             start=torch.tensor([0, 0, 0, 0, 0, 0, 0]),
             stop=torch.tensor([1, 1, 1, 1, 1, 1, 1]),
             event=torch.tensor([1, 1, 1, 1, 1, 0, 1]),
