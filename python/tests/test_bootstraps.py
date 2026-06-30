@@ -172,6 +172,8 @@ def test_bootstraps_simple(
     assert sum([len(b) for b in boots]) == n_bootstraps
 
     for it, res in enumerate(boots):
+
+        print("it:", it, "len(res):", len(res))
         if it < len(boots) - 1:
             b = batch_size
         else:

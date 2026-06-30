@@ -1,8 +1,8 @@
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
-from survivalgpu import device, float32, int32
-from survivalgpu.utils import numpy
+from survivalgpu import float32, int32
+from survivalgpu.utils import default_device, numpy
 from survivalgpu.wce_features import bspline_atoms, wce_features_batch
 
 if False:
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     cutoff = 20
 
     # Sampling times:
-    times = torch.arange(-5, cutoff + 10, device=device, dtype=int32)
+    times = torch.arange(-5, cutoff + 10, device=default_device, dtype=int32)
     N = len(times)
 
     # We study two patients on the same time-scale:
@@ -49,13 +49,13 @@ if __name__ == "__main__":
     # Ids to distinguish between patient 0 and patient 1:
     ids = torch.cat(
         (
-            torch.zeros(N, device=device, dtype=int32),
-            torch.ones(N, device=device, dtype=int32),
+            torch.zeros(N, device=default_device, dtype=int32),
+            torch.ones(N, device=default_device, dtype=int32),
         )
     )
 
     # Doses:
-    doses = torch.zeros(2 * N, device=device, dtype=float32)
+    doses = torch.zeros(2 * N, device=default_device, dtype=float32)
     doses[(times == 0) & (ids == 0)] = 1
 
     doses[(times == 5) & (ids == 1)] = 1
