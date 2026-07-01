@@ -3,9 +3,12 @@
 #
 # The suite compares survivalGPU against the reference R packages `survival`
 # and `WCE` through rpy2, so this job needs a working R + rpy2 pairing.
-# IMPORTANT: modern rpy2 (>= 3.6) links against R's `R_getVar` symbol, which
-# only exists in R >= 4.5.0. Pinning an older R (e.g. 4.4.x) makes rpy2 fail to
-# import with `undefined symbol: R_getVar`, which breaks pytest collection.
+# rpy2 is pinned to < 3.6 in pyproject.toml: the 3.6.x line is a namespace
+# meta-package split across rpy2-rinterface/rpy2-robjects with no Linux wheels,
+# so on Python 3.12 it is built from sdist and `import rpy2` fails
+# ("No module named 'rpy2'"). The monolithic 3.5.x line imports cleanly on all
+# supported Python versions and is matched here with the contemporaneous R 4.4.3
+# (3.5.x doesn't need R 4.5's `R_getVar` symbol).
 name: Python tests
 
 concurrency:
@@ -25,12 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.12 is excluded on purpose: rpy2 3.6.x ships no cp312 wheels, so it is
-        # built from sdist and the `rpy2` namespace package ends up unimportable
-        # ("No module named 'rpy2'"). 3.10/3.11 use prebuilt wheels and pass.
-        # (The install workflow still covers 3.12 — only the R-backed test suite
-        # can't run there yet.)
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
@@ -41,10 +39,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Setup R (>= 4.5 -- required by modern rpy2 for the R_getVar symbol)
+      - name: Setup R 4.4.3 (matched to the pinned rpy2 3.5.x)
         uses: r-lib/actions/setup-r@v2
         with:
-          r-version: "4.5"
+          r-version: "4.4.3"
           use-public-rspm: true
 
       - name: Install R reference packages (survival, WCE)

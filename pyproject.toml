@@ -36,7 +36,10 @@ classifiers = [
 
 [project.optional-dependencies]
 test = [
-  "rpy2",
+  # Pin to the monolithic 3.5.x line. rpy2 3.6.x is a namespace meta-package
+  # (rpy2-rinterface / rpy2-robjects) with no Linux wheels, so it is built from
+  # sdist and `import rpy2` fails on Python 3.12. See CI-CD-FIXES.md.
+  "rpy2<3.6",
   "ruff",
   "black",
   "flake8",
