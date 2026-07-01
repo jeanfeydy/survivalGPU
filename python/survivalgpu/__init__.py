@@ -1,3 +1,5 @@
+from . import _env_setup  # noqa: F401 -- must run first: sets CPATH for PyKeOps
+
 import torch
 
 from . import optimizers, utils

@@ -1,8 +1,0 @@
-numpy
-matplotlib
-torch
-pykeops
-beartype
-jaxtyping
-pandas
-scipy
