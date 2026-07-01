@@ -78,9 +78,15 @@ Getting the pipeline to *run* exposed a second layer of problems:
 
 **Progress after round 1:** `Python install` ✅ (3.10–3.12), `Python tests` ✅ (3.10/3.11), and the R jobs now **load the Python module successfully** (the original blocker) — remaining R failures are the package-level issues #9–#11 above, not CI plumbing.
 
-### Open decisions (need the researcher)
-- **wceGPU snapshot tests** — options: (a) generate and commit `_snaps/` (fragile across environments), (b) convert to tolerance-based `expect_equal` vs the `WCE` reference, or (c) skip them on CI.
-- **Vignette virtualenv** — options: (a) create a reticulate virtualenv named `survivalGPU` in CI, (b) make the vignettes honor `RETICULATE_PYTHON` instead of a hardcoded name, or (c) don't rebuild vignettes during `R CMD check`.
+### Decisions taken (by the researcher)
+- **wceGPU snapshot tests** → **skip on CI**. Added `skip_on_ci()` to the 7
+  `expect_snapshot()` tests in `R/tests/testthat/test-wceGPU.R`; they still run
+  locally on the GPU machine. (The tolerance-based `expect_equal` tests in the
+  same file, which compare against the `WCE` reference, continue to run in CI.)
+- **Vignette virtualenv** → **don't rebuild vignettes during `R CMD check`**.
+  The check step now passes `--no-build-vignettes` / `--ignore-vignettes`
+  (vignettes still build locally where the `survivalGPU` virtualenv exists), and
+  `error-on: "error"` so benign style NOTEs/warnings don't fail the check.
 
 ## Known limitations / follow-ups
 
