@@ -1,5 +1,11 @@
-# Install survivalGPU from source, run the tests and upload the coverage to Codecov
-# this workflow is triggered on pull request  and push to main branch
+# Install survivalGPU with its test dependencies, run the Python test suite,
+# and upload coverage to Codecov.
+#
+# The suite compares survivalGPU against the reference R packages `survival`
+# and `WCE` through rpy2, so this job needs a working R + rpy2 pairing.
+# IMPORTANT: modern rpy2 (>= 3.6) links against R's `R_getVar` symbol, which
+# only exists in R >= 4.5.0. Pinning an older R (e.g. 4.4.x) makes rpy2 fail to
+# import with `undefined symbol: R_getVar`, which breaks pytest collection.
 name: Python tests
 
 concurrency:
@@ -14,51 +20,58 @@ on:
   workflow_dispatch:
 
 jobs:
-  install_and_run_tests:
-
-    runs-on: ${{ matrix.os }}
+  tests:
+    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
+
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: pip
 
-      # R is needed to install rpy2 and run the tests against
-      # the reference R package survival
-      - name: Setup R
+      - name: Setup R (>= 4.5 -- required by modern rpy2 for the R_getVar symbol)
         uses: r-lib/actions/setup-r@v2
         with:
-          # Currently, rpy2 is broken for R 4.5.0.
-          # See https://github.com/rpy2/rpy2/issues/1164
-          r-version: 4.4.3
+          r-version: "4.5"
           use-public-rspm: true
 
-      - name: Install R dependencies
-        uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          extra-packages: any::rcmdcheck
-          needs: check
-          working-directory: "R/"
-
-      - name: Install package (with dependencies for tests)
+      - name: Install R reference packages (survival, WCE)
         run: |
-          pip install --upgrade pip
+          Rscript -e 'install.packages(c("survival", "WCE"), repos = "https://cloud.r-project.org")'
+        shell: bash
+
+      - name: Install package with test extras (CPU-only torch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -e .[test]
-          export LD_LIBRARY_PATH=$(python -m rpy2.situation LD_LIBRARY_PATH):${LD_LIBRARY_PATH}
 
-      - name: Test
+      - name: Wire rpy2 <-> R and PyKeOps headers (persist across steps)
         run: |
-          pytest
+          # Each `run:` is a fresh shell, so `export` would be lost before the
+          # test step. Persist through $GITHUB_ENV instead.
+          # LD_LIBRARY_PATH: lets rpy2 find libR.so at import time (rpy2 issue #1164).
+          echo "LD_LIBRARY_PATH=$(python -m rpy2.situation LD_LIBRARY_PATH):${LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+          # CPATH: lets PyKeOps find pybind11's headers when it JIT-compiles.
+          echo "CPATH=$(python -c 'import pybind11; print(pybind11.get_include())'):${CPATH}" >> "$GITHUB_ENV"
+
+      - name: Sanity check -- rpy2 imports and talks to R
+        run: |
+          python -c "import rpy2.robjects as ro; print(ro.r('R.version.string')[0])"
+
+      - name: Run tests
+        run: |
+          python -m pytest
 
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v4
         with:
           fail_ci_if_error: false

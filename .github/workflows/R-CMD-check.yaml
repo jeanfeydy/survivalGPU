@@ -1,5 +1,12 @@
 # Workflow derived from https://github.com/r-lib/actions/tree/v2/examples
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
+#
+# The R package calls the Python `survivalgpu` package through reticulate
+# (see R/R/survivalGPU-package.R). For R CMD check (which runs the R tests and
+# rebuilds the vignettes) to succeed, that Python package and all of its
+# dependencies (torch, pykeops, pybind11, ...) must be importable by the
+# interpreter reticulate uses -- hence the `pip install .` + RETICULATE_PYTHON
+# wiring below.
 name: R CMD check
 
 concurrency:
@@ -33,15 +40,15 @@ jobs:
       R_KEEP_PKG_SOURCE: yes
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: r-lib/actions/setup-pandoc@v2
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: 'pip' # caching pip dependencies
+          cache: pip
 
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
@@ -57,13 +64,22 @@ jobs:
           needs: check
           working-directory: "R/"
 
-      - name: Install Python dependencies
+      - name: Install the Python package and point reticulate at it
         run: |
           python -m pip install --upgrade pip
-          pip install ruff pytest pytest-cov hypothesis
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install torch-scatter -f https://data.pyg.org/whl/torch-2.0.0+cpu.html
-          pip install rpy2
+          # CPU-only torch on Linux to avoid the multi-GB CUDA download;
+          # the default PyPI wheel is already CPU/MPS on macOS.
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            pip install torch --index-url https://download.pytorch.org/whl/cpu
+          else
+            pip install torch
+          fi
+          pip install .
+          # Make reticulate use THIS interpreter (where survivalgpu + deps live),
+          # and help PyKeOps find pybind11's headers when it JIT-compiles.
+          echo "RETICULATE_PYTHON=$(which python)" >> "$GITHUB_ENV"
+          echo "CPATH=$(python -c 'import pybind11; print(pybind11.get_include())'):${CPATH}" >> "$GITHUB_ENV"
+        shell: bash
 
       - name: R CMD CHECK
         uses: r-lib/actions/check-r-package@v2
