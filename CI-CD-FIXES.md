@@ -65,6 +65,23 @@ readme"`.
   the stale `torch-scatter`/`requirements.txt` install with `pip install .`
   (CPU torch), and wired `RETICULATE_PYTHON` + `CPATH`.
 
+## Round 2: issues surfaced once CI actually ran
+
+Getting the pipeline to *run* exposed a second layer of problems:
+
+| # | Symptom | Root cause | Fix / status |
+|---|---------|------------|--------------|
+| 8 | `Python tests` green on 3.10/3.11 but **`No module named 'rpy2'` on 3.12** (despite "Successfully installed rpy2") | `rpy2` 3.6.x is a *meta-package*; the real code lives in `rpy2-rinterface`/`rpy2-robjects`, which have no cp312 wheels. On 3.12 they build from sdist and the `rpy2` namespace ends up unimportable. Upstream limitation. | Excluded 3.12 from the **tests** matrix (still covered by the **install** matrix). Documented. |
+| 9 | R tests: 6 × `Error: coxphGPU(...)` → `there is no package called 'data.table'` | `R/R/coxphGPU.R` calls `library(data.table)` and uses `data.table(...)`, but `data.table` was **not declared** in `R/DESCRIPTION`. Worked locally (installed), failed in CI. | Added `data.table` to `Imports` in `R/DESCRIPTION`. |
+| 10 | R tests: 7 × `wceGPU` "Failure … Adding new snapshot" | `test-wceGPU.R` uses `expect_snapshot()`, but there is no committed `R/tests/testthat/_snaps/` directory, so every run records a "new" snapshot = failure. Snapshotting GPU/CPU float output is also environment-fragile. | **Needs a decision** (see below). |
+| 11 | R CMD check: vignettes fail with `use_virtualenv("survivalGPU")` | The vignettes (`coxPH.Rmd`, `WCE.Rmd`, `python_connect.Rmd`) hardcode a reticulate virtualenv named `survivalGPU` that doesn't exist on CI. | **Needs a decision** (see below). |
+
+**Progress after round 1:** `Python install` ✅ (3.10–3.12), `Python tests` ✅ (3.10/3.11), and the R jobs now **load the Python module successfully** (the original blocker) — remaining R failures are the package-level issues #9–#11 above, not CI plumbing.
+
+### Open decisions (need the researcher)
+- **wceGPU snapshot tests** — options: (a) generate and commit `_snaps/` (fragile across environments), (b) convert to tolerance-based `expect_equal` vs the `WCE` reference, or (c) skip them on CI.
+- **Vignette virtualenv** — options: (a) create a reticulate virtualenv named `survivalGPU` in CI, (b) make the vignettes honor `RETICULATE_PYTHON` instead of a hardcoded name, or (c) don't rebuild vignettes during `R CMD check`.
+
 ## Known limitations / follow-ups
 
 - **CPU-only CI.** GitHub runners have no GPU, so GPU code paths are not
