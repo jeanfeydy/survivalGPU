@@ -29,6 +29,7 @@ class WCESurvivalAnalysis:
         n_knots: Int = 1,
         order: Int = 3,
         constrained: Literal["right", "left"] | None = None,
+        criterion: Literal["aic", "bic"] = "bic",
         survival_model=None,
         dtype = np.float64,
         device = None,
@@ -54,6 +55,12 @@ class WCESurvivalAnalysis:
             `order == 0` corresponds to a piecewise constant risk function,
             `order == 1` corresponds to a piecewise linear risk function,
             `order == 3` corresponds to a piecewise cubic risk function.
+        criterion
+            Which information criterion to report in `self.info_criterion_`: "aic"
+            (penalty = 2 per degree of freedom) or "bic" (penalty =
+            log(n_events) per degree of freedom). Defaults to "bic".
+            Matches the `my_bic_c()` formula from the reference `WCE` R
+            package.
         constrained
             Whether the B-splines should be constrained.
             Defaults to None (i.e. no constraint).
@@ -93,6 +100,7 @@ class WCESurvivalAnalysis:
         self.cutoff = cutoff
         self.n_knots = n_knots
         self.constrained = constrained
+        self.criterion = criterion
 
 
         if survival_model is None:
@@ -184,6 +192,22 @@ class WCESurvivalAnalysis:
             )
             raise ValueError(msg)
         self._constrained = new_c
+
+    # "criterion" only accepts two values: "aic" and "bic" -------------------------------
+    @property
+    def criterion(self):
+        return self._criterion
+
+    @criterion.setter
+    def criterion(self, new_criterion):
+        supported_values = ["aic", "bic"]
+        if new_criterion not in supported_values:
+            msg = (
+                f"criterion should be one of {supported_values}. "
+                f"Received {new_criterion}."
+            )
+            raise ValueError(msg)
+        self._criterion = new_criterion
 
     # The number of WCE features depends on n_knots, the order and constrained -----------
     @property
@@ -313,8 +337,8 @@ class WCESurvivalAnalysis:
 
         Results are stored as attributes: knots_, coef_, WCE_coef_,
         risk_function_, std_, SED_, means_, score_, loglik_, loglik_init_,
-        sctest_init_, hessian_, imat_, iter_, n_events_, BIC_, and (if
-        n_bootstraps is set) bootstrap_coef_, bootstrap_WCE_coef_,
+        sctest_init_, hessian_, imat_, iter_, n_events_, info_criterion_, and
+        (if n_bootstraps is set) bootstrap_coef_, bootstrap_WCE_coef_,
         bootstrap_risk_functions_.
         """
 
@@ -425,9 +449,11 @@ class WCESurvivalAnalysis:
         self.imat_ = self.survival_model.imat_
         self.iter_ = self.survival_model.iter_
         self.n_events_ = int(np.sum(event))
-         # Compute the BIC for the WCE model:
-        total_number_knots = self.n_knots + 4 if self.constrained is None else self.n_knots + 2
-        self.BIC_ = -2 * np.asarray(self.loglik_) + (total_number_knots + self.n_covariates) * np.log(self.n_events_)
+        # Compute the information criterion for the WCE model, matching the
+        # `my_bic_c()` formula from the reference `WCE` R package: AIC uses a
+        # penalty of 2 per degree of freedom, BIC uses log(n_events).
+        penalty_per_df = 2.0 if self.criterion == "aic" else np.log(self.n_events_)
+        self.info_criterion_ = -2 * np.asarray(self.loglik_) + (self.n_atoms + self.n_covariates) * penalty_per_df
 
 
     def HR(self,
@@ -475,6 +501,7 @@ def wce_numpy(
     n_knots: Int = 1,
     order: Int = 3,
     constrained: Literal["right", "left"] | None = None,
+    criterion: Literal["aic", "bic"] = "bic",
     strata: Int64Array["intervals"] | None = None,
     batch: Int64Array["intervals"] | None = None,
     init: Float64Array["fullcovariates"] | None = None,
@@ -502,6 +529,8 @@ def wce_numpy(
         order (int, optional): order of the B-splines. Defaults to 3.
         constrained ("left", "right" or None, optional): boundary constraint
             on the B-splines. Defaults to None.
+        criterion ("aic" or "bic", optional): information criterion reported
+            as "info_criterion" in the output. Defaults to "bic".
         strata ((I,) int64 array, optional): stratum id for each interval.
         batch ((I,) int64 array, optional): batch id for each interval.
         init ((fullcovariates,) float64 array, optional): initial values for
@@ -516,7 +545,7 @@ def wce_numpy(
 
     Returns:
         dict: with keys "knotsmat", "coef", "std", "WCE_coef", "SED",
-            "risk_function", "BIC", "means", "score", "sctest_init",
+            "risk_function", "info_criterion", "means", "score", "sctest_init",
             "loglik_init", "loglik", "hessian", "imat", "iter", and (if
             n_bootstraps is set) "bootstrap_coef", "bootstrap_WCE_coef",
             "bootstrap_risk_functions".
@@ -530,6 +559,7 @@ def wce_numpy(
         n_knots=n_knots,
         order=order,
         constrained=constrained,
+        criterion=criterion,
         survival_model=surv_model,
         n_bootstraps=n_bootstraps,
         batch_size=batch_size,
@@ -564,7 +594,7 @@ def wce_numpy(
         WCE_coef=model.WCE_coef_,
         SED=model.SED_,
         risk_function=model.risk_function_.cpu().numpy(),
-        BIC=model.BIC_,
+        info_criterion=model.info_criterion_,
         means=model.means_,
         score=model.score_,
         sctest_init=model.sctest_init_,
@@ -602,6 +632,7 @@ def wce_R(
     n_knots=1,
     order=3,
     constrained=None,
+    aic=False,
     bootstrap=None,
     # Cox parameters:
     profile=None,
@@ -629,6 +660,10 @@ def wce_R(
         order (int, optional): order of the B-splines. Defaults to 3.
         constrained (str or None, optional): one of "None"/None, "left"/"Left"/"l"/"L"
             or "right"/"Right"/"r"/"R". Defaults to None.
+        aic (bool, optional): if True, "info_criterion" in the output is the
+            AIC (penalty = 2 per degree of freedom); otherwise it is the BIC
+            (penalty = log(n_events) per degree of freedom). Matches the
+            `aic` argument of the reference `WCE` R package. Defaults to False.
         bootstrap (int): number of bootstrap resamples (0 disables bootstrapping).
             Must be set to an integer, since it is converted with int(bootstrap).
         profile (str, optional): if set, path where a Chrome trace of the
@@ -647,7 +682,7 @@ def wce_R(
 
     Returns:
         dict: with keys "knotsmat", "coef", "std", "WCE_coef", "SED",
-            "risk_function", "BIC", "means", "score", "sctest_init",
+            "risk_function", "info_criterion", "means", "score", "sctest_init",
             "loglik_init", "loglik", "hessian", "imat", "iter", and (if
             bootstrap > 0) "bootstrap_coef", "bootstrap_WCE_coef",
             "bootstrap_risk_functions".
@@ -737,6 +772,7 @@ def wce_R(
             n_knots=int(n_knots),
             order=int(order),
             constrained=constrained,
+            criterion="aic" if aic else "bic",
             strata=strata,
             batch=None,
             init=init,

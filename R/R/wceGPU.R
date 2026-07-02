@@ -23,14 +23,14 @@
 #'   or 'R' to constrain the weight function to smoothly go to zero for exposure
 #'   remote in time, and to 'Left' or 'L' to constrain the weight function to
 #'   start a zero for the current values.
-#' @param aic Logical. If TRUE, then the AIC is used to select the best fitting
-#'   model among those estimated for the different numbers of interior knots
-#'   requested with nknots. If FALSE, then the BIC is used instead of the AIC.
-#'   Default to FALSE (BIC). Note that the BIC implemented in WCE is the version
-#'   suggested by Volinsky and Raftery in Biometrics (2000), which corresponds
-#'   to BIC = 2 * log(PL) + p * log(d) where PL is the model's partial
+#' @param aic Logical. Controls which information criterion is reported in
+#'   `info.criterion`: the AIC if TRUE, the BIC if FALSE (default). Note that
+#'   the BIC implemented in WCE is the version suggested by Volinsky and
+#'   Raftery in Biometrics (2000), which corresponds to
+#'   BIC = -2 * log(PL) + p * log(d) where PL is the model's partial
 #'   likelihood, p is the number of estimated parameters and d is the number of
-#'   uncensored events. See Sylvestre and Abrahamowicz (2009) for more details.
+#'   uncensored events; the AIC replaces the log(d) penalty with 2. See
+#'   Sylvestre and Abrahamowicz (2009) for more details.
 #' @param id Name of the variable in data corresponding to the identification of
 #'   subjects.
 #' @param event Name of the variable in data corresponding to event indicator.
@@ -151,7 +151,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   wce <- wce_R(
     data = data, ids = id, covars = py_covariates, start = start, stop = stop,
     doses = expos, events = event, n_knots = nknots,
-    constrained = py_constrained, cutoff = cutoff,
+    constrained = py_constrained, cutoff = cutoff, aic = aic,
     bootstrap = nbootstraps, batchsize = batchsize,
     device = device, double_precision = double_precision,
   )
@@ -216,7 +216,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   names(data)[names(data) == event] <- "Event"
   nevents <- length(data$Event[data$Event == 1])
 
-  BIC <- c(wce$BIC)
+  info_criterion <- c(wce$info_criterion)
 
 
 
@@ -234,8 +234,8 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     loglik = loglik,
     constrained = constrained,
     nevents = nevents,
-    aic = FALSE,
-    info.criterion = BIC,
+    aic = aic,
+    info.criterion = info_criterion,
     nknots = nknots,
     confint = confint,
     nbootstraps = nbootstraps,
