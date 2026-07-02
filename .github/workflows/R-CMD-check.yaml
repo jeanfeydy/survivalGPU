@@ -59,11 +59,11 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install ruff pytest pytest-cov hypothesis
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install torch-scatter -f https://data.pyg.org/whl/torch-2.0.0+cpu.html
-          pip install rpy2
+          pip install --upgrade pip
+          pip install -e .[test]
+          # Point reticulate at this interpreter instead of letting it
+          # auto-provision its own bare ephemeral Python.
+          echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
 
       - name: R CMD CHECK
         uses: r-lib/actions/check-r-package@v2
