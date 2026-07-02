@@ -83,11 +83,15 @@ if (use_cuda()) {
 }
 ```
 
-You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula.
+You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula. If you use `bootstrap`, `patient_id` must be provided: it identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates).
 
 ```{r coxphGPU}
+lung <- lung[stats::complete.cases(lung[c("time", "status", "age", "sex", "ph.ecog")]), ]
+lung$id <- seq_len(nrow(lung)) # one row per patient here, so a row index works as patient_id
+
 coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
                                data = lung,
+                               patient_id = "id",
                                bootstrap = n_bootstrap,
                                batchsize = batchsize,
                                ties = "breslow")

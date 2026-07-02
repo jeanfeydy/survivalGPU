@@ -1,7 +1,7 @@
 ---
 title: "survivalGPU : Fast survival analysis"
 author: "Alexis van STRAATEN"
-date: "2026-07-02"
+date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{survivalGPU : Fast survival analysis}
@@ -9,9 +9,15 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-<!-- survivalGPU.Rmd.orig produces survivalGPU.Rmd; please edit survivalGPU.Rmd.orig and run vignettes/precompile.R -->
-
-
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.align = "center",
+  fig.height = 3.5,
+  fig.width = 5
+)
+```
 
 
 The survivalGPU library allows you to perform survival analyzes using the resources of Graphic Processing Units (GPU) in order to accelerate the speed of calculations. Currently, two models have been implemented :
@@ -23,8 +29,7 @@ It's also possible to use the library without having Graphics Processing Units (
 
 An important thing for this package was to take the same inputs from `survival::coxph()` for Cox models and `WCE::WCE` for WCE models. So after being inspired by these functions, they were rewritten in python with CUDA to make it compatible with CUDA drivers.
 
-
-``` r
+```{r setup}
 library(survivalGPU)
 library(survival)
 library(WCE)
@@ -35,8 +40,7 @@ For the examples, we will define in advance the number of bootstraps we will use
 Batchsize argument is used to put a limit on the number of models to do at the same time. This is very important if you want to run several bootstraps, because too many models at the same time can saturate the RAM memory. Also, the number of bootstrap should be a multiple of the batchsize.
 
 
-
-``` r
+```{r cuda}
 if (use_cuda()) {
   n_bootstrap <- 1000
   batchsize <- 200
@@ -48,17 +52,9 @@ if (use_cuda()) {
 
 Let's make an example with `drugdata` dataset from WCE package.
 
-
-``` r
+```{r data}
 data(drugdata)
 head(drugdata)
-#>   Id Event Start Stop sex age dose
-#> 1  1     0     0    1   1  40    0
-#> 2  1     0     1    2   1  40    0
-#> 3  1     0     2    3   1  40    0
-#> 4  1     0     3    4   1  40    0
-#> 5  1     0     4    5   1  40    0
-#> 6  1     0     5    6   1  40    0
 ```
 
 
@@ -68,76 +64,26 @@ head(drugdata)
 
 The `summary` of a coxphGPU object is the same as a coxph object, a table with the estimated coefficients for the covariates, standards errors, and a significance test (Pr(>|z|)).
 
-
-``` r
+```{r}
 coxphGPU <- coxphGPU(
   formula = Surv(time = Start, time2 = Stop, event = Event) ~ sex + age,
   data = drugdata
 )
 
 summary(coxphGPU)
-#> Call:
-#> coxphGPU.default(formula = Surv(time = Start, time2 = Stop, event = Event) ~
-#>     sex + age, data = drugdata)
-#>
-#>   n= 77038, number of events= 383
-#>
-#>         coef exp(coef) se(coef)     z Pr(>|z|)
-#> sex 0.620634  1.860106 0.117783 5.269 1.37e-07 ***
-#> age 0.010696  1.010754 0.003964 2.698  0.00697 **
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#>
-#>     exp(coef) exp(-coef) lower .95 upper .95
-#> sex     1.860     0.5376     1.477     2.343
-#> age     1.011     0.9894     1.003     1.019
-#>
-#> Concordance= 0.59  (se = 0.018 )
-#> Likelihood ratio test= 33.88  on 2 df,   p=4e-08
-#> Wald test            = 36.27  on 2 df,   p=1e-08
-#> Score (logrank) test = 37.27  on 2 df,   p=8e-09
 ```
 
-The advantage of survivalGPU is to use bootstrap more easily. The `summary` gives the results for the initial model without bootstrap, and at the end, confidence interval for estimates covariates with bootstrap, according to `conf.int` argument. Whenever `bootstrap > 0`, `patient_id` must also be provided: it identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (`drugdata` has several rows per patient, identified by the `Id` column).
+The advantage of survivalGPU is to use bootstrap more easily. The `summary` gives the results for the initial model without bootstrap, and at the end, confidence interval for estimates covariates with bootstrap, according to `conf.int` argument.
 
-
-``` r
+```{r}
 coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   data = drugdata,
-  patient_id = "Id",
   bootstrap = n_bootstrap,
   batchsize = batchsize,
   all.results = FALSE
 )
 
 summary(coxphGPU_bootstrap)
-#> Call:
-#> coxphGPU.default(formula = Surv(Start, Stop, Event) ~ sex + age,
-#>     data = drugdata, patient_id = "Id", bootstrap = n_bootstrap,
-#>     batchsize = batchsize, all.results = FALSE)
-#>
-#>   n= 77038, number of events= 383
-#>
-#>         coef exp(coef) se(coef)     z Pr(>|z|)
-#> sex 0.620634  1.860106 0.117783 5.269 1.37e-07 ***
-#> age 0.010696  1.010754 0.003964 2.698  0.00697 **
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#>
-#>     exp(coef) exp(-coef) lower .95 upper .95
-#> sex     1.860     0.5376     1.477     2.343
-#> age     1.011     0.9894     1.003     1.019
-#>
-#> Concordance= 0.59  (se = 0.018 )
-#> Likelihood ratio test= 33.88  on 2 df,   p=4e-08
-#> Wald test            = 36.27  on 2 df,   p=1e-08
-#> Score (logrank) test = 37.27  on 2 df,   p=8e-09
-#>
-#>  ----------------
-#> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
-#>        2.5%   97.5%
-#> sex 1.36896 2.39688
-#> age 1.00335 1.01537
 ```
 
 
@@ -145,8 +91,7 @@ summary(coxphGPU_bootstrap)
 
 In the same idea as the Cox model, `wceGPU` uses the same arguments as the `WCE::WCE` function. The summary changes slightly with the appearance of confidence intervals without bootstrap for the estimators of the covariates.
 
-
-``` r
+```{r, eval=FALSE}
 wce_gpu <- wceGPU(
   data = drugdata, nknots = 1, cutoff = 90, id = "Id",
   event = "Event", start = "Start", stop = "Stop",
@@ -159,15 +104,13 @@ summary(wce_gpu)
 
 We can display the risk function of the model in order to observe the weights attributed to each time until the defined cutoff.
 
-
-``` r
+```{r, eval=FALSE}
 plot(wce_gpu)
 ```
 
 By applying `wceGPU()` with bootstrap, we obtain the confidence intervals for the estimates of the covariates and the risk function on each time, in addition to the information on the initial model without bootstrap.
 
-
-``` r
+```{r, eval=FALSE}
 wce_gpu_bootstrap <- wceGPU(
   data = drugdata, nknots = 1, cutoff = 90, id = "Id",
   event = "Event", start = "Start", stop = "Stop",
@@ -181,8 +124,7 @@ summary(wce_gpu_bootstrap)
 
 Now we can see the estimated risk function with the confidence intervals thanks to the bootstrap.
 
-
-``` r
+```{r, eval=FALSE}
 plot(wce_gpu_bootstrap)
 ```
 

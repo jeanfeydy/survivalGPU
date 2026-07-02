@@ -12,8 +12,8 @@ The survivalGPU library allows you to perform survival analyzes using
 the resources of Graphic Processing Units (GPU) in order to accelerate
 the speed of calculations. Currently, two models have been implemented :
 
-- Cox Proportional Hazards regression model
-- Weighted Cumulative Exposure model
+-   Cox Proportional Hazards regression model
+-   Weighted Cumulative Exposure model
 
 It’s also possible to use the library without having Graphics Processing
 Units (with CPU).
@@ -22,10 +22,10 @@ Units (with CPU).
 
 survivalGPU is a package based on a package written in python, dependent
 on the `reticulate` R package. To use it, it’s necessary to have
-installed some python libraries such as `torch` and `pykeops`.
-To use survivalGPU, you can create a virtual python
-environment through `reticulate`. It’s highly recommended to not to use
-the default python executable.
+installed some python libraries such as `torch` and `pykeops`. To use
+survivalGPU, you can create a virtual python environment through
+`reticulate`. It’s highly recommended to not to use the default python
+executable.
 
 ``` r
 library(reticulate)
@@ -70,6 +70,7 @@ Check if CUDA is detected :
 
 ``` r
 use_cuda()
+#> [KeOps] Warning : CUDA libraries not found or could not be loaded; Switching to CPU only.
 #> [1] FALSE
 ```
 
@@ -89,11 +90,19 @@ if (use_cuda()) {
 
 You can realize the Cox model with the `coxphGPU()` function, which is
 written in the same way as the `survival::coxph()` function from
-survival package, with a Surv object in the formula.
+survival package, with a Surv object in the formula. If you use
+`bootstrap`, `patient_id` must be provided: it identifies each patient
+(subject) in `data`, so that bootstrap resampling is performed at the
+patient level rather than at the row level (relevant when a patient has
+several rows, e.g. with time-varying covariates).
 
 ``` r
+lung <- lung[stats::complete.cases(lung[c("time", "status", "age", "sex", "ph.ecog")]), ]
+lung$id <- seq_len(nrow(lung)) # one row per patient here, so a row index works as patient_id
+
 coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
                                data = lung,
+                               patient_id = "id",
                                bootstrap = n_bootstrap,
                                batchsize = batchsize,
                                ties = "breslow")
@@ -108,14 +117,14 @@ interval is also estimated for coefficients by bootstrap (if bootstrap
 summary(coxphGPU_bootstrap)
 #> Call:
 #> coxphGPU.default(formula = Surv(time, status) ~ age + sex + ph.ecog,
-#>     data = lung, ties = "breslow", bootstrap = n_bootstrap, batchsize = batchsize)
+#>     data = lung, ties = "breslow", patient_id = "id", bootstrap = n_bootstrap,
+#>     batchsize = batchsize)
 #>
 #>   n= 227, number of events= 164
-#>    (1 observation effacée parce que manquante)
 #>
 #>              coef exp(coef)  se(coef)      z Pr(>|z|)
 #> age      0.011041  1.011102  0.009267  1.191    0.233
-#> sex     -0.551889  0.575861  0.167742 -3.290    0.001 **
+#> sex     -0.551890  0.575861  0.167742 -3.290    0.001 **
 #> ph.ecog  0.462947  1.588749  0.113574  4.076 4.58e-05 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
@@ -133,9 +142,9 @@ summary(coxphGPU_bootstrap)
 #>  ----------------
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>             2.5%    97.5%
-#> age     0.996991 1.026560
-#> sex     0.405905 0.782716
-#> ph.ecog 1.285360 1.898860
+#> age     0.998209 1.027550
+#> sex     0.429259 0.747363
+#> ph.ecog 1.276450 2.033300
 ```
 
 To visualize your model, you can plot adjusted survival curves with
@@ -147,7 +156,7 @@ survminer::ggadjustedcurves(coxphGPU_bootstrap,
                             data = lung)
 ```
 
-<img src="man/figures/README-unnamed-chunk-8-1.png" width="70%" />
+<img src="man/figures/README-unnamed-chunk-8-1.png" alt="" width="70%" />
 
 If you have no model, it’s possible to estimate survival curves with
 Kaplan-Meier estimation by `survival::survfit()`, and you can use
@@ -159,6 +168,6 @@ plot a forestplot of your model. All is explain in the
 
 ## Vignettes
 
-- `vignette("coxPH")`
-- `vignette("WCE")`
-- `vignette("python_connect")`
+-   `vignette("coxPH")`
+-   `vignette("WCE")`
+-   `vignette("python_connect")`

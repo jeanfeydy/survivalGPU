@@ -4,14 +4,18 @@
 #'   to use (or not) your GPU to speed up calculations, in particular for
 #'   bootstrap.
 #'
-#' @usage coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 0,
-#'          batchsize = 0, init, all.results = FALSE, control,
+#' @usage coxphGPU(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
+#'          bootstrap = 0, batchsize = 0, init, all.results = FALSE, control,
 #'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
 #'
 #' @inheritParams survival::coxph
 #' @param formula a formula object, with the response on the left of a ~
 #'   operator, and the terms on the right. The response must be a survival
 #'   object as returned by the Surv function.
+#' @param patient_id Name of the column in `data` that identifies each patient
+#'   (subject). Required if `bootstrap > 0`, so that bootstrap resampling is
+#'   performed at the patient level rather than at the row level (a patient
+#'   can have several rows, e.g. with time-varying covariates).
 #' @param bootstrap Number of repeats for the bootstrap cross-validation.
 #' @param batchsize Number of bootstrap copies that should be handled at a time.
 #'   Defaults to 0, which means that we handle all copies at once. If you run
@@ -60,6 +64,7 @@
 #'
 #' coxph_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
 #'                             data = drugdata,
+#'                             patient_id = "Id",
 #'                             bootstrap = n_bootstrap,
 #'                             batchsize = batchsize)
 #'

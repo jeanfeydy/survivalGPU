@@ -5,8 +5,8 @@
 \alias{summary.coxphGPU}
 \title{Fast Cox Proportional Hazards Regression Model}
 \usage{
-coxphGPU(formula, data, ties = c("efron", "breslow"), bootstrap = 1,
-         batchsize = 0, init, all.results = FALSE, control,
+coxphGPU(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
+         bootstrap = 0, batchsize = 0, init, all.results = FALSE, control,
          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
 
 \method{summary}{coxphGPU}(object, ..., conf.int = 0,95, scale = 1)
@@ -32,6 +32,11 @@ object as returned by the Surv function.}
     equivalent to a conditional logistic model, and is appropriate when
     the times are a small set of discrete values.
   }
+
+\item{patient_id}{Name of the column in \code{data} that identifies each patient
+(subject). Required if \code{bootstrap > 0}, so that bootstrap resampling is
+performed at the patient level rather than at the row level (a patient
+can have several rows, e.g. with time-varying covariates).}
 
 \item{bootstrap}{Number of repeats for the bootstrap cross-validation.}
 
@@ -144,6 +149,7 @@ if (use_cuda()) {
 
 coxph_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
                             data = drugdata,
+                            patient_id = "Id",
                             bootstrap = n_bootstrap,
                             batchsize = batchsize)
 
