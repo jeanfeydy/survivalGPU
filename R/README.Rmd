@@ -28,40 +28,24 @@ It's also possible to use the library without having Graphics Processing Units (
 
 ## Installation
 
-survivalGPU is a package based on a package written in python, dependent on the `reticulate` R package. To use it, it's necessary to have installed some python libraries such as `torch`, `torch-scatter`, and `pykeops`. To use survivalGPU, you can create a virtual python environment through `reticulate`. It's highly recommended to not to use the default python executable.
+survivalGPU is a package based on a package written in python, dependent on the `reticulate` R package. To use it, it's necessary to have installed some python libraries such as `torch` and `pykeops`. To use survivalGPU, you can create a virtual python environment through `reticulate`. It's highly recommended to not to use the default python executable.
 
 ```{r, eval=FALSE}
 library(reticulate)
 
 virtualenv_create("survivalGPU")
-virtualenv_install("survivalGPU", packages = c("torch", "torch_scatter",
-                                               "pykeops", "matplotlib",
+virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
                                                "beartype", "jaxtyping"))
 # torch takes a long time to set up
 ```
 
 To configure properly and understand your python environment, check `vignette("python_connect")`
 
-survivalGPU require submodules : you can install the development version of survivalGPU from [GitHub](https://github.com/) with `install_git_with_submodule()`:
+The R package and its Python backend live together in the same [GitHub](https://github.com/) repository (no git submodule involved), so you can install the development version of survivalGPU directly with:
 
 ```{r, eval=FALSE}
-# install.packages("devtools")
-
-install_git_with_submodule <- function(x, subdir) {
-  install_dir <- tempfile()
-  system(paste("git clone --recursive", shQuote(x), shQuote(install_dir)))
-
-  # change name for windows install
-  file.rename(file.path(install_dir, "R/inst/python/survivalgpu"),
-              file.path(install_dir, "R/inst/python/survivalgpu_submodule"))
-  file.copy(file.path(install_dir, "python/survivalgpu"),
-            file.path(install_dir, "R/inst/python"), recursive = TRUE)
-
-  devtools::install(file.path(file.path(install_dir, subdir)))
-}
-
-install_git_with_submodule("https://github.com/jeanfeydy/survivalGPU",
-                           subdir = "R")
+# install.packages("remotes")
+remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")
 ```
 
 > **Warning**: Currently, survivalGPU is not available for Windows.

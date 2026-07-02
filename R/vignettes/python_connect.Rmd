@@ -16,7 +16,7 @@ knitr::opts_chunk$set(
 ```
 
 
-survivalGPU is a package based on a package written in python, dependent on the `reticulate` R package. To use it, it's necessary to have installed some python libraries such as `torch`, `torch-scatter`, and `pykeops` in your python environment.
+survivalGPU is a package based on a package written in python, dependent on the `reticulate` R package. To use it, it's necessary to have installed some python libraries such as `torch` and `pykeops` in your python environment.
 
 Maybe it's installed in your python default system, but it's better if your create your own virtualenv for your project. Let's make the steps to configure properly a virtual python environment to use `survivalGPU` in R.
 
@@ -30,8 +30,7 @@ virtualenv_list()
 py_list_packages(envname = "survivalGPU") # numpy by default
 
 # now, install all the survivalgpu python dependencies
-virtualenv_install("survivalGPU", packages = c("torch", "torch_scatter",
-                                               "pykeops", "matplotlib",
+virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
                                                "beartype", "jaxtyping"))
 py_list_packages(envname = "survivalGPU")
 ```

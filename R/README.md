@@ -39,28 +39,13 @@ virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
 To configure properly and understand your python environment, check
 `vignette("python_connect")`
 
-survivalGPU require submodules : you can install the development version
-of survivalGPU from [GitHub](https://github.com/) with
-`install_git_with_submodule()`:
+The R package and its Python backend live together in the same
+[GitHub](https://github.com/) repository (no git submodule involved), so
+you can install the development version of survivalGPU directly with:
 
 ``` r
-# install.packages("devtools")
-
-install_git_with_submodule <- function(x, subdir) {
-  install_dir <- tempfile()
-  system(paste("git clone --recursive", shQuote(x), shQuote(install_dir)))
-
-  # change name for windows install
-  file.rename(file.path(install_dir, "R/inst/python/survivalgpu"),
-              file.path(install_dir, "R/inst/python/survivalgpu_submodule"))
-  file.copy(file.path(install_dir, "python/survivalgpu"),
-            file.path(install_dir, "R/inst/python"), recursive = TRUE)
-
-  devtools::install(file.path(file.path(install_dir, subdir)))
-}
-
-install_git_with_submodule("https://github.com/jeanfeydy/survivalGPU",
-                           subdir = "R")
+# install.packages("remotes")
+remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")
 ```
 
 > **Warning**: Currently, survivalGPU is not available for Windows.
