@@ -193,22 +193,6 @@ class WCESurvivalAnalysis:
             raise ValueError(msg)
         self._constrained = new_c
 
-    # "criterion" only accepts two values: "aic" and "bic" -------------------------------
-    @property
-    def criterion(self):
-        return self._criterion
-
-    @criterion.setter
-    def criterion(self, new_criterion):
-        supported_values = ["aic", "bic"]
-        if new_criterion not in supported_values:
-            msg = (
-                f"criterion should be one of {supported_values}. "
-                f"Received {new_criterion}."
-            )
-            raise ValueError(msg)
-        self._criterion = new_criterion
-
     # The number of WCE features depends on nknots, the order and constrained -----------
     @property
     def n_atoms(self):
