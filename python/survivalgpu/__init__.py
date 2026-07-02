@@ -1,6 +1,10 @@
 import torch
 
-from . import optimizers, utils
+from . import (
+    _env_setup,  # -- must run first: sets CPATH for PyKeOps
+    optimizers,
+    utils,
+)
 from .coxph import CoxPHSurvivalAnalysis, coxph_numpy, coxph_R
 from .simulations import (
     ConstantCovariate,
