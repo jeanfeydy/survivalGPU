@@ -17,7 +17,7 @@ with conversion.localconverter(conv + pandas2ri.converter):
 #
 
 model_survivalgpu_1knot = WCESurvivalAnalysis(
-    cutoff=180, constrained="right", n_knots=1
+    cutoff=180, constrained="right", nknots=1
 )
 
 model_survivalgpu_1knot.fit(

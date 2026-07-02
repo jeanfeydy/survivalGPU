@@ -403,8 +403,8 @@ class TorchSurvivalDataset:
     def bootstraps(
         self,
         *,
-        n_bootstraps: int,
-        batch_size: int | None,
+        nbootstraps: int,
+        batchsize: int | None,
         stratify: bool = True,
     ) -> Iterator[Resampling]:
         """Returns a generator of Resampling objects that correspond to bootstrap samples.
@@ -435,8 +435,8 @@ class TorchSurvivalDataset:
 
 
         Args:
-            n_bootstraps (int): The number of bootstrap samples to generate.
-            batch_size (int): The number of bootstrap samples that should be handled
+            nbootstraps (int): The number of bootstrap samples to generate.
+            batchsize (int): The number of bootstrap samples that should be handled
                 simultaneously by the CoxPH optimizer.
             stratify (bool): If True, the bootstrap samples are stratified according
                 to the values of the `batch` and `strata` vectors.
@@ -525,10 +525,10 @@ class TorchSurvivalDataset:
         # i.e. strata_values[...] will be a uniform distribution in the set of patient
         # ids that belong to the strata.
 
-        if batch_size is None:
-            batch_size = n_bootstraps
-        for s in range(0, n_bootstraps, batch_size):
-            B = min(batch_size, n_bootstraps - s)
+        if batchsize is None:
+            batchsize = nbootstraps
+        for s in range(0, nbootstraps, batchsize):
+            B = min(batchsize, nbootstraps - s)
             rnd = torch.rand(
                 (B, P),
                 dtype=torch.float32,

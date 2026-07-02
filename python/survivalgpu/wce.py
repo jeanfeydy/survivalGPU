@@ -26,34 +26,41 @@ class WCESurvivalAnalysis:
         self,
         *,
         cutoff: Int,
-        n_knots: Int = 1,
+        nknots: Int = 1,
         order: Int = 3,
         constrained: Literal["right", "left"] | None = None,
+        criterion: Literal["aic", "bic"] = "bic",
         survival_model=None,
         dtype = np.float64,
         device = None,
-        n_bootstraps: Int | None = None,
-        batch_size: Int | None = None,
+        nbootstraps: Int | None = None,
+        batchsize: Int | None = None,
 
     ):
         """Weighted Cumulative Exposure Model that combines B-spline time-varying features with a CoxPH analysis.
 
         The total number of degrees of freedom for the risk function (i.e. WCE covariates)
         is equal to:
-            n_knots + order + 1 if constrained is None,
-            n_knots + 2         if constrained is "left" or "right".
+            nknots + order + 1 if constrained is None,
+            nknots + 2         if constrained is "left" or "right".
 
         Parameters
     ----------
         cutoff
             Size of the time window for the risk function.
-        n_knots
+        nknots
             Number of knots for the B-splines.
         order
             Order of the B-splines used to model the risk function.
             `order == 0` corresponds to a piecewise constant risk function,
             `order == 1` corresponds to a piecewise linear risk function,
             `order == 3` corresponds to a piecewise cubic risk function.
+        criterion
+            Which information criterion to report in `self.info_criterion_`: "aic"
+            (penalty = 2 per degree of freedom) or "bic" (penalty =
+            log(n_events) per degree of freedom). Defaults to "bic".
+            Matches the `my_bic_c()` formula from the reference `WCE` R
+            package.
         constrained
             Whether the B-splines should be constrained.
             Defaults to None (i.e. no constraint).
@@ -80,10 +87,10 @@ class WCESurvivalAnalysis:
         device
             Device (e.g. "cpu" or "cuda") on which to run the computations.
             Defaults to the best available device.
-        n_bootstraps
+        nbootstraps
             Number of bootstrap resamples to fit, in addition to the main model.
             Defaults to None (i.e. no bootstrapping).
-        batch_size
+        batchsize
             Number of bootstrap resamples to process at once on the GPU.
             Defaults to None, i.e. all the bootstraps are processed at once.
         """
@@ -91,8 +98,9 @@ class WCESurvivalAnalysis:
         # Note that all type and value checks are performed in the attribute setters:
         self.order = order
         self.cutoff = cutoff
-        self.n_knots = n_knots
+        self.nknots = nknots
         self.constrained = constrained
+        self.criterion = criterion
 
 
         if survival_model is None:
@@ -100,7 +108,7 @@ class WCESurvivalAnalysis:
 
         if isinstance(survival_model, CoxPHSurvivalAnalysis):
             survival_model = CoxPHSurvivalAnalysis(
-                maxiter=20, device=device, n_bootstraps=n_bootstraps, batch_size=batch_size, dtype = dtype
+                maxiter=20, device=device, nbootstraps=nbootstraps, batchsize=batchsize, dtype = dtype
             )
 
 
@@ -118,11 +126,11 @@ class WCESurvivalAnalysis:
 
         self.device = device if device is not None else default_device
 
-        if n_bootstraps == 0:
-            n_bootstraps = None
+        if nbootstraps == 0:
+            nbootstraps = None
 
-        self.n_bootstraps = n_bootstraps
-        self.batch_size = batch_size
+        self.nbootstraps = nbootstraps
+        self.batchsize = batchsize
 
 
 
@@ -153,12 +161,12 @@ class WCESurvivalAnalysis:
 
     # The number of extra knots should be an integer >= 0 --------------------------------
     @property
-    def n_knots(self):
-        return self._n_knots
+    def nknots(self):
+        return self._nknots
 
-    @n_knots.setter
-    def n_knots(self, new_n):
-        self.set_non_negative_int(new_n, "n_knots")
+    @nknots.setter
+    def nknots(self, new_n):
+        self.set_non_negative_int(new_n, "nknots")
 
     # The cutoff value should be an integer >= 0 -----------------------------------------
     @property
@@ -185,14 +193,30 @@ class WCESurvivalAnalysis:
             raise ValueError(msg)
         self._constrained = new_c
 
-    # The number of WCE features depends on n_knots, the order and constrained -----------
+    # "criterion" only accepts two values: "aic" and "bic" -------------------------------
+    @property
+    def criterion(self):
+        return self._criterion
+
+    @criterion.setter
+    def criterion(self, new_criterion):
+        supported_values = ["aic", "bic"]
+        if new_criterion not in supported_values:
+            msg = (
+                f"criterion should be one of {supported_values}. "
+                f"Received {new_criterion}."
+            )
+            raise ValueError(msg)
+        self._criterion = new_criterion
+
+    # The number of WCE features depends on nknots, the order and constrained -----------
     @property
     def n_atoms(self):
         if self.constrained is None:
-            return self.n_knots + self.order + 1
+            return self.nknots + self.order + 1
         else:
             # TODO: fix when self.order != 3
-            return self.n_knots + 2
+            return self.nknots + 2
 
     # Functions related to the B-Spline atoms --------------------------------------------
     def _constrain(self, features):
@@ -207,7 +231,7 @@ class WCESurvivalAnalysis:
             truncated features ((N,D) or (N,D-(order-1)) tensor: Relevant WCE features.
         """
         assert len(features.shape) == 2
-        assert features.shape[1] == self.n_knots + self.order + 1
+        assert features.shape[1] == self.nknots + self.order + 1
 
         # TODO: fix when self.order != 3
 
@@ -230,7 +254,7 @@ class WCESurvivalAnalysis:
     def atoms(self):
         """Samples the B-spline basis functions on the interval [0, cutoff-1]."""
         atoms, _ = bspline_atoms(
-            cutoff=self.cutoff, order=self.order, nknots=self.n_knots, dtype=self.dtype,
+            cutoff=self.cutoff, order=self.order, nknots=self.nknots, dtype=self.dtype,
             device=self.device,
         )
         atoms = self._constrain(atoms)
@@ -264,7 +288,7 @@ class WCESurvivalAnalysis:
             ids=patient,
             times=time,
             doses=dose,
-            nknots=self.n_knots,
+            nknots=self.nknots,
             cutoff=self.cutoff,
             order=self.order,
             dtype=self.dtype,
@@ -313,8 +337,8 @@ class WCESurvivalAnalysis:
 
         Results are stored as attributes: knots_, coef_, WCE_coef_,
         risk_function_, std_, SED_, means_, score_, loglik_, loglik_init_,
-        sctest_init_, hessian_, imat_, iter_, n_events_, BIC_, and (if
-        n_bootstraps is set) bootstrap_coef_, bootstrap_WCE_coef_,
+        sctest_init_, hessian_, imat_, iter_, n_events_, info_criterion_, and
+        (if nbootstraps is set) bootstrap_coef_, bootstrap_WCE_coef_,
         bootstrap_risk_functions_.
         """
 
@@ -384,9 +408,9 @@ class WCESurvivalAnalysis:
         assert self.SED_.shape == (n_batch, self.n_atoms)
 
         # Batch coefficients: --------------------------------------------------
-        if self.n_bootstraps is not None:
+        if self.nbootstraps is not None:
             assert self.survival_model.bootstrap_coef_.shape == (
-                self.n_bootstraps,
+                self.nbootstraps,
                 n_batch,
                 self.n_covariates + self.n_atoms,
             )
@@ -396,7 +420,7 @@ class WCESurvivalAnalysis:
                 :, :, : self.n_covariates
             ]
             assert self.bootstrap_coef_.shape == (
-                self.n_bootstraps,
+                self.nbootstraps,
                 n_batch,
                 self.n_covariates,
             )
@@ -406,14 +430,14 @@ class WCESurvivalAnalysis:
                 :, :, self.n_covariates :
             ]
             assert self.bootstrap_WCE_coef_.shape == (
-                self.n_bootstraps,
+                self.nbootstraps,
                 n_batch,
                 self.n_atoms,
             )
 
 
             # Estimated risk function:
-            # (n_bootstraps, n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_bootstraps, n_batch, cutoff)
+            # (nbootstraps, n_batch, n_atoms) @ (n_atoms, cutoff) -> (nbootstraps, n_batch, cutoff)
             self.bootstrap_risk_functions_ = torch.tensor(self.bootstrap_WCE_coef_, dtype=self.dtype).to(self.device) @ self.atoms.to(self.dtype).T
         # Usual CoxPH results: -------------------------------------------------
         self.means_ = self.survival_model.means_
@@ -425,9 +449,11 @@ class WCESurvivalAnalysis:
         self.imat_ = self.survival_model.imat_
         self.iter_ = self.survival_model.iter_
         self.n_events_ = int(np.sum(event))
-         # Compute the BIC for the WCE model:
-        total_number_knots = self.n_knots + 4 if self.constrained is None else self.n_knots + 2
-        self.BIC_ = -2 * np.asarray(self.loglik_) + (total_number_knots + self.n_covariates) * np.log(self.n_events_)
+        # Compute the information criterion for the WCE model, matching the
+        # `my_bic_c()` formula from the reference `WCE` R package: AIC uses a
+        # penalty of 2 per degree of freedom, BIC uses log(n_events).
+        penalty_per_df = 2.0 if self.criterion == "aic" else np.log(self.n_events_)
+        self.info_criterion_ = -2 * np.asarray(self.loglik_) + (self.n_atoms + self.n_covariates) * penalty_per_df
 
 
     def HR(self,
@@ -472,14 +498,15 @@ def wce_numpy(
     start,
     stop,
     cutoff: Int,
-    n_knots: Int = 1,
+    nknots: Int = 1,
     order: Int = 3,
     constrained: Literal["right", "left"] | None = None,
+    criterion: Literal["aic", "bic"] = "bic",
     strata: Int64Array["intervals"] | None = None,
     batch: Int64Array["intervals"] | None = None,
     init: Float64Array["fullcovariates"] | None = None,
-    n_bootstraps: Int | None = None,
-    batch_size: Int | None = None,
+    nbootstraps: Int | None = None,
+    batchsize: Int | None = None,
     device: TorchDevice | None = None,
     dtype = np.float64,
     **kwargs,
@@ -498,17 +525,19 @@ def wce_numpy(
         start ((I,) array): start time of each interval.
         stop ((I,) array): end time of each interval.
         cutoff (int): size of the time window for the risk function.
-        n_knots (int, optional): number of knots for the B-splines. Defaults to 1.
+        nknots (int, optional): number of knots for the B-splines. Defaults to 1.
         order (int, optional): order of the B-splines. Defaults to 3.
         constrained ("left", "right" or None, optional): boundary constraint
             on the B-splines. Defaults to None.
+        criterion ("aic" or "bic", optional): information criterion reported
+            as "info_criterion" in the output. Defaults to "bic".
         strata ((I,) int64 array, optional): stratum id for each interval.
         batch ((I,) int64 array, optional): batch id for each interval.
         init ((fullcovariates,) float64 array, optional): initial values for
             the coefficients.
-        n_bootstraps (int, optional): number of bootstrap resamples. 0 is
+        nbootstraps (int, optional): number of bootstrap resamples. 0 is
             treated as None (no bootstrapping).
-        batch_size (int, optional): number of bootstrap resamples processed
+        batchsize (int, optional): number of bootstrap resamples processed
             at once on the GPU.
         device (optional): device on which to run the computations.
         dtype (optional): np.float32 or np.float64. Defaults to np.float64.
@@ -516,23 +545,24 @@ def wce_numpy(
 
     Returns:
         dict: with keys "knotsmat", "coef", "std", "WCE_coef", "SED",
-            "risk_function", "BIC", "means", "score", "sctest_init",
+            "risk_function", "info_criterion", "means", "score", "sctest_init",
             "loglik_init", "loglik", "hessian", "imat", "iter", and (if
-            n_bootstraps is set) "bootstrap_coef", "bootstrap_WCE_coef",
+            nbootstraps is set) "bootstrap_coef", "bootstrap_WCE_coef",
             "bootstrap_risk_functions".
     """
-    if n_bootstraps == 0:
-        n_bootstraps = None
+    if nbootstraps == 0:
+        nbootstraps = None
 
     surv_model = CoxPHSurvivalAnalysis(**kwargs)
     model = WCESurvivalAnalysis(
         cutoff=cutoff,
-        n_knots=n_knots,
+        nknots=nknots,
         order=order,
         constrained=constrained,
+        criterion=criterion,
         survival_model=surv_model,
-        n_bootstraps=n_bootstraps,
-        batch_size=batch_size,
+        nbootstraps=nbootstraps,
+        batchsize=batchsize,
         device=device,
         dtype=dtype
     )
@@ -564,7 +594,7 @@ def wce_numpy(
         WCE_coef=model.WCE_coef_,
         SED=model.SED_,
         risk_function=model.risk_function_.cpu().numpy(),
-        BIC=model.BIC_,
+        info_criterion=model.info_criterion_,
         means=model.means_,
         score=model.score_,
         sctest_init=model.sctest_init_,
@@ -576,7 +606,7 @@ def wce_numpy(
     )
 
 
-    if n_bootstraps is not None:
+    if nbootstraps is not None:
         output.update(
             bootstrap_coef=model.bootstrap_coef_,
             bootstrap_WCE_coef=model.bootstrap_WCE_coef_,
@@ -599,14 +629,15 @@ def wce_R(
     events,
     # WCE parameters:
     cutoff,
-    n_knots=1,
+    nknots=1,
     order=3,
     constrained=None,
+    aic=False,
     bootstrap=None,
     # Cox parameters:
     profile=None,
     batchsize=0,
-    ties="breslow", #
+    ties="efron",
     maxiter=20,
     init=None,
     doscale=False,
@@ -625,17 +656,21 @@ def wce_R(
         doses (str): name of the column with drug doses.
         events (str): name of the column with the event indicator.
         cutoff (int): size of the time window for the risk function.
-        n_knots (int, optional): number of knots for the B-splines. Defaults to 1.
+        nknots (int, optional): number of knots for the B-splines. Defaults to 1.
         order (int, optional): order of the B-splines. Defaults to 3.
         constrained (str or None, optional): one of "None"/None, "left"/"Left"/"l"/"L"
             or "right"/"Right"/"r"/"R". Defaults to None.
+        aic (bool, optional): if True, "info_criterion" in the output is the
+            AIC (penalty = 2 per degree of freedom); otherwise it is the BIC
+            (penalty = log(n_events) per degree of freedom). Matches the
+            `aic` argument of the reference `WCE` R package. Defaults to False.
         bootstrap (int): number of bootstrap resamples (0 disables bootstrapping).
             Must be set to an integer, since it is converted with int(bootstrap).
         profile (str, optional): if set, path where a Chrome trace of the
             computation is exported. Defaults to None.
         batchsize (int, optional): number of bootstrap resamples processed at
             once on the GPU; 0 means "process all at once". Defaults to 0.
-        ties ("breslow" or "efron", optional): tie-handling method. Defaults to "breslow".
+        ties ("breslow" or "efron", optional): tie-handling method. Defaults to "efron".
         maxiter (int, optional): maximum number of Newton iterations. Defaults to 20.
         init (array, optional): initial values for the coefficients.
         doscale (bool, optional): whether to rescale the covariates. Defaults to False.
@@ -647,7 +682,7 @@ def wce_R(
 
     Returns:
         dict: with keys "knotsmat", "coef", "std", "WCE_coef", "SED",
-            "risk_function", "BIC", "means", "score", "sctest_init",
+            "risk_function", "info_criterion", "means", "score", "sctest_init",
             "loglik_init", "loglik", "hessian", "imat", "iter", and (if
             bootstrap > 0) "bootstrap_coef", "bootstrap_WCE_coef",
             "bootstrap_risk_functions".
@@ -734,14 +769,15 @@ def wce_R(
             start=start,
             stop=stop,
             cutoff=int(cutoff),
-            n_knots=int(n_knots),
+            nknots=int(nknots),
             order=int(order),
             constrained=constrained,
+            criterion="aic" if aic else "bic",
             strata=strata,
             batch=None,
             init=init,
-            n_bootstraps=int(bootstrap),
-            batch_size=int(batchsize) if batchsize > 0 else None,
+            nbootstraps=int(bootstrap),
+            batchsize=int(batchsize) if batchsize > 0 else None,
             device=device,
             maxiter=int(maxiter),
             ties=ties,

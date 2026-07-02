@@ -97,87 +97,135 @@ test_that("HR", {
 })
 
 
-# snapshot
+# Each of these compares wceGPU() against the reference WCE::WCE()
+# implementation for the same arguments, rather than snapshotting the
+# printed output: raw floating-point prints are not stable across R
+# versions/BLAS/torch builds (trailing whitespace, last-digit rounding),
+# which made the previous expect_snapshot()-based tests flaky across CI
+# environments.
 test_that("WCE - no covariates", {
-  expect_snapshot({
-    wceGPU(
-      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-      event = "Event", start = "Start", stop = "Stop",
-      expos = "dose",
-      constrained = FALSE, aic = FALSE, confint = 0.95,
-      nbootstraps = 0, batchsize = 0
-    )
-  })
+  wce_ref <- WCE::WCE(
+    data = drugdata, analysis = "Cox", nknots = 1, cutoff = 90,
+    id = "Id", event = "Event", start = "Start", stop = "Stop",
+    expos = "dose",
+    constrained = FALSE, aic = FALSE, double_precision = TRUE
+  )
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose",
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+  expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
 })
 
 test_that("WCE - one covariate", {
-  expect_snapshot({
-    wceGPU(
-      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-      event = "Event", start = "Start", stop = "Stop",
-      expos = "dose", covariates = c("age"),
-      constrained = FALSE, aic = FALSE, confint = 0.95,
-      nbootstraps = 0, batchsize = 0
-    )
-  })
+  wce_ref <- WCE::WCE(
+    data = drugdata, analysis = "Cox", nknots = 1, cutoff = 90,
+    id = "Id", event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age"),
+    constrained = FALSE, aic = FALSE, double_precision = TRUE
+  )
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age"),
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+  expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
+  expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
 })
 
 test_that("WCE - two covariates", {
-  expect_snapshot({
-    wceGPU(
-      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-      event = "Event", start = "Start", stop = "Stop",
-      expos = "dose", covariates = c("age","sex"),
-      constrained = FALSE, aic = FALSE, confint = 0.95,
-      nbootstraps = 0, batchsize = 0
-    )
-  })
+  wce_ref <- WCE::WCE(
+    data = drugdata, analysis = "Cox", nknots = 1, cutoff = 90,
+    id = "Id", event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, double_precision = TRUE
+  )
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+  expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
+  expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
 })
 
 test_that("WCE - AIC", {
-  expect_snapshot({
-    wceGPU(
-      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-      event = "Event", start = "Start", stop = "Stop",
-      expos = "dose", covariates = c("age","sex"),
-      constrained = FALSE, aic = TRUE, confint = 0.95,
-      nbootstraps = 0, batchsize = 0
-    )
-  })
+  wce_ref <- WCE::WCE(
+    data = drugdata, analysis = "Cox", nknots = 1, cutoff = 90,
+    id = "Id", event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = TRUE, double_precision = TRUE
+  )
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = TRUE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+  expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
+  expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
+  expect_equal(as.numeric(wce_ref$info.criterion), as.numeric(wce_test$info.criterion), tolerance = 1e-4)
+  expect_true(wce_test$aic)
 })
 
 test_that("WCE - right constraint", {
-  expect_snapshot({
-    wceGPU(
-      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-      event = "Event", start = "Start", stop = "Stop",
-      expos = "dose", covariates = c("age","sex"),
-      constrained = "R", aic = FALSE, confint = 0.95,
-      nbootstraps = 0, batchsize = 0
-    )
-  })
+  wce_ref <- WCE::WCE(
+    data = drugdata, analysis = "Cox", nknots = 1, cutoff = 90,
+    id = "Id", event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = "R", aic = FALSE, double_precision = TRUE
+  )
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = "R", aic = FALSE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+  expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
+  expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
 })
 
 test_that("WCE - left constraint", {
-  expect_snapshot({
-    wceGPU(
-      data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-      event = "Event", start = "Start", stop = "Stop",
-      expos = "dose", covariates = c("age","sex"),
-      constrained = "L", aic = FALSE, confint = 0.95,
-      nbootstraps = 0, batchsize = 0
-    )
-  })
+  wce_ref <- WCE::WCE(
+    data = drugdata, analysis = "Cox", nknots = 1, cutoff = 90,
+    id = "Id", event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = "L", aic = FALSE, double_precision = TRUE
+  )
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = "L", aic = FALSE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+  expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
+  expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
 })
 
 test_that("WCE - 3 knots", {
-  expect_snapshot({
-    wceGPU(
-      data = drugdata, nknots = 3, cutoff = 90, id = "Id",
-      event = "Event", start = "Start", stop = "Stop",
-      expos = "dose", covariates = c("age","sex"),
-      constrained = FALSE, aic = FALSE, confint = 0.95,
-      nbootstraps = 0, batchsize = 0
-    )
-  })
+  wce_ref <- WCE::WCE(
+    data = drugdata, analysis = "Cox", nknots = 3, cutoff = 90,
+    id = "Id", event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, double_precision = TRUE
+  )
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 3, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+  expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
+  expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
 })

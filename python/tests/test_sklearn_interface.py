@@ -55,7 +55,7 @@ def test_wce_shapes():
     print(ds.start)
     print(ds.stop)
 
-    model = WCESurvivalAnalysis(cutoff=10, order=3, n_knots=1)
+    model = WCESurvivalAnalysis(cutoff=10, order=3, nknots=1)
     model.fit(
         covariates=ds.covariates,
         stop=ds.stop,

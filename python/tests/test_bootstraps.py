@@ -21,7 +21,7 @@ else:
 
 @given(
     n_patients=small_int,
-    n_bootstraps=small_int,
+    nbootstraps=small_int,
     n_samples=small_int,
     n_intervals=small_int,
     use_cuda=st.booleans(),
@@ -29,13 +29,13 @@ else:
 def test_resampling_shapes(
     *,
     n_patients: int,
-    n_bootstraps: int,
+    nbootstraps: int,
     n_samples: int,
     n_intervals: int,
     use_cuda: bool,
 ):
     """Tests the Resampling constructor."""
-    indices = torch.randint(0, n_patients, size=(n_bootstraps, n_samples))
+    indices = torch.randint(0, n_patients, size=(nbootstraps, n_samples))
     patients = torch.randint(0, n_patients, size=(n_intervals,))
 
     # Make sure that we "use" all the patients:
@@ -47,18 +47,18 @@ def test_resampling_shapes(
 
     res = Resampling(indices=indices, patient=patients)
 
-    assert res.patient_weights.shape == (n_bootstraps, n_patients)
-    assert res.patient_counts.shape == (n_bootstraps, n_patients)
+    assert res.patient_weights.shape == (nbootstraps, n_patients)
+    assert res.patient_counts.shape == (nbootstraps, n_patients)
     assert res.patient_weights.dtype in (torch.float32, torch.float64)
     assert res.patient_counts.dtype == torch.int64
 
-    assert res.interval_weights.shape == (n_bootstraps, n_intervals)
+    assert res.interval_weights.shape == (nbootstraps, n_intervals)
     assert res.interval_weights.dtype in (torch.float32, torch.float64)
 
 
 @given(
     n_patients=small_int,
-    n_bootstraps=small_int,
+    nbootstraps=small_int,
     n_samples=small_int,
     n_intervals=small_int,
     use_cuda=st.booleans(),
@@ -66,7 +66,7 @@ def test_resampling_shapes(
 def test_resampling_single(
     *,
     n_patients: int,
-    n_bootstraps: int,
+    nbootstraps: int,
     n_samples: int,
     n_intervals: int,
     use_cuda: bool,
@@ -75,7 +75,7 @@ def test_resampling_single(
     unique_patient = torch.randint(0, n_patients, size=(1,)).item()
     # indices is constant: we only care about the unique patient above!
     indices = unique_patient * torch.ones(
-        n_bootstraps, n_samples, dtype=torch.int64
+        nbootstraps, n_samples, dtype=torch.int64
     )
     patients = torch.randint(0, n_patients, size=(n_intervals,))
 
@@ -90,12 +90,12 @@ def test_resampling_single(
 
     # Expected patient weights: zeros, except for the unique patient
     # that get a weight that is equal to n_samples.
-    expected_patient_weights = torch.zeros(n_bootstraps, n_patients)
+    expected_patient_weights = torch.zeros(nbootstraps, n_patients)
     expected_patient_weights[:, unique_patient] = n_samples
 
     # Expected interval weights: zeros, except for the intervals that
     # are associated to the unique patient.
-    expected_interval_weights = torch.zeros(n_bootstraps, n_intervals)
+    expected_interval_weights = torch.zeros(nbootstraps, n_intervals)
     expected_interval_weights[:, patients == unique_patient] = n_samples
 
     if use_cuda and torch.cuda.is_available():
@@ -156,32 +156,32 @@ def test_original_sample_simple(use_patient: bool, device: str):
 
 
 @given(
-    n_bootstraps=small_int,
-    batch_size=small_int,
+    nbootstraps=small_int,
+    batchsize=small_int,
     use_patient=st.booleans(),
     device=st_device,
 )
 def test_bootstraps_simple(
-    n_bootstraps: int, batch_size: int, use_patient: bool, device: str
+    nbootstraps: int, batchsize: int, use_patient: bool, device: str
 ):
     """Tests the bootstrap method on a simple handcrafted dataset."""
     dataset, n_patients = simple_dataset(use_patient, device)
 
     boots = list(
-        dataset.bootstraps(n_bootstraps=n_bootstraps, batch_size=batch_size)
+        dataset.bootstraps(nbootstraps=nbootstraps, batchsize=batchsize)
     )
-    assert len(boots) == ceil(n_bootstraps / batch_size)
-    assert sum([len(b) for b in boots]) == n_bootstraps
+    assert len(boots) == ceil(nbootstraps / batchsize)
+    assert sum([len(b) for b in boots]) == nbootstraps
 
     for it, res in enumerate(boots):
 
         print("it:", it, "len(res):", len(res))
         if it < len(boots) - 1:
-            b = batch_size
+            b = batchsize
         else:
-            b = n_bootstraps % batch_size
+            b = nbootstraps % batchsize
             if b == 0:
-                b = batch_size
+                b = batchsize
 
         assert len(res) == b
         assert res.patient_weights.shape == (b, n_patients)
@@ -195,11 +195,11 @@ def test_bootstraps_simple(
 @given(
     n_groups=small_int,
     n_intervals=small_int,
-    n_bootstraps=st.one_of(small_int, st.just(1000), st.just(10000)),
+    nbootstraps=st.one_of(small_int, st.just(1000), st.just(10000)),
     device=st_device,
 )
 def test_bootstraps_stratification_1(
-    n_groups: int, n_intervals: int, n_bootstraps: int, device: str
+    n_groups: int, n_intervals: int, nbootstraps: int, device: str
 ):
     """Checks that stratification works as expected."""
 
@@ -223,11 +223,11 @@ def test_bootstraps_stratification_1(
 
     # Retrieve our bootstraps in a single Resampling object:
     boots = next(
-        dataset.bootstraps(n_bootstraps=n_bootstraps, batch_size=n_bootstraps)
+        dataset.bootstraps(nbootstraps=nbootstraps, batchsize=nbootstraps)
     )
 
     # Simple check on the shapes, as in test_bootstraps_simple():
-    assert boots.patient_weights.shape == (n_bootstraps, n_intervals)
+    assert boots.patient_weights.shape == (nbootstraps, n_intervals)
 
     # Check that the total number of samples per group is preserved ----------------------
 
@@ -235,33 +235,33 @@ def test_bootstraps_stratification_1(
     # Compute the original number of patients per strata:
     weight_per_strata = (
         torch.bincount(batch, minlength=n_groups)
-        .tile((n_bootstraps, 1))
+        .tile((nbootstraps, 1))
         .float()
     )
 
     # Compute the total weight per strata:
     new_weight_per_strata = group_sum(
         values=boots.patient_weights,
-        groups=batch.view(1, -1).tile((n_bootstraps, 1)),
+        groups=batch.view(1, -1).tile((nbootstraps, 1)),
         output_size=n_groups,
     )
 
     assert torch.allclose(weight_per_strata, new_weight_per_strata)
 
     # Check that every patient has an equal probability of being sampled -----------------
-    if n_bootstraps >= 1000:
+    if nbootstraps >= 1000:
         # each cell of boots.patient_weights is a random variable with expected
         # mean value of 1 and finite variance that depends on the number of patients
         # per group. (A patient that is alone is always going to get picked, with
         # weight=1, whereas a patient in a more populous groups may experience
         # a wider range of fortunes.)
         # In any case, according to the central limit theorem,
-        # we expect that the average empirical probas over n_bootstraps will
-        # be equal to 1 + Cst * N(0,1) / sqrt(n_bootstraps)
+        # we expect that the average empirical probas over nbootstraps will
+        # be equal to 1 + Cst * N(0,1) / sqrt(nbootstraps)
         probas = boots.patient_weights.mean(dim=0)  # (n_intervals,)
 
         # We can reasonably expect that Cst ~ 3, and ask with >99% certainty
         # that the error falls in the confidence interval +- 3/sqrt(n_boostraps):
         assert torch.allclose(
-            probas, torch.ones_like(probas), atol=10 / sqrt(n_bootstraps)
+            probas, torch.ones_like(probas), atol=10 / sqrt(nbootstraps)
         )

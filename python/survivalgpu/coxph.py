@@ -71,8 +71,8 @@ class CoxPHSurvivalAnalysis:
         mode: Literal["unit length", "start zero", "any"] | None = None,
         dtype = np.float64,
         device = None,
-        n_bootstraps: Int | None = None,
-        batch_size: Int | None = None,
+        nbootstraps: Int | None = None,
+        batchsize: Int | None = None,
     ):
         self.alpha = alpha
         self.ties = ties
@@ -89,8 +89,8 @@ class CoxPHSurvivalAnalysis:
             msg = f"dtype should be np.float32 or np.float64. Received {dtype}."
             raise ValueError(msg)
         self.device = device if device is not None else default_device
-        self.n_bootstraps = n_bootstraps
-        self.batch_size = batch_size
+        self.nbootstraps = nbootstraps
+        self.batchsize = batchsize
 
 
     @typecheck
@@ -130,7 +130,7 @@ class CoxPHSurvivalAnalysis:
 
         Results are stored as attributes: coef_, std_, means_, score_, loglik_,
         loglik_init_, sctest_init_, hessian_, imat_, iter_, and (if
-        n_bootstraps is set) bootstrap_coef_.
+        nbootstraps is set) bootstrap_coef_.
         """
         # Pre-process the input data: ----------------------------------------------------
         # Create a dataset object: this enforces checks on the input data
@@ -265,10 +265,10 @@ class CoxPHSurvivalAnalysis:
         self.iter_ = res.iterations
 
         # If required, compute a distribution of the coefficients using bootstrap: -------
-        if (self.n_bootstraps is not None) and (self.n_bootstraps >0):
+        if (self.nbootstraps is not None) and (self.nbootstraps >0):
             bootstrap_coef = []
             for bootstrap in dataset.bootstraps(
-                n_bootstraps=self.n_bootstraps, batch_size=self.batch_size
+                nbootstraps=self.nbootstraps, batchsize=self.batchsize
             ):
                 # Vector of initial values of the Newton iteration.
                 # Zero for all variables by default.
@@ -293,7 +293,7 @@ class CoxPHSurvivalAnalysis:
                 bootstrap_coef.append(res.x)
 
             self.bootstrap_coef_ = torch.stack(bootstrap_coef).view(
-                self.n_bootstraps, n_batch, n_covariates
+                self.nbootstraps, n_batch, n_covariates
             )
 
         # If the covariates have been normalized for the sake of stability,
@@ -322,8 +322,8 @@ class CoxPHSurvivalAnalysis:
         assert self.imat_.shape == hessian_shape
 
 
-        if (self.n_bootstraps is not None) and (self.n_bootstraps >0 ):
-            assert self.bootstrap_coef_.shape == (self.n_bootstraps, n_batch, n_covariates)
+        if (self.nbootstraps is not None) and (self.nbootstraps >0 ):
+            assert self.bootstrap_coef_.shape == (self.nbootstraps, n_batch, n_covariates)
 
 
 
@@ -442,8 +442,8 @@ def coxph_numpy(
         verbosity=verbosity,
         dtype = dtype,
         device = device,
-        n_bootstraps=bootstrap,
-        batch_size=batchsize
+        nbootstraps=bootstrap,
+        batchsize=batchsize
    )
 
     # Configure 'start' according to survtype ('counting' or 'right')
