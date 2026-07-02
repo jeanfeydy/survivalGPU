@@ -42,7 +42,9 @@ use_survivalGPU <- function() {
 #' @export
 #'
 #' @examples
+#' \dontrun{
 #' use_cuda()
+#' }
 use_cuda <- function() {
   # survivalgpu <- use_survivalGPU()
   return(survivalgpu$use_cuda)

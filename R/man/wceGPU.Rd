@@ -8,14 +8,14 @@
 \title{Fast WCE}
 \usage{
 wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
-       event, start, stop, expos, covariates = NULL, nbootstraps = 1,
+       event, start, stop, expos, covariates = NULL, nbootstraps = 0,
        batchsize = 0, confint = 0.95, controls = NULL, ...)
 
-\method{summary}{wceGPU}(object, ...)
+\method{summary}{wceGPU}(object, allres = FALSE, ...)
 
 \method{plot}{wceGPU}(x, ..., hist.covariates = FALSE)
 
-\method{confint}{wceGPU}(object, parm, level = 0,95, ..., digits = 3)
+\method{confint}{wceGPU}(object, parm, level = 0.95, ..., digits = 3)
 }
 \arguments{
 \item{data}{A data frame in an interval (long) format, in which each line
@@ -79,6 +79,9 @@ the coxph function. See coxph.control for more details.}
 \item{...}{additional argument(s) for methods.}
 
 \item{object}{wceGPU object.}
+
+\item{allres}{Post-processing calculations. If TRUE, returns
+linear predictors, wald.test, concordance for all bootstraps.}
 
 \item{x}{wceGPU object.}
 

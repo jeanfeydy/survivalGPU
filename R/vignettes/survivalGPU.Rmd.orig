@@ -9,6 +9,8 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+<!-- survivalGPU.Rmd.orig produces survivalGPU.Rmd; please edit survivalGPU.Rmd.orig and run vignettes/precompile.R -->
+
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
@@ -73,11 +75,12 @@ coxphGPU <- coxphGPU(
 summary(coxphGPU)
 ```
 
-The advantage of survivalGPU is to use bootstrap more easily. The `summary` gives the results for the initial model without bootstrap, and at the end, confidence interval for estimates covariates with bootstrap, according to `conf.int` argument.
+The advantage of survivalGPU is to use bootstrap more easily. The `summary` gives the results for the initial model without bootstrap, and at the end, confidence interval for estimates covariates with bootstrap, according to `conf.int` argument. Whenever `bootstrap > 0`, `patient_id` must also be provided: it identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (`drugdata` has several rows per patient, identified by the `Id` column).
 
 ```{r}
 coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   data = drugdata,
+  patient_id = "Id",
   bootstrap = n_bootstrap,
   batchsize = batchsize,
   all.results = FALSE

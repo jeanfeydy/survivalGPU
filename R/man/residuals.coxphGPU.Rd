@@ -30,12 +30,10 @@ Only enough of the string to determine a unique match is required.
 }
 
 \item{collapse}{
-vector indicating which rows to collapse (sum) over.
-In time-dependent models more than one row data can pertain
-to a single individual.
-If there were 4 individuals represented by 3, 1, 2 and 4 rows of data
-respectively, then \code{collapse=c(1,1,1, 2, 3,3, 4,4,4,4)} could be used to
-obtain per subject rather than per observation residuals.
+  either a logical (TRUE/FALSE), or a vector indicating which rows to
+  collapse (sum) over.
+  In time-dependent models more than one row data can pertain
+  to a single individual or group.
 }
 
 \item{weighted}{
@@ -48,6 +46,7 @@ Calculates martingale, deviance, score or Schoenfeld residuals for a
 Cox proportional hazards model.
 }
 \examples{
+\dontrun{
 library(survival)
 fit <- coxphGPU(Surv(start, stop, event) ~ age + surgery,
                 data = heart)
@@ -55,10 +54,11 @@ fit <- coxphGPU(Surv(start, stop, event) ~ age + surgery,
 # Martingale residuals
 mresid <- resid(fit, collapse = heart$id)
 }
+}
 \references{
 T. Therneau, P. Grambsch, and T. Fleming. "Martingale based residuals
 for survival models", \emph{Biometrika}, March 1990.
 }
 \seealso{
-\code{\link[=residuals.coxph]{residuals.coxph()}}
+\code{\link[survival:residuals.coxph]{survival::residuals.coxph()}}
 }

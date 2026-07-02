@@ -21,7 +21,7 @@
 
 \item{newdata}{
   Optional new data at which to do predictions.
-  If absent predictions are for the  data frame used in the original
+  If absent, predictions are for the  data frame used in the original
   fit.
   When coxph has been called with a formula argument created in another
   context, i.e., coxph has been called within another function and the
@@ -69,6 +69,7 @@ entry per observation.
 Compute fitted values and regression terms for a model fitted by coxphGPU
 }
 \examples{
+\dontrun{
 library(survival)
 options(na.action = na.exclude) # retain NA in predictions
 fit <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung)
@@ -77,6 +78,12 @@ predict(fit, type = "expected")
 predict(fit, type = "risk", se.fit = TRUE)
 predict(fit, type = "terms", se.fit = TRUE)
 }
+}
+\references{
+C Crowson, E Atkinson and T Therneau,
+    Assessing calibration of prognostic risk scores,
+    Stat Methods Med Res, 2016.
+}
 \seealso{
-\code{\link[=predict.coxph]{predict.coxph()}}
+\code{\link[survival:predict.coxph]{survival::predict.coxph()}}
 }

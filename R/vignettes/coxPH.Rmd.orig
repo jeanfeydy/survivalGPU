@@ -7,6 +7,8 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+<!-- coxPH.Rmd.orig produces coxPH.Rmd; please edit coxPH.Rmd.orig and run vignettes/precompile.R -->
+
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
@@ -36,14 +38,17 @@ library(survival)
 data <- lung
 data$status <- lung$status - 1 # event variable now coded in 0 - 1 (instead of 1 - 2)
 data$sex <- ifelse(lung$sex == 1, "Male", "Female")
+data <- data[stats::complete.cases(data[c("time", "status", "age", "sex", "ph.ecog")]), ]
+data$id <- seq_len(nrow(data)) # one row per patient here, so a row index works as patient_id
 head(data)
 ```
 
-You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula.
+You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula. If you use `bootstrap`, `patient_id` must be provided: it identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates).
 
 ```{r coxphGPU}
 coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
                                data = data,
+                               patient_id = "id",
                                bootstrap = 50,
                                ties = "breslow")
 

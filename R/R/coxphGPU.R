@@ -29,6 +29,7 @@
 #' @import survival
 #' @importFrom utils methods
 #' @importFrom utils head
+#' @importFrom data.table data.table
 #'
 #' @return A coxphGPU object representing the fit.
 #' @export
@@ -70,8 +71,8 @@
 #'
 #' summary(coxph_bootstrap)
 #' }
-coxphGPU <- function(formula, data, ties = c("efron", "breslow"), bootstrap = 0,
-                     batchsize = 0, init, all.results = FALSE, control,
+coxphGPU <- function(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
+                     bootstrap = 0, batchsize = 0, init, all.results = FALSE, control,
                      singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
                      ...) {
   UseMethod("coxphGPU")
@@ -99,8 +100,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   #
   ##############################################################################
   ##############################################################################
-
-  library(data.table)
 
   ties <- match.arg(ties)
 
@@ -1475,6 +1474,11 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
 #' Print method for coxphGPU object
 #'
+#' @param x a coxphGPU object
+#' @param digits significant digits to print
+#' @param signif.stars show stars to highlight small p-values
+#' @param ... additional argument(s) for methods.
+#'
 #' @exportS3Method print coxphGPU
 #' @inherit survival::print.coxph
 print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
@@ -1573,16 +1577,18 @@ coef.coxphGPU <- function(object, ...) {
 #' @inherit survival::residuals.coxph description references
 #' @inheritParams survival::residuals.coxph
 #'
-#' @seealso [residuals.coxph()]
+#' @seealso [survival::residuals.coxph()]
 #'
 #' @exportS3Method residuals coxphGPU
 #' @examples
+#' \dontrun{
 #' library(survival)
 #' fit <- coxphGPU(Surv(start, stop, event) ~ age + surgery,
 #'                 data = heart)
 #'
 #' # Martingale residuals
 #' mresid <- resid(fit, collapse = heart$id)
+#' }
 residuals.coxphGPU <- function(object, ...,
                                type = c("martingale", "deviance", "score",
                                         "schoenfeld", "dfbeta", "dfbetas",
@@ -1603,10 +1609,11 @@ residuals.coxphGPU <- function(object, ...,
 #' @inheritParams survival::predict.coxph
 #' @param object the results of a coxphGPU fit.
 #'
-#' @seealso [predict.coxph()]
+#' @seealso [survival::predict.coxph()]
 #'
 #' @exportS3Method predict coxphGPU
 #' @examples
+#' \dontrun{
 #' library(survival)
 #' options(na.action = na.exclude) # retain NA in predictions
 #' fit <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung)
@@ -1614,6 +1621,7 @@ residuals.coxphGPU <- function(object, ...,
 #' predict(fit, type = "expected")
 #' predict(fit, type = "risk", se.fit = TRUE)
 #' predict(fit, type = "terms", se.fit = TRUE)
+#' }
 predict.coxphGPU <- function(object, newdata,
                              type = c("lp", "risk", "expected", "terms", "survival"),
                              se.fit = FALSE, na.action = na.pass,

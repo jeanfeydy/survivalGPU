@@ -372,6 +372,8 @@ print.wceGPU <- function(x, ...) {
 #' Summary method for wceGPU object
 #'
 #' @param object wceGPU object
+#' @param allres Post-processing calculations. If TRUE, returns
+#'   linear predictors, wald.test, concordance for all bootstraps.
 #' @param ... additional argument(s) for methods.
 #' @exportS3Method summary wceGPU
 #' @rdname wceGPU
@@ -386,11 +388,10 @@ summary.wceGPU <- function(object, allres = FALSE, ...) {
   }
 }
 
-#' Summary method for wceGPU object
-#'
 #' For the moment there is only the poissibility to use 1 knot
 #' In the future it will be possible to select for several knots
 #' Then we will have to do a summary_best and a summary_all, use a parameter
+#' @noRd
 sumWCEall <- function(object, objname, ...) {
 
   best <- which.min(object$info.criterion)

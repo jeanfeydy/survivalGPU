@@ -7,11 +7,13 @@
 \method{print}{coxphGPU}(x, ..., digits = max(1L, getOption("digits") - 3L), signif.stars = FALSE)
 }
 \arguments{
-\item{...}{
-The object will also contain the following, for documentation see the \code{lm}
-object: \code{terms}, \code{assign}, \code{formula}, \code{call}, and, optionally, \code{x}, \code{y},
-and/or \code{frame}.
-}
+\item{x}{a coxphGPU object}
+
+\item{...}{additional argument(s) for methods.}
+
+\item{digits}{significant digits to print}
+
+\item{signif.stars}{show stars to highlight small p-values}
 }
 \description{
 This class of objects is returned by the \code{coxph} class of functions

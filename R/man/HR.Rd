@@ -4,7 +4,7 @@
 \alias{HR}
 \title{Hazard Ratio for WCE model}
 \usage{
-HR(object, vecnum, vecdenom, level = 0,95, without_bootstrap = FALSE)
+HR(object, vecnum, vecdenom, level = 0.95)
 }
 \arguments{
 \item{object}{wceGPU object.}
@@ -16,13 +16,10 @@ scenario of interest (numerator of the HR).}
 scenario for the reference category (denominator of the HR).}
 
 \item{level}{the confidence level required for HR CI. Default to 0.95.}
-
-\item{without_bootstrap}{Gaussian approximation for confidence interval.}
 }
 \value{
 Returns a HR according to the scenarios. If bootstrap is present
-(or without_bootstrap = TRUE) in wceGPU object, this function returns
-confidence interval for the HR.
+in the wceGPU object, this function returns a confidence interval for the HR.
 }
 \description{
 Calcul the hazard ratio from a wceGPU object to compare two scenarios of
@@ -47,14 +44,5 @@ exposed   <- rep(1, cutoff)
 unexposed <- rep(0, cutoff)
 
 HR(wce_gpu_bootstrap, exposed, unexposed)
-
-# Confidence interval with Gaussian approximation when no bootstrap
- wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff, id = "Id",
-                   event = "Event", start = "Start", stop = "Stop",
-                   expos = "dose", covariates = c("age", "sex"),
-                   constrained = FALSE, aic = FALSE, confint = 0.95,
-                   batchsize = 0)
-
-HR(wce_gpu_bootstrap, exposed, unexposed, without_bootstrap = TRUE)
 }
 }
