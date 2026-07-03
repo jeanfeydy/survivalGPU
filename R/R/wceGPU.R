@@ -243,9 +243,6 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   )
 
 
-  print(results$se.covariates)
-
-
   if (is_bootstraps) {
 
     bootstrap_beta.hat.covariates <- drop(wce$bootstrap_coef)
@@ -637,14 +634,15 @@ HR <- function(object, vecnum, vecdenom, level = 0.95) {
   cutoff <- ncol(object$WCEmat)
   if (length(vecnum) != cutoff | length(vecdenom) != cutoff) stop("At least one of the vector provided as the numerator or denominator is not of proper length.")
 
-  hr <- apply(object$WCEmat, 1, function(x) exp(x %*% vecnum) / exp(x %*% vecdenom), simplify = TRUE)
+  hr <- exp(object$WCEmat[1, ] %*% vecnum) / exp(object$WCEmat[1, ] %*% vecdenom)
 
  if (object$is_bootstraps) {
+   hr_boot <- apply(object$WCEmat_bootstrap, 1, function(x) exp(x %*% vecnum) / exp(x %*% vecdenom))
    a <- (1 - level) / 2
    a <- c(a, 1 - a)
-   ci <- quantile(hr, p = a)
+   ci <- quantile(hr_boot, p = a)
    pct <- paste0(format(100 * a, trim = TRUE, scientific = FALSE), "%")
-   results <- matrix(c(hr[1], ci), nrow = 1L)
+   results <- matrix(c(hr, ci), nrow = 1L)
    colnames(results) <- c(
      "HR",
      paste("CI", pct[1]),
