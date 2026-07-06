@@ -8,9 +8,10 @@ concurrency:
 
 on:
   push:
-  #   branches: [main, master]
-  # pull_request:
-  #   branches: [main, master]
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   R-CMD-check:
