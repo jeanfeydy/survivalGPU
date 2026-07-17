@@ -78,7 +78,7 @@ for (k=0; k<nr; k++) {
  **    'person2': if person2=27 that means that 27 subjects have stop >=time,
  **    and are thus potential members of the risk set.  If 'person1' =9,
  **    that means that 9 subjects have start >=time and thus are NOT part
- **    of the risk set.  (stop > start for each subject guarrantees that
+ **    of the risk set.  (stop > start for each subject guarantees that
  **    the 9 are a subset of the 27).
  **  A basic rule is to remove subjects from the sums as soon as possible
  **    and add them as late as possible: (a-b) +c vs (a+c)-b when b might

@@ -8,10 +8,10 @@
 \title{Fast WCE}
 \usage{
 wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
-       event, start, stop, expos, covariates = NULL, nbootstraps = 1,
+       event, start, stop, expos, covariates = NULL, nbootstraps = 0,
        batchsize = 0, confint = 0.95, controls = NULL, ...)
 
-\method{summary}{wceGPU}(object, ...)
+\method{summary}{wceGPU}(object, allres = FALSE, ...)
 
 \method{plot}{wceGPU}(x, ..., hist.covariates = FALSE)
 
@@ -34,14 +34,14 @@ or 'R' to constrain the weight function to smoothly go to zero for exposure
 remote in time, and to 'Left' or 'L' to constrain the weight function to
 start a zero for the current values.}
 
-\item{aic}{Logical. If TRUE, then the AIC is used to select the best fitting
-model among those estimated for the different numbers of interior knots
-requested with nknots. If FALSE, then the BIC is used instead of the AIC.
-Default to FALSE (BIC). Note that the BIC implemented in WCE is the version
-suggested by Volinsky and Raftery in Biometrics (2000), which corresponds
-to BIC = 2 * log(PL) + p * log(d) where PL is the model's partial
+\item{aic}{Logical. Controls which information criterion is reported in
+\code{info.criterion}: the AIC if TRUE, the BIC if FALSE (default). Note that
+the BIC implemented in WCE is the version suggested by Volinsky and
+Raftery in Biometrics (2000), which corresponds to
+BIC = -2 * log(PL) + p * log(d) where PL is the model's partial
 likelihood, p is the number of estimated parameters and d is the number of
-uncensored events. See Sylvestre and Abrahamowicz (2009) for more details.}
+uncensored events; the AIC replaces the log(d) penalty with 2. See
+Sylvestre and Abrahamowicz (2009) for more details.}
 
 \item{id}{Name of the variable in data corresponding to the identification of
 subjects.}
@@ -79,6 +79,9 @@ the coxph function. See coxph.control for more details.}
 \item{...}{additional argument(s) for methods.}
 
 \item{object}{wceGPU object.}
+
+\item{allres}{Post-processing calculations. If TRUE, returns
+linear predictors, wald.test, concordance for all bootstraps.}
 
 \item{x}{wceGPU object.}
 

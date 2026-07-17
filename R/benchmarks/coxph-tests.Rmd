@@ -69,8 +69,8 @@ summary(coxphGPU_breslow)
 
 # Comparison Right - counting process
 
-- right process : one time with censored/event status  
-- counting process : time-dependent model  
+- right process : one time with censored/event status
+- counting process : time-dependent model
 
 
 ```{r}

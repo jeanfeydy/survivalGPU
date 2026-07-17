@@ -1,6 +1,5 @@
 url: ~
 template:
-  bootstrap: 5
   bootswatch: cosmo
 
 reference:
@@ -17,3 +16,20 @@ reference:
     contents:
     - use_cuda
     - survivalGPU-package
+
+navbar:
+  title: ~
+  type: default
+  left:
+    - text: Reference
+      href: reference/index.html
+    - text: Articles
+      menu:
+      - text: "Models"
+      - text: "Cox Proportional Hazards regression"
+        href: articles/coxPH.html
+      - text: "Weighted Cumulative Exposure : Signal detection"
+        href: articles/WCE.html
+      - text: "-------"
+      - text: "Python Configuration"
+        href: articles/python_connect.html

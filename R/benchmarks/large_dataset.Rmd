@@ -39,7 +39,7 @@ TDhist <- function(m) {
   # Duration : lognormal distribution(0.5,0.8)
   duration <- 7 + 7 * round(rlnorm(1, meanlog = 0.5, sdlog = 0.8), 0) # in weeks
 
-  # Dose : random assigment of values 0.5, 1, 1.5, 2, 2.5 and 3
+  # Dose : random assignment of values 0.5, 1, 1.5, 2, 2.5 and 3
   dose <- sample(seq(from = 0.5, to = 3, by = 0.5), size = 1)
 
   vec <- c(rep(0, start - 1), rep(dose, duration))
@@ -55,7 +55,7 @@ TDhist <- function(m) {
 }
 # create TD var
 Xmat[, 3] <- do.call("c", lapply(1:n, function(i) TDhist(m)))
-# genereate vectors of event and censoring times prior to calling the
+# generate vectors of event and censoring times prior to calling the
 # function for the algorithm
 eventRandom <- round(rexp(n, 0.012) + 1, 0)
 censorRandom <- round(runif(n, 1, 870), 0)
@@ -99,5 +99,4 @@ time_coxphGPU <- Sys.time() - start
 ```
 
 Time for one Coxph : **`r round(time_coxph, 3)`**
-Time for one Coxph with GPU : **`r round(time_coxphGPU, 3)`**  
-
+Time for one Coxph with GPU : **`r round(time_coxphGPU, 3)`**

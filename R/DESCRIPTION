@@ -1,6 +1,6 @@
 Package: survivalGPU
 Title: Fast and scalable implementations for survival models
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: c(
     person("Jean", "FEYDY", email = "jean.feydy@inria.fr",role = "aut"),
     person("Alexis", "van STRAATEN", email = "alexis.vanstraaten@outlook.fr", role = c("aut","cre")),
@@ -12,18 +12,20 @@ License: LGPL (>= 2.1)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
-Imports: 
+Imports:
+    data.table,
     reticulate,
     stats,
     survival,
     utils
-Suggests: 
+Suggests:
+    dplyr,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0),
     WCE
 Config/testthat/edition: 3
 VignetteBuilder: knitr
-SystemRequirements: python, pytorch, pytorch-scatter, pykeops
+SystemRequirements: python, pytorch, pykeops
 URL: https://github.com/jeanfeydy/survivalGPU
 BugReports: https://github.com/jeanfeydy/survivalGPU/issues

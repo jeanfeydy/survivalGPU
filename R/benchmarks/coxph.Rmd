@@ -25,8 +25,8 @@ devtools::load_all() # or devtools::load_all("path = "R") if you run from git ro
 drugdata <- WCE::drugdata
 ```
 
-Bootstrap with :  
-- `survival::coxph`  
+Bootstrap with :
+- `survival::coxph`
 - `survivalGPU::coxphGPU`
 
 
@@ -39,7 +39,7 @@ list_df_bootstrap <- function(dataset, n_bootstrap) {
       slice_sample(prop = 1, replace = TRUE)
   })
   liste_df[[1]] <- dataset
-  
+
   return(liste_df)
 }
 ```
@@ -47,7 +47,7 @@ list_df_bootstrap <- function(dataset, n_bootstrap) {
 
 ```{r coxph}
 time_cox <- function(list_df) {
-    
+
     start_time <- Sys.time()
     lapply(list_df, function(x) {
       coxph(Surv(Start, Stop, Event) ~ sex + age,
@@ -62,25 +62,25 @@ time_cox <- function(list_df) {
 
 ```{r coxph parallel, eval=FALSE}
 time_cox_parallel <- function(list_df){
-  
+
   no_cores <- detectCores()
   clust <- makeCluster(no_cores - 2)
-  
+
   clusterEvalQ(clust, {
     library(survival)
   })
-  
+
   # clusterExport(clust,"list_df")
-  
+
   start_time<-Sys.time()
-  
+
   parLapply(clust,list_df,function(x) coxph(Surv(Start,Stop,Event) ~ sex + age,
                                             data = x,
                                             id = Id))
-  
+
   end_time <- Sys.time()
   stopCluster(clust)
-  
+
   return(difftime(end_time, start_time, units = "secs") )
 }
 ```
@@ -103,7 +103,7 @@ time_coxphGPU <- function(dataset, n_bootstrap) {
 
 ```{r}
 combine_time <- function(dataset, n_bootstrap) {
-  
+
   # if (n_bootstrap > 100) {
   #   return(NA)
   # } else {
@@ -112,12 +112,12 @@ combine_time <- function(dataset, n_bootstrap) {
   #     n_bootstrap = n_bootstrap
   #   )
   # }
-  
+
   list_df <- list_df_bootstrap(
     dataset = dataset,
     n_bootstrap = n_bootstrap
   )
-  
+
   return(list(
     coxph = time_cox(list_df),
     # coxph_parallel = time_cox_parallel(list_df),

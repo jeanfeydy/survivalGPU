@@ -26,8 +26,8 @@ drugdata <- WCE::drugdata
 head(drugdata, 20)
 ```
 
-Bootstrap with :  
-- WCE::WCE  
+Bootstrap with :
+- WCE::WCE
 - survivalGPU::wceGPU
 
 
