@@ -1414,7 +1414,7 @@ def coxph_objective(
     dataset,  #: TorchSurvivalDataset, omitted to avoid circular import
     ties: Literal["efron", "breslow"],
     bootstrap: Resampling,
-    l2_reg: int | float,
+    l2_reg: int | float | FloatTensor["covariates"],
     mode: Literal["unit length", "start zero", "any"] = "any",
 ) -> FloatTensor["bootstraps batches"]:
     """Implements the CoxPH objective.
@@ -1449,7 +1449,10 @@ def coxph_objective(
         assert scales.shape == (D,)
         scaled_coef = coef * scales
 
-    reg = l2_reg * (scaled_coef**2).sum(dim=-1)
+    # The 1/2 factor matches R's survival::ridge() convention, under which
+    # `l2_reg` (theta) is the precision of an implicit N(0, 1/theta) prior:
+    # gradient = l2_reg * coef, Hessian diagonal = l2_reg.
+    reg = 0.5 * (l2_reg * scaled_coef**2).sum(dim=-1)
     assert reg.shape == (B, n_batches)
 
     return obj + reg

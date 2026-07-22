@@ -45,7 +45,11 @@ class CoxPHSurvivalAnalysis:
     The API of this object is loosely based on scikit-survival.
 
     Args:
-        alpha (float): L2 regularization parameter.
+        alpha (float or (D,) float64 array): Ridge (L2) regularization strength.
+            If a single float, the same penalty is applied to every covariate.
+            If an array, it gives a per-covariate penalty (one entry per column
+            of `covariates`). Set an entry to 0 to leave that covariate
+            unpenalized. Defaults to 0.0 (no penalty).
         ties (str): Ties handling method. One of "efron", "breslow".
         bootstrap (int): Number of bootstrap samples to use.
         batchsize (int): Number of bootstrap samples to process in parallel.
@@ -62,7 +66,7 @@ class CoxPHSurvivalAnalysis:
     @typecheck
     def __init__(
         self,
-        alpha: Real = 0.0,
+        alpha: Real | Float64Array["covariates"] = 0.0,
         ties: Literal["efron", "breslow"] = "efron",
         maxiter: Int = 20,
         eps: Real = 1e-5,
@@ -169,6 +173,13 @@ class CoxPHSurvivalAnalysis:
 
         n_batch, n_covariates = dataset.n_batch, dataset.n_covariates
 
+        # Ridge penalty: turn a per-covariate array into a tensor on the right
+        # device/dtype. A plain scalar is passed through as-is.
+        if isinstance(self.alpha, np.ndarray):
+            l2_reg = torch.tensor(self.alpha, dtype=self.dtype, device=self.device)
+        else:
+            l2_reg = self.alpha
+
         # Choose the fastest implementation of the CoxPH objective, ----------------------
         # i.e. the partial neg-log-likelihood of the CoxPH model.
 
@@ -206,7 +217,7 @@ class CoxPHSurvivalAnalysis:
                     dataset=dataset,
                     ties=self.ties,
                     bootstrap=bootstrap,
-                    l2_reg=self.alpha,
+                    l2_reg=l2_reg,
                     scales=scales,
                     mode=mode,
                 )
