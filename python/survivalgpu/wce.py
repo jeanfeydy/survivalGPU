@@ -29,6 +29,7 @@ class WCESurvivalAnalysis:
         nknots: Int = 1,
         order: Int = 3,
         constrained: Literal["right", "left"] | None = None,
+        knot_placement: Literal["quantile", "uniform"] = "quantile",
         criterion: Literal["aic", "bic"] = "bic",
         survival_model=None,
         dtype = np.float64,
@@ -78,6 +79,23 @@ class WCESurvivalAnalysis:
                 a non-zero value or derivative on the "right" of the domain,
                 i.e. around the "exposure+cutoff" time.
                 This is useful to model a risk function that vanishes "at infinity".
+        knot_placement
+            How to position the B-Spline knots. Defaults to "quantile".
+
+            - "quantile": matches the WCE R package convention. The `nknots`
+                inner knots sit at regular quantiles of the time window, but the
+                boundary "padding" knots are always spaced by 1, regardless of
+                the interior spacing. For a large cutoff relative to nknots,
+                this makes the boundary basis functions narrower than the
+                interior ones.
+
+            - "uniform": every knot -- inner and boundary padding alike -- is
+                spaced by the same amount, cutoff / (nknots + 1), so all basis
+                functions have the same width. This is the design required by
+                P-splines (Eilers & Marx, 1996): their difference penalty on
+                adjacent coefficients assumes equally-spaced knots, and the
+                uneven "quantile" spacing distorts that penalty near the
+                boundaries.
         survival_model
             Estimator that will be used to
             perform a risk analysis from the WCE covariates.
@@ -100,6 +118,7 @@ class WCESurvivalAnalysis:
         self.cutoff = cutoff
         self.nknots = nknots
         self.constrained = constrained
+        self.knot_placement = knot_placement
         self.criterion = criterion
 
 
@@ -193,6 +212,22 @@ class WCESurvivalAnalysis:
             raise ValueError(msg)
         self._constrained = new_c
 
+    # "knot_placement" only accepts "quantile" and "uniform" -----------------------------
+    @property
+    def knot_placement(self):
+        return self._knot_placement
+
+    @knot_placement.setter
+    def knot_placement(self, new_k):
+        supported_values = ["quantile", "uniform"]
+        if new_k not in supported_values:
+            msg = (
+                f"knot_placement should be one of {supported_values}. "
+                f"Received {new_k}."
+            )
+            raise ValueError(msg)
+        self._knot_placement = new_k
+
     # The number of WCE features depends on nknots, the order and constrained -----------
     @property
     def n_atoms(self):
@@ -238,7 +273,8 @@ class WCESurvivalAnalysis:
     def atoms(self):
         """Samples the B-spline basis functions on the interval [0, cutoff-1]."""
         atoms, _ = bspline_atoms(
-            cutoff=self.cutoff, order=self.order, nknots=self.nknots, dtype=self.dtype,
+            cutoff=self.cutoff, order=self.order, nknots=self.nknots,
+            knot_placement=self.knot_placement, dtype=self.dtype,
             device=self.device,
         )
         atoms = self._constrain(atoms)
@@ -251,6 +287,93 @@ class WCESurvivalAnalysis:
         areas = self.atoms.sum(0)  # {Cutoff, Features) -> (Features,)
         assert areas.shape == (self.n_atoms,)
         return areas
+
+    def plot_basis(self, ax=None, show=True):
+        """Plots the B-spline basis functions ("atoms") used to model the risk function.
+
+        This is useful to visually check that a given basis configuration
+        (order, nknots, constrained, ...) behaves as expected.
+
+        Args:
+            ax (matplotlib.axes.Axes, optional): axes to draw on.
+                Defaults to None, i.e. a new figure and axes are created.
+            show (bool, optional): whether to call plt.show(). Defaults to True.
+
+        Returns:
+            matplotlib.axes.Axes: the axes that were used for the plot.
+        """
+        import matplotlib.pyplot as plt
+
+        atoms = self.atoms.detach().cpu().numpy()
+
+        if ax is None:
+            _, ax = plt.subplots(figsize=(10, 6))
+
+        for i, atom in enumerate(atoms.T):
+            ax.plot(atom, label=f"Atom {i}")
+
+        ax.plot(atoms.sum(1), "--", color="black", label="Sum")
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Basis value")
+        ax.set_title(
+            f"B-spline basis (order={self.order}, nknots={self.nknots}, "
+            f"constrained={self.constrained}, knot_placement={self.knot_placement})"
+        )
+        ax.legend()
+
+        if show:
+            plt.show()
+
+        return ax
+
+    def plot_fitted_basis(self, index=0, ax=None, show=True):
+        """Plots the fitted B-spline atoms, scaled by their estimated coefficients.
+
+        Requires the model to have been `.fit()` first: each basis function is
+        multiplied by its corresponding entry in `WCE_coef_`, and their sum
+        (the dashed curve) is exactly `risk_function_`. Useful to see how much
+        each atom actually contributes to the fitted risk function.
+
+        Args:
+            index (int, optional): which row of `WCE_coef_` to plot -- the
+                main fit is at index 0, bootstrap resamples (if any) come
+                after. Defaults to 0.
+            ax (matplotlib.axes.Axes, optional): axes to draw on.
+                Defaults to None, i.e. a new figure and axes are created.
+            show (bool, optional): whether to call plt.show(). Defaults to True.
+
+        Returns:
+            matplotlib.axes.Axes: the axes that were used for the plot.
+        """
+        import matplotlib.pyplot as plt
+
+        atoms = self.atoms.detach().cpu().numpy()  # (cutoff, n_atoms)
+        coef = self.WCE_coef_[index]  # (n_atoms,)
+        scaled_atoms = atoms * coef[None, :]
+
+        if ax is None:
+            _, ax = plt.subplots(figsize=(10, 6))
+
+        for i, atom in enumerate(scaled_atoms.T):
+            ax.plot(atom, label=f"Atom {i} * coef")
+
+        ax.plot(
+            self.risk_function_[index].detach().cpu().numpy(),
+            "--", color="black", linewidth=2, label="Risk function (sum)",
+        )
+        ax.axhline(0, color="grey", linewidth=0.8)
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Log hazard contribution")
+        ax.set_title(
+            f"Fitted B-spline basis (order={self.order}, nknots={self.nknots}, "
+            f"constrained={self.constrained}, knot_placement={self.knot_placement})"
+        )
+        ax.legend()
+
+        if show:
+            plt.show()
+
+        return ax
 
     # Computation of the WCE features ====================================================
 
@@ -275,6 +398,7 @@ class WCESurvivalAnalysis:
             nknots=self.nknots,
             cutoff=self.cutoff,
             order=self.order,
+            knot_placement=self.knot_placement,
             dtype=self.dtype,
             device=self.device,
         )
@@ -485,6 +609,7 @@ def wce_numpy(
     nknots: Int = 1,
     order: Int = 3,
     constrained: Literal["right", "left"] | None = None,
+    knot_placement: Literal["quantile", "uniform"] = "quantile",
     criterion: Literal["aic", "bic"] = "bic",
     strata: Int64Array["intervals"] | None = None,
     batch: Int64Array["intervals"] | None = None,
@@ -513,6 +638,10 @@ def wce_numpy(
         order (int, optional): order of the B-splines. Defaults to 3.
         constrained ("left", "right" or None, optional): boundary constraint
             on the B-splines. Defaults to None.
+        knot_placement ("quantile" or "uniform", optional): how to position
+            the B-spline knots. "uniform" spaces every knot (including the
+            boundary padding) equally, which is required for P-splines.
+            Defaults to "quantile".
         criterion ("aic" or "bic", optional): information criterion reported
             as "info_criterion" in the output. Defaults to "bic".
         strata ((I,) int64 array, optional): stratum id for each interval.
@@ -543,6 +672,7 @@ def wce_numpy(
         nknots=nknots,
         order=order,
         constrained=constrained,
+        knot_placement=knot_placement,
         criterion=criterion,
         survival_model=surv_model,
         nbootstraps=nbootstraps,
@@ -616,6 +746,7 @@ def wce_R(
     nknots=1,
     order=3,
     constrained=None,
+    knot_placement="quantile",
     aic=False,
     bootstrap=None,
     # Cox parameters:
@@ -644,6 +775,10 @@ def wce_R(
         order (int, optional): order of the B-splines. Defaults to 3.
         constrained (str or None, optional): one of "None"/None, "left"/"Left"/"l"/"L"
             or "right"/"Right"/"r"/"R". Defaults to None.
+        knot_placement ("quantile" or "uniform", optional): how to position
+            the B-spline knots. "uniform" spaces every knot (including the
+            boundary padding) equally, which is required for P-splines.
+            Defaults to "quantile".
         aic (bool, optional): if True, "info_criterion" in the output is the
             AIC (penalty = 2 per degree of freedom); otherwise it is the BIC
             (penalty = log(n_events) per degree of freedom). Matches the
@@ -756,6 +891,7 @@ def wce_R(
             nknots=int(nknots),
             order=int(order),
             constrained=constrained,
+            knot_placement=knot_placement,
             criterion="aic" if aic else "bic",
             strata=strata,
             batch=None,

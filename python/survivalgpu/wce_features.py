@@ -16,7 +16,7 @@ from pykeops.torch import LazyTensor
 from .utils import default_device, float64, int32, int64
 
 
-def place_knots(*, cutoff, nknots, order):
+def place_knots(*, cutoff, nknots, order, knot_placement="quantile"):
     """Returns a list of (nknots + 2 + 2*order) knot positions for the B-Splines model.
 
     The number of knots accounts for the fact that, following the conventions of the
@@ -35,26 +35,59 @@ def place_knots(*, cutoff, nknots, order):
     Args:
         cutoff (int): length of the observation window.
         nknots (int): number of inner knots.
+        knot_placement (str, optional): either "quantile" (default) or "uniform".
+
+            - "quantile" matches the WCE R package convention: the `nknots` inner
+              knots sit at regular quantiles of [1, cutoff], but the 2*order
+              "padding" knots at both ends are always spaced by 1, regardless of
+              how far apart the inner knots are. For a large cutoff/small nknots,
+              this makes the boundary basis functions much narrower than the
+              interior ones.
+            - "uniform" places all knots -- inner AND padding -- at the exact
+              same spacing cutoff / (nknots + 1), so every basis function has the
+              same width. This is the design that P-splines (Eilers & Marx, 1996)
+              rely on: their difference penalty on adjacent coefficients assumes
+              equally-spaced knots, and the uneven spacing of the "quantile"
+              scheme distorts that penalty near the boundaries.
 
     Returns:
         ((K,) array): (nknots + 2*order + 2) values for the knot positions.
     """
-    # Place nknots+1 equispaced values in [1, 2, ..., cutoff], at integer positions.
-    knots = np.round(
-        np.quantile(1 + np.arange(cutoff), np.arange(nknots + 1) / (nknots + 1)), 0
-    )
-    # And remove the first quantile:
-    knots = knots[1:]  # (nknots,)
-    # The code above ensures that if nknots=1, our knot will fall around cutoff/2.
+    if knot_placement == "quantile":
+        # Place nknots+1 equispaced values in [1, 2, ..., cutoff], at integer positions.
+        knots = np.round(
+            np.quantile(1 + np.arange(cutoff), np.arange(nknots + 1) / (nknots + 1)), 0
+        )
+        # And remove the first quantile:
+        knots = knots[1:]  # (nknots,)
+        # The code above ensures that if nknots=1, our knot will fall around cutoff/2.
 
-    # Pad the knot vectors with:
-    # - [-order, -(order-1), ..., 0] to the left
-    # - [cutoff, cutoff+1, ..., cutoff+order] to the right
-    ends = np.arange(order + 1)
-    # (nknots + 2 + 2*order,):
-    return np.concatenate(
-        (-ends[::-1], knots, cutoff + ends)
-    )
+        # Pad the knot vectors with:
+        # - [-order, -(order-1), ..., 0] to the left
+        # - [cutoff, cutoff+1, ..., cutoff+order] to the right
+        ends = np.arange(order + 1)
+        # (nknots + 2 + 2*order,):
+        return np.concatenate(
+            (-ends[::-1], knots, cutoff + ends)
+        )
+
+    elif knot_placement == "uniform":
+        # A single spacing is used everywhere, including the boundary padding,
+        # so that all basis functions share the same width.
+        delta = cutoff / (nknots + 1)
+        ends = np.arange(order + 1)
+        inner_knots = delta * np.arange(1, nknots + 1)  # (nknots,)
+        # (nknots + 2 + 2*order,):
+        return np.concatenate(
+            (-ends[::-1] * delta, inner_knots, cutoff + ends * delta)
+        )
+
+    else:
+        msg = (
+            "knot_placement should be 'quantile' or 'uniform'. "
+            f"Received {knot_placement}."
+        )
+        raise ValueError(msg)
 
 
 # KeOps computation of the B-Spline covariates ===========================================
@@ -183,7 +216,7 @@ def bspline_conv(
     return full_ij.sum(1)  # (N,K-order-1)
 
 
-def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None, dtype, device=None):
+def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None, knot_placement="quantile", dtype, device=None):
     """This function is equivalent to a parallel application of the .wcecalc method from the WCE package.
 
     The number of B-spline covariates is equal to
@@ -209,6 +242,8 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
         knots ((K,) tensor): the positions of the knots.
         cutoff (int): the length of the observation window.
         order (int): the order of the B-Spline basis.
+        knot_placement (str, optional): "quantile" or "uniform", passed to
+            `place_knots` when `knots` is None. Defaults to "quantile".
 
     Returns:
         tuple of ((N, F) tensor, (K,) tensor):
@@ -245,7 +280,7 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
     if device is None:
         device = default_device
     if knots is None:
-        knots = place_knots(cutoff=cutoff, nknots=nknots, order=order)
+        knots = place_knots(cutoff=cutoff, nknots=nknots, order=order, knot_placement=knot_placement)
         knots = torch.tensor(knots, device=device, dtype=dtype)
 
     # The window is a (2,) tensor:
@@ -273,7 +308,7 @@ def wce_features_batch(*, ids, times, doses, nknots, cutoff, order=3, knots=None
     return features, knots
 
 
-def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None, dtype, device=None):
+def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None, knot_placement="quantile", dtype, device=None):
     """Returns a set of B-Spline functions sampled on [0, cutoff-1].
 
     The number of B-spline covariates is equal to
@@ -287,6 +322,8 @@ def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None, dtype, device=None):
         order (int, optional): order of the B-Splines. Defaults to 3 (=cubic splines).
         knots ((K,) tensor, optional): specific values for the B-Spline knots,
             to use instead of relying on nknots. Defaults to None.
+        knot_placement (str, optional): "quantile" or "uniform", passed to
+            `place_knots` when `knots` is None. Defaults to "quantile".
 
     Returns:
         tuple of ((cutoff, F) tensor, (K,) tensor):
@@ -314,6 +351,7 @@ def bspline_atoms(*, cutoff, nknots=1, order=3, knots=None, dtype, device=None):
         cutoff=cutoff,
         order=order,
         knots=knots,
+        knot_placement=knot_placement,
         dtype=dtype,
         device=device,
     )
