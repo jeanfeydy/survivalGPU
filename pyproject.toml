@@ -9,6 +9,7 @@ authors = [
     { name = "Antoine Poirot-Bourdain", email = "antoine.poirot.bourdain@gmail.com"},
     { name = "Alexis van Straaten", email = "alexis.vanstraaten@outlook.fr"}
 ]
+dynamic = ["version"]
 description = "Survival analysis with GPU acceleration"
 readme = "python/README.md"
 license = "LGPL-2.1-or-later"
