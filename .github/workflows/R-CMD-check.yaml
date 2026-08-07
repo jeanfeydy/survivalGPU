@@ -64,7 +64,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -e .[test]
+          pip install . --group test
           # Point reticulate at this interpreter instead of letting it
           # auto-provision its own bare ephemeral Python.
           echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
