@@ -4,9 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "survivalgpu"
+authors = [
+    { name = "Jean Feydy", email = "jean.feydy@gmail.com" },
+    { name = "Antoine Poirot-Bourdain", email = "antoine.poirot.bourdain@gmail.com"},
+    { name = "Alexis van Straaten", email = "alexis.vanstraaten@outlook.fr"}
+]
 dynamic = ["version"]
 description = "Survival analysis with GPU acceleration"
-readme = "README.md"
+readme = "python/README.md"
 license = "LGPL-2.1-or-later"
 license-files = ["LICENSE"]
 requires-python = ">= 3.10"
@@ -33,7 +38,7 @@ classifiers = [
   "Programming Language :: Python"
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 test = [
   "rpy2",
   "black",
@@ -45,7 +50,9 @@ test = [
   "pytest-sphinx @ git+https://github.com/jeanfeydy/pytest-sphinx.git",
 ]
 
-all = ["survivalgpu[test]"] # https://stackoverflow.com/questions/75490231/pip-pyproject-toml-can-optional-dependency-groups-require-other-optional-depend
+
+
+all = [{include-group = "test"}] # https://stackoverflow.com/questions/75490231/pip-pyproject-toml-can-optional-dependency-groups-require-other-optional-depend
 
 
 [project.urls]

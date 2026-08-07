@@ -37,7 +37,7 @@ To also pull in the tools needed to run the test suite and linters (`pytest`,
 instead:
 
 ```bash
-pip install -e .[test]
+pip install -e . --group test
 ```
 
 `pykeops`, one of the core dependencies, just-in-time compiles CUDA/C++ kernels,
