@@ -9,7 +9,6 @@ authors = [
     { name = "Antoine Poirot-Bourdain", email = "antoine.poirot.bourdain@gmail.com"},
     { name = "Alexis van Straaten", email = "alexis.vanstraaten@outlook.fr"}
 ]
-dynamic = ["version"]
 description = "Survival analysis with GPU acceleration"
 readme = "python/README.md"
 license = "LGPL-2.1-or-later"
@@ -58,6 +57,7 @@ all = [{include-group = "test"}] # https://stackoverflow.com/questions/75490231
 [project.urls]
 Documentation = "https://github.com/jeanfeydy/survivalGPU"
 Repository = "https://github.com/jeanfeydy/survivalGPU"
+
 
 [tool.setuptools.dynamic]
 version = {attr = "survivalgpu.__version__"}
