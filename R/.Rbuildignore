@@ -13,3 +13,5 @@
 ^pkgdown$
 ^vignettes/.*\.orig$
 ^vignettes/precompile\.R$
+^src/.*\.o$
+^src/.*\.so$
