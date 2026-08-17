@@ -595,8 +595,8 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 
 #' Hazard Ratio for WCE model
 #'
-#' Calcul the hazard ratio from a wceGPU object to compare two scenarios of
-#' time-dependant exposures.
+#' Calculate the hazard ratio from a wceGPU object to compare two scenarios of
+#' time-dependent exposures.
 #'
 #' @param object wceGPU object.
 #' @param vecnum 	A vector of time-dependent exposures corresponding to a

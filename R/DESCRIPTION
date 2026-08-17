@@ -14,9 +14,9 @@ Description: Performs survival analysis on GPU-accelerated hardware using
     Computations are delegated to 'PyTorch' and 'PyKeOps' via
     'reticulate'.
 License: LGPL (>= 2.1)
+Language: en-US
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
 Imports:
     data.table,
     reticulate,
@@ -34,3 +34,4 @@ VignetteBuilder: knitr
 SystemRequirements: python, pytorch, pykeops
 URL: https://github.com/jeanfeydy/survivalGPU
 BugReports: https://github.com/jeanfeydy/survivalGPU/issues
+Config/roxygen2/version: 8.1.0

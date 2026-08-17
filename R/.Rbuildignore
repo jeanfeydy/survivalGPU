@@ -5,6 +5,7 @@
 ^PUBLISHING_CRAN\.md$
 ^CRAN_CHECKLIST\.md$
 ^CRAN_WORK_LOG\.md$
+^cran-comments\.md$
 ^doc$
 ^Meta$
 ^benchmarks$

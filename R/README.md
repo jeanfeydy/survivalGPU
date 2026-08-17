@@ -8,24 +8,34 @@
 [![R-CMD-check](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-The survivalGPU library allows you to perform survival analyzes using
-the resources of Graphic Processing Units (GPU) in order to accelerate
-the speed of calculations. Currently, two models have been implemented :
+**GPU-accelerated survival analysis** — Cox Proportional Hazards (CoxPH)
+and Weighted Cumulative Exposure (WCE) models, built on
+[PyTorch](https://pytorch.org) and
+[KeOps](https://www.kernel-operations.io), with an R interface via
+[reticulate](https://rstudio.github.io/reticulate/). survivalGPU scales
+classical survival models to large datasets and to heavy bootstrap
+resampling by running the core computations on the GPU. It’s also
+possible to use the library without a GPU (CPU fallback).
 
--   Cox Proportional Hazards regression model
--   Weighted Cumulative Exposure model
+## Features
 
-It’s also possible to use the library without having Graphics Processing
-Units (with CPU).
+-   **Cox Proportional Hazards** models (`coxphGPU()`), with Breslow and
+    Efron handling of ties, built as a drop-in companion to
+    `survival::coxph()`.
+-   **Weighted Cumulative Exposure (WCE)** models (`wceGPU()`) for
+    time-varying exposure effects, built as a drop-in companion to
+    `WCE::WCE()`.
+-   **GPU acceleration** of the likelihood and its gradients via
+    PyTorch + KeOps, with a CPU fallback (`use_cuda()` to check what’s
+    available).
+-   **Bootstrap** resampling for confidence intervals on both models.
 
 ## Installation
 
-survivalGPU is a package based on a package written in python, dependent
-on the `reticulate` R package. To use it, it’s necessary to have
-installed some python libraries such as `torch` and `pykeops`. To use
-survivalGPU, you can create a virtual python environment through
-`reticulate`. It’s highly recommended to not to use the default python
-executable.
+survivalGPU wraps a Python backend (via the `reticulate` R package), so
+it needs a working Python environment with `torch` and `pykeops`
+installed. To configure this properly, check
+`vignette("python_connect")` — the short version:
 
 ``` r
 library(reticulate)
@@ -36,8 +46,23 @@ virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
 # torch takes a long time to set up
 ```
 
-To configure properly and understand your python environment, check
-`vignette("python_connect")`
+### Requirements
+
+-   **R \>= 4.1**
+-   **Python \>= 3.10**
+-   **A C++ compiler:** [`pykeops`](https://www.kernel-operations.io)
+    just-in-time compiles C++/CUDA kernels at runtime, so a working C++
+    toolchain must be present. For GPU acceleration you also need the
+    **CUDA toolkit** (`nvcc`) installed, not just a CUDA-capable GPU —
+    the code runs on CPU without one, the GPU is simply where the
+    speedups come from.
+
+### Windows
+
+**pykeops** compiles C++/CUDA kernels at runtime and is **not supported
+natively on Windows**. See the [Python package’s
+README](https://github.com/jeanfeydy/survivalGPU/blob/main/python/README.md#windows)
+for working alternatives (WSL2, Docker).
 
 The R package and its Python backend live together in the same
 [GitHub](https://github.com/) repository (no git submodule involved), so
@@ -48,13 +73,12 @@ you can install the development version of survivalGPU directly with:
 remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")
 ```
 
-> **Warning**: Currently, survivalGPU is not available for Windows.
+## Quick start
 
-## Example
-
-Let’s make a small example for a Cox PH model with `lung` cancer dataset
-from `survival` package. Before load `survivalGPU`, use your virtual
-python environment (see above or `vignette("python_connect")`).
+Let’s make a small example for a Cox PH model with the `lung` cancer
+dataset from the `survival` package. Before loading `survivalGPU`, use
+your virtual Python environment (see above or
+`vignette("python_connect")`).
 
 ``` r
 library(reticulate)
@@ -142,9 +166,9 @@ summary(coxphGPU_bootstrap)
 #>  ----------------
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>             2.5%    97.5%
-#> age     0.998209 1.027550
-#> sex     0.429259 0.747363
-#> ph.ecog 1.276450 2.033300
+#> age     0.995557 1.026190
+#> sex     0.402488 0.804488
+#> ph.ecog 1.294040 2.351550
 ```
 
 To visualize your model, you can plot adjusted survival curves with
@@ -171,3 +195,37 @@ plot a forestplot of your model. All is explain in the
 -   `vignette("coxPH")`
 -   `vignette("WCE")`
 -   `vignette("python_connect")`
+
+## Development
+
+Clone the repository and install the R package in development mode:
+
+``` r
+# git clone https://github.com/jeanfeydy/survivalGPU.git
+# cd survivalGPU/R
+
+devtools::install_deps(dependencies = TRUE)
+devtools::load_all()
+```
+
+Run the test suite with:
+
+``` r
+devtools::test()
+```
+
+## Citation
+
+If you use survivalGPU in your research, please cite it.
+
+    @software{survivalgpu,
+      author = {Jean Feydy, Antoine Poirot-Bourdain, Alexis van Straaten},
+      title  = {{survivalGPU}: GPU-accelerated survival analysis},
+      url    = {https://github.com/jeanfeydy/survivalGPU},
+      year   = {2026},
+    }
+
+## License
+
+Distributed under the terms of the **LGPL-2.1-or-later** license. See
+[LICENSE](https://github.com/jeanfeydy/survivalGPU/blob/main/LICENSE).

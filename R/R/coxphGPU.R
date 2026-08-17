@@ -21,7 +21,7 @@
 #'   Defaults to 0, which means that we handle all copies at once. If you run
 #'   into out of memory errors, please consider using batchsize=100, 10 or 1.
 #' @param all.results Post-processing calculations. If TRUE, coxphGPU returns
-#'   linears.predictors, wald.test, concordance for all bootstraps. Default to
+#'   linear.predictors, wald.test, concordance for all bootstraps. Default to
 #'   FALSE if bootstraps.
 #' @param ... Other arguments for methods.
 #'
