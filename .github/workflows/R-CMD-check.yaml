@@ -74,3 +74,39 @@ jobs:
         with:
           upload-snapshots: true
           working-directory: "R/"
+
+  # Simulates a CRAN check machine: no Python/torch/pykeops installed at
+  # all (this runner's stock python3 has neither). Exported functions must
+  # fail gracefully at runtime instead of crashing, and Python-dependent
+  # tests/vignettes must skip instead of erroring -- see
+  # R/CRAN_CHECKLIST.md Phase 0.
+  R-CMD-check-no-python:
+    runs-on: ubuntu-latest
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      - name: Install R dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+          working-directory: "R/"
+
+      - name: R CMD CHECK (no Python/torch/pykeops installed)
+        uses: r-lib/actions/check-r-package@v2
+        with:
+          upload-snapshots: true
+          working-directory: "R/"

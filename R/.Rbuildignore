@@ -1,6 +1,10 @@
 ^survivalGPU\.Rproj$
 ^\.Rproj\.user$
 ^README\.Rmd$
+^README\.html$
+^PUBLISHING_CRAN\.md$
+^CRAN_CHECKLIST\.md$
+^CRAN_WORK_LOG\.md$
 ^doc$
 ^Meta$
 ^benchmarks$

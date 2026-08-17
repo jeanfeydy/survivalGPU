@@ -1,29 +1,29 @@
 ## coxph internals functions from `survival` R package    ----------------------
 
-# terms.inner
+# terms_inner
 
 # Function to extract the arguments of a formula by distinguishing between what
 # is before/after the "~"
-terms.inner <- function(x) {
+terms_inner <- function(x) {
   if (inherits(x, "formula")) {
     if (length(x) == 3) {
-      c(terms.inner(x[[2]]), terms.inner(x[[3]]))
+      c(terms_inner(x[[2]]), terms_inner(x[[3]]))
     } else {
-      terms.inner(x[[2]])
+      terms_inner(x[[2]])
     }
   } else if (inherits(x, "call") &&
              (x[[1]] != as.name("$") && x[[1]] != as.name("["))) {
     if (x[[1]] == "+" || x[[1]] == "*" || x[[1]] == "-" || x[[1]] == ":") {
       # terms in a model equation, unary minus only has one argument
       if (length(x) == 3) {
-        c(terms.inner(x[[2]]), terms.inner(x[[3]]))
+        c(terms_inner(x[[2]]), terms_inner(x[[3]]))
       } else {
-        terms.inner(x[[2]])
+        terms_inner(x[[2]])
       }
     } else if (x[[1]] == as.name("Surv")) {
-      unlist(lapply(x[-1], terms.inner))
+      unlist(lapply(x[-1], terms_inner))
     } else {
-      terms.inner(x[[2]])
+      terms_inner(x[[2]])
     }
   } else {
     (deparse(x))

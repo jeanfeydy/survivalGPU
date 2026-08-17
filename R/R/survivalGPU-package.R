@@ -47,5 +47,5 @@ use_survivalGPU <- function() {
 #' }
 use_cuda <- function() {
   # survivalgpu <- use_survivalGPU()
-  return(survivalgpu$use_cuda)
+  return(tryCatch(survivalgpu$use_cuda, error = survivalgpu_unavailable_error))
 }

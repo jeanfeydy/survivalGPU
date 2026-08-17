@@ -1,7 +1,7 @@
 ---
 title: "survivalGPU : Fast survival analysis"
 author: "Alexis van STRAATEN"
-date: "2026-07-02"
+date: "2026-08-17"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{survivalGPU : Fast survival analysis}
@@ -136,8 +136,8 @@ summary(coxphGPU_bootstrap)
 #>  ----------------
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>        2.5%   97.5%
-#> sex 1.36896 2.39688
-#> age 1.00335 1.01537
+#> sex 1.50221 2.33782
+#> age 1.00093 1.01579
 ```
 
 

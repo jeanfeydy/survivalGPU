@@ -128,7 +128,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                            confint = 0.95, controls = NULL, device = NULL, double_precision = TRUE, ...) {
   # survivalgpu <- use_survivalGPU()
 
-  wce_R <- survivalgpu$wce_R
+  wce_R <- tryCatch(survivalgpu$wce_R, error = survivalgpu_unavailable_error)
 
 
   # Minor changes for python inputs
@@ -393,7 +393,7 @@ sumWCEall <- function(object, objname, ...) {
 
   best <- which.min(object$info.criterion)
 
-  if (is.na(object$loglik[best]) == T) {cat('Warning : the model did not converge, and no \npartial log-likelihood was produced. Results \nfor this model should be ignored.\n\n')}
+  if (is.na(object$loglik[best]) == TRUE) {cat('Warning : the model did not converge, and no \npartial log-likelihood was produced. Results \nfor this model should be ignored.\n\n')}
   if (sum(object$SED[[best]]==0) >0) {cat('Warning : some of the SE for the spline \nvariables in the model are exactlty zero, probably \nbecause the model did not converge. Variable(s)',  names(which(object$SED[[1]]==0)), ' \nhad SE=0. Consider re-parametrizing or increasing \nthe number of iterations\n\n')}
 
   if (object$analysis == 'Cox') lab <- 'Proportional hazards model'
@@ -411,8 +411,8 @@ sumWCEall <- function(object, objname, ...) {
     cat("\n*** Right-constrained estimated WCE function  (",lab ,").***\n", sep='')}
   if (object$constrained == FALSE) {
     cat("\nUnconstrained estimated WCE function (",lab ,").***\n", sep='')}
-  if (object$aic == F) {criterion <- "BIC: "} else {criterion <- "AIC: "}
-  if (is.null(object$covariates[1]) == F){
+  if (object$aic == FALSE) {criterion <- "BIC: "} else {criterion <- "AIC: "}
+  if (is.null(object$covariates[1]) == FALSE){
     cat("\nEstimated coefficients for the covariates: \n")
     bhat <- unlist(object$beta.hat.covariates[best,])
     s_hat <- unlist(object$se.covariates[best,])

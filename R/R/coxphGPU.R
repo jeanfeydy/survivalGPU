@@ -325,10 +325,10 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
   # Formula check
   if (length(attr(Terms, "variables")) > 2) { # a ~1 formula has length 2
-    ytemp <- terms.inner(formula[1:2])
+    ytemp <- terms_inner(formula[1:2])
     suppressWarnings(z <- as.numeric(ytemp)) # are any of the elements numeric?
     ytemp <- ytemp[is.na(z)] # toss numerics, e.g. Surv(t, 1-s)
-    xtemp <- terms.inner(formula[-2])
+    xtemp <- terms_inner(formula[-2])
     if (any(!is.na(match(xtemp, ytemp)))) {
       warning("a variable appears on both the left and right sides of the formula")
     }
@@ -1072,7 +1072,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
   # Python coxph
   # survivalgpu <- use_survivalGPU() # change due to .onload
-  coxph_R <- survivalgpu$coxph_R
+  coxph_R <- tryCatch(survivalgpu$coxph_R, error = survivalgpu_unavailable_error)
 
   # time_start = Sys.time()
   # data_X <- as.data.table(X)
@@ -1322,7 +1322,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
       fit$rscore <- coxph.wtest(t(temp0) %*% temp0, u, control$toler.chol)$test
     }
 
-    # plusieurs tests de Wald nécessaire ? il faut la matrice de variance covar pour tous les bootstraps
+    # multiple Wald tests needed? requires the variance-covariance matrix for all bootstraps
 
     # # Wald test
     # if (length(fit$coefficients) && is.null(fit$wald.test)) {

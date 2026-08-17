@@ -12,7 +12,7 @@ vignette: >
 
 
 
-présenter Weighted Cumulative Exposure[^wce] model ...
+The Weighted Cumulative Exposure (WCE) model[^wce] extends the Cox proportional hazards model to time-varying exposures whose effect on the hazard depends not only on the current exposure level but also on how it has evolved over time. It estimates a weight function that captures how the influence of past exposure on the hazard changes with the time elapsed since it occurred, so that the cumulative effect at any given time is a weighted sum of the exposure history up to that point.
 
 
 Let's make an example with `drugdata` dataset from WCE package. Before load `survivalGPU`, use your virtual python environment (see `vignette("python_connect")`).
@@ -85,7 +85,7 @@ plot(wce_gpu_bootstrap)
 
 ## Hazards Ratios
 
-Expliquer HR et IC bootstrap
+`HR()` computes the hazard ratio between two exposure profiles — for example a constantly exposed patient versus an unexposed one — using the estimated WCE weight function. If the model was fit with bootstrap resampling (`nbootstraps > 0`), it also reports a bootstrap confidence interval for that hazard ratio.
 
 
 ``` r
