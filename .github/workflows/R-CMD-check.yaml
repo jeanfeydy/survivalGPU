@@ -88,12 +88,23 @@ jobs:
           working-directory: "R/"
 
   # Simulates a CRAN check machine: no Python/torch/pykeops installed at
-  # all (this runner's stock python3 has neither). Exported functions must
-  # fail gracefully at runtime instead of crashing, and Python-dependent
-  # tests/vignettes must skip instead of erroring -- see
-  # R/CRAN_CHECKLIST.md Phase 0.
+  # all (these runners' stock Python has none of it). Exported functions
+  # must fail gracefully at runtime instead of crashing, and
+  # Python-dependent tests/vignettes must skip instead of erroring -- see
+  # R/CRAN_CHECKLIST.md Phase 0. No Python is installed in this job at
+  # all, so unlike R-CMD-check above, there's no pykeops/libomp concern
+  # here -- that's exactly why Windows can be included here even though
+  # the package's real GPU functionality doesn't support it (see
+  # README.md): this job never touches that code path.
   R-CMD-check-no-python:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    name: no-python (${{ matrix.os }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
