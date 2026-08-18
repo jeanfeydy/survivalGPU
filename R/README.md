@@ -1,13 +1,4 @@
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
-
-# survivalGPU <img src="man/figures/logo.png" align="right" height="139" />
-
-<!-- badges: start -->
-
-[![R-CMD-check](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml)
-<!-- badges: end -->
-
 **GPU-accelerated survival analysis** — Cox Proportional Hazards (CoxPH)
 and Weighted Cumulative Exposure (WCE) models, built on
 [PyTorch](https://pytorch.org) and
