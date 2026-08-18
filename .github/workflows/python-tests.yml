@@ -77,6 +77,12 @@ jobs:
           "$PY" -m pip install . --group test
           echo "PY=$PY" >> "$GITHUB_ENV"
           export LD_LIBRARY_PATH=$("$PY" -m rpy2.situation LD_LIBRARY_PATH):${LD_LIBRARY_PATH}
+          # Same diagnostic as R-CMD-check.yaml's macOS job, for direct
+          # comparison: this job passes on macOS, that one segfaults
+          # inside torch.tensor(numpy_array) -- if the resolved versions
+          # differ between the two despite both being macOS-arm64 with
+          # the same unpinned deps, that's a strong signal.
+          "$PY" -c "import numpy, torch; print('numpy', numpy.__version__); print('torch', torch.__version__)"
 
       - name: Test
         run: |

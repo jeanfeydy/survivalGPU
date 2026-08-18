@@ -101,6 +101,12 @@ jobs:
           "$PY" -m pip install --upgrade pip
           "$PY" -m pip install . --group test
           echo "RETICULATE_PYTHON=$PY" >> "$GITHUB_ENV"
+          # Diagnostic: numpy/torch are unpinned upstream in pyproject.toml
+          # (beyond the floors just added), so print exactly what got
+          # resolved on this platform -- a NumPy/PyTorch ABI mismatch is a
+          # common cause of segfaults inside torch.tensor(numpy_array),
+          # which is where the macOS crash under investigation happens.
+          "$PY" -c "import numpy, torch; print('numpy', numpy.__version__); print('torch', torch.__version__)"
 
       - name: R CMD CHECK
         uses: r-lib/actions/check-r-package@v2
