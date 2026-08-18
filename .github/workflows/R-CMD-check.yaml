@@ -102,19 +102,20 @@ jobs:
       - name: Pin numpy/torch to known-working versions (macOS debugging)
         if: runner.os == 'macOS'
         run: |
-          # `numpy`/`torch` are only floor-pinned in pyproject.toml
-          # (numpy>=1.26, torch>=2.2), so this job could still resolve a
-          # different exact combination than what's known to work: this
-          # session's own dev environment (Linux) runs numpy 2.2.6 +
-          # torch 2.12.1 without issue. Force those exact versions here
-          # (dropping the +cu130 local tag -- that's a CUDA build detail
-          # that doesn't apply on macOS, which only has CPU wheels) as a
-          # targeted experiment for the known macOS segfault -- see
-          # R/CRAN_WORK_LOG.md. Deliberately *not* changing the published
-          # package's own floors to an exact pin, which would risk
-          # breaking wheel availability across the full Python
-          # version/OS test matrix for no good reason.
-          pip install "numpy==2.2.6" "torch==2.12.1"
+          # getkeops/keops#420 documents a *confirmed* NumPy binary
+          # incompatibility in pykeops/keopscore 2.3 (our exact installed
+          # version) specifically when used through `reticulate` from R:
+          # "reticulate reports incompatible NumPy binary versions
+          # (33554432 vs 16777225 expected)" -- exactly this class of
+          # native crash. The KeOps maintainers' own fix is to pin numpy
+          # to 1.26.4 (NumPy 1.x, not 2.x) or pin pykeops back to 2.2.3.
+          # Trying the numpy pin first, since it's less invasive. Not
+          # changing the published package's own pyproject.toml floors to
+          # an exact pin -- that's installed across a full Python
+          # 3.10-3.13 x OS test matrix in python-tests.yml, and an exact
+          # pin there would risk breaking wheel availability for no good
+          # reason; this stays scoped to the one job under investigation.
+          pip install "numpy==1.26.4" "torch==2.12.1"
 
       - name: R CMD CHECK
         uses: r-lib/actions/check-r-package@v2
