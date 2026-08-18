@@ -35,6 +35,13 @@ jobs:
       # own OpenMP runtime; on macOS loading both into the same process
       # aborts with "OMP: Error #15: ... libomp.dylib already initialized".
       KMP_DUPLICATE_LIB_OK: "TRUE"
+      # Diagnostic only (not a fix): on a native crash (segfault included),
+      # CPython's faulthandler dumps a Python-level traceback to stderr
+      # showing which Python/C call was actually in progress. Investigating
+      # a macOS-only segfault in `R CMD check`'s test step that gave no
+      # further detail in R's own crash handler output -- see
+      # R/CRAN_WORK_LOG.md, "Fix macOS CI segfault" entries.
+      PYTHONFAULTHANDLER: "1"
 
     steps:
       - uses: actions/checkout@v3
@@ -42,6 +49,7 @@ jobs:
       - uses: r-lib/actions/setup-pandoc@v2
 
       - name: Setup Python
+        id: setup-python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
@@ -74,12 +82,25 @@ jobs:
           working-directory: "R/"
 
       - name: Install Python dependencies
+        env:
+          PY: ${{ steps.setup-python.outputs.python-path }}
         run: |
-          pip install --upgrade pip
-          pip install . --group test
-          # Point reticulate at this interpreter instead of letting it
-          # auto-provision its own bare ephemeral Python.
-          echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
+          # Use the exact interpreter setup-python resolved (via its own
+          # python-path output), invoked with -m pip, rather than bare
+          # `pip`/`python` on PATH. macOS runner images ship pre-installed
+          # framework Pythons alongside whatever setup-python provisions
+          # into its hosted tool cache; bare `pip` and bare `python` are
+          # independent PATH lookups that aren't guaranteed to resolve to
+          # the same interpreter, especially there. If they diverge here,
+          # torch/pykeops get installed into one interpreter's
+          # site-packages while RETICULATE_PYTHON below points reticulate
+          # at a different one -- loading a mismatched libpython against
+          # natively-linked extensions built for a different one is
+          # exactly the kind of thing that produces a hard-to-diagnose
+          # native crash rather than a clean Python-level error.
+          "$PY" -m pip install --upgrade pip
+          "$PY" -m pip install . --group test
+          echo "RETICULATE_PYTHON=$PY" >> "$GITHUB_ENV"
 
       - name: R CMD CHECK
         uses: r-lib/actions/check-r-package@v2

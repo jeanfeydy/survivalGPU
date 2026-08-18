@@ -33,6 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
+        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -64,14 +65,22 @@ jobs:
           working-directory: "R/"
 
       - name: Install package (with dependencies for tests)
+        env:
+          PY: ${{ steps.setup-python.outputs.python-path }}
         run: |
-          pip install --upgrade pip
-          pip install . --group test
-          export LD_LIBRARY_PATH=$(python -m rpy2.situation LD_LIBRARY_PATH):${LD_LIBRARY_PATH}
+          # Use the exact interpreter setup-python resolved, not bare
+          # pip/python on PATH -- see R-CMD-check.yaml's "Install Python
+          # dependencies" step for why that can silently diverge on
+          # macOS runners, which ship pre-installed framework Pythons
+          # alongside whatever setup-python provisions.
+          "$PY" -m pip install --upgrade pip
+          "$PY" -m pip install . --group test
+          echo "PY=$PY" >> "$GITHUB_ENV"
+          export LD_LIBRARY_PATH=$("$PY" -m rpy2.situation LD_LIBRARY_PATH):${LD_LIBRARY_PATH}
 
       - name: Test
         run: |
-          pytest
+          "$PY" -m pytest
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
