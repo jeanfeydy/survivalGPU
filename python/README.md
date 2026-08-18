@@ -34,6 +34,17 @@ pip install survivalgpu
   just a CUDA-capable GPU. The code runs on CPU without a GPU — the GPU is simply
   where the speedups come from.
 
+### macOS (Apple Silicon)
+
+`pykeops` needs [OpenMP](https://www.openmp.org), which isn't bundled with Apple's
+compiler toolchain on Apple Silicon (M1/M2/M3/M4). Without it, `pykeops` disables
+OpenMP and falls back to a much less-tested code path — we've seen this cause
+crashes. Install it via Homebrew before setting up your environment:
+
+```bash
+brew install libomp
+```
+
 ### Windows
 
 **pykeops** compiles C++/CUDA kernels at runtime and is **not supported natively on

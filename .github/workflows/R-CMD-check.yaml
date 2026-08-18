@@ -8,9 +8,9 @@ concurrency:
 
 on:
   push:
-  #   branches: [main, master]
-  # pull_request:
-  #   branches: [main, master]
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
 
 jobs:
   R-CMD-check:
@@ -23,7 +23,7 @@ jobs:
       matrix:
         config:
           - {os: macos-latest,   r: 'release'}
-        #  - {os: windows-latest, r: 'release'}
+          # - {os: windows-latest, r: 'release'}
           - {os: ubuntu-latest,   r: 'devel', http-user-agent: 'release'}
           - {os: ubuntu-latest,   r: 'release'}
           - {os: ubuntu-latest,   r: 'oldrel-1'}
@@ -46,6 +46,18 @@ jobs:
         with:
           python-version: "3.11"
           cache: 'pip' # caching pip dependencies
+
+      - name: Install OpenMP (macOS/Apple Silicon)
+        if: runner.os == 'macOS'
+        run: |
+          # pykeops JIT-compiles its kernels and needs libomp on Apple
+          # Silicon; without it, keopscore disables OpenMP and falls back
+          # to a much less-tested code path that has crashed with a
+          # segfault during `R CMD check` on macOS-arm64 runners. keopscore
+          # detects it via `brew --prefix`/opt/libomp itself at runtime, so
+          # installing the formula is the whole fix -- no extra
+          # CFLAGS/LDFLAGS needed.
+          brew install libomp
 
       - name: Setup R
         uses: r-lib/actions/setup-r@v2

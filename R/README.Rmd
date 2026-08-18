@@ -63,6 +63,18 @@ virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
   installed, not just a CUDA-capable GPU — the code runs on CPU without one,
   the GPU is simply where the speedups come from.
 
+### macOS (Apple Silicon)
+
+`pykeops` needs [OpenMP](https://www.openmp.org), which isn't bundled with
+Apple's compiler toolchain on Apple Silicon (M1/M2/M3/M4). Without it,
+`pykeops` disables OpenMP and falls back to a much less-tested code path —
+we've seen this cause crashes. Install it via Homebrew before setting up
+your Python environment:
+
+```bash
+brew install libomp
+```
+
 ### Windows
 
 **pykeops** compiles C++/CUDA kernels at runtime and is **not supported

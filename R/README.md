@@ -1,4 +1,13 @@
 
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+# survivalGPU <img src="man/figures/logo.png" align="right" height="139" />
+
+<!-- badges: start -->
+
+[![R-CMD-check](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml)
+<!-- badges: end -->
+
 **GPU-accelerated survival analysis** — Cox Proportional Hazards (CoxPH)
 and Weighted Cumulative Exposure (WCE) models, built on
 [PyTorch](https://pytorch.org) and
@@ -47,6 +56,18 @@ virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
     **CUDA toolkit** (`nvcc`) installed, not just a CUDA-capable GPU —
     the code runs on CPU without one, the GPU is simply where the
     speedups come from.
+
+### macOS (Apple Silicon)
+
+`pykeops` needs [OpenMP](https://www.openmp.org), which isn’t bundled
+with Apple’s compiler toolchain on Apple Silicon (M1/M2/M3/M4). Without
+it, `pykeops` disables OpenMP and falls back to a much less-tested code
+path — we’ve seen this cause crashes. Install it via Homebrew before
+setting up your Python environment:
+
+``` bash
+brew install libomp
+```
 
 ### Windows
 
@@ -157,9 +178,9 @@ summary(coxphGPU_bootstrap)
 #>  ----------------
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>             2.5%    97.5%
-#> age     0.995557 1.026190
-#> sex     0.402488 0.804488
-#> ph.ecog 1.294040 2.351550
+#> age     0.994729 1.028270
+#> sex     0.412227 0.777047
+#> ph.ecog 1.320180 2.052470
 ```
 
 To visualize your model, you can plot adjusted survival curves with
