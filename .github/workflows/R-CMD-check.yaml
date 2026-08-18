@@ -99,6 +99,23 @@ jobs:
           # auto-provision its own bare ephemeral Python.
           echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
 
+      - name: Pin numpy/torch to known-working versions (macOS debugging)
+        if: runner.os == 'macOS'
+        run: |
+          # `numpy`/`torch` are only floor-pinned in pyproject.toml
+          # (numpy>=1.26, torch>=2.2), so this job could still resolve a
+          # different exact combination than what's known to work: this
+          # session's own dev environment (Linux) runs numpy 2.2.6 +
+          # torch 2.12.1 without issue. Force those exact versions here
+          # (dropping the +cu130 local tag -- that's a CUDA build detail
+          # that doesn't apply on macOS, which only has CPU wheels) as a
+          # targeted experiment for the known macOS segfault -- see
+          # R/CRAN_WORK_LOG.md. Deliberately *not* changing the published
+          # package's own floors to an exact pin, which would risk
+          # breaking wheel availability across the full Python
+          # version/OS test matrix for no good reason.
+          pip install "numpy==2.2.6" "torch==2.12.1"
+
       - name: R CMD CHECK
         uses: r-lib/actions/check-r-package@v2
         with:

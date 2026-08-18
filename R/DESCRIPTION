@@ -19,7 +19,7 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Imports:
     data.table,
-    reticulate,
+    reticulate (>= 1.46.0),
     stats,
     survival,
     utils
