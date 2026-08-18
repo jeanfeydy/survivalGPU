@@ -65,6 +65,15 @@ virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
 
 ### macOS (Apple Silicon)
 
+> **Known issue:** calling `coxphGPU()`/`wceGPU()` from R currently
+> crashes with a native segfault on macOS, specifically when Python is
+> embedded via `reticulate` — this is under active investigation and not
+> yet resolved. It does **not** affect the
+> [Python package](https://github.com/jeanfeydy/survivalGPU/tree/main/python)
+> used directly, without R. If you're on macOS and need the package
+> working today, use the Python package directly rather than the R
+> wrapper.
+
 `pykeops` needs [OpenMP](https://www.openmp.org), which isn't bundled with
 Apple's compiler toolchain on Apple Silicon (M1/M2/M3/M4). Without it,
 `pykeops` disables OpenMP and falls back to a much less-tested code path —

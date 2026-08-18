@@ -54,6 +54,19 @@ jobs:
       # produced the only useful diagnostics for the known macOS issue
       # above; harmless elsewhere.
       PYTHONFAULTHANDLER: "1"
+      # python/survivalgpu/datasets.py -- the exact file the macOS
+      # segfault happens in -- imports matplotlib.pyplot at module load
+      # time. matplotlib's default backend auto-selection picks the
+      # interactive, Cocoa/AppKit-based "macosx" backend on macOS (unlike
+      # Linux, macOS doesn't need a $DISPLAY to look display-capable, so
+      # this happens even in headless CI). Cocoa/AppKit generally expects
+      # proper main-thread app initialization, which an embedded
+      # interpreter inside R's process doesn't provide -- a known
+      # category of crash for Python-on-macOS-CI generally. Force the
+      # non-interactive backend before matplotlib ever gets a chance to
+      # auto-select. Safe on every platform regardless of whether this is
+      # the actual cause.
+      MPLBACKEND: "Agg"
 
     steps:
       - uses: actions/checkout@v3
