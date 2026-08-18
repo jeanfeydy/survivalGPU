@@ -61,8 +61,8 @@ virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
 
 > **Known issue:** calling `coxphGPU()`/`wceGPU()` from R currently
 > crashes with a native segfault on macOS, specifically when Python is
-> embedded via `reticulate` — this is under active investigation and not
-> yet resolved. It does **not** affect the [Python
+> embedded via `reticulate` — see [MACOS_SEGFAULT.md](MACOS_SEGFAULT.md)
+> for the full investigation. It does **not** affect the [Python
 > package](https://github.com/jeanfeydy/survivalGPU/tree/main/python)
 > used directly, without R. If you’re on macOS and need the package
 > working today, use the Python package directly rather than the R
@@ -187,9 +187,9 @@ summary(coxphGPU_bootstrap)
 #>  ----------------
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>             2.5%    97.5%
-#> age     0.992353 1.034090
-#> sex     0.404248 0.711317
-#> ph.ecog 1.123050 2.035530
+#> age     0.990589 1.029560
+#> sex     0.403348 0.741719
+#> ph.ecog 1.272200 1.995180
 ```
 
 To visualize your model, you can plot adjusted survival curves with

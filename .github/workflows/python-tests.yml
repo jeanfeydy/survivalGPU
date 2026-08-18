@@ -17,14 +17,6 @@ jobs:
   install_and_run_tests:
 
     runs-on: ${{ matrix.os }}
-    env:
-      # python/survivalgpu/datasets.py imports matplotlib.pyplot at
-      # module load time; force the non-interactive backend rather than
-      # letting matplotlib auto-select (picks the Cocoa-based "macosx"
-      # backend on macOS by default, even headless) -- standard, safe
-      # practice for CI regardless of platform. See R-CMD-check.yaml for
-      # the fuller reasoning (investigating a macOS-only segfault there).
-      MPLBACKEND: "Agg"
     strategy:
       fail-fast: false
       matrix:

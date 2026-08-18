@@ -6,6 +6,7 @@
 ^CRAN_CHECKLIST\.md$
 ^CRAN_WORK_LOG\.md$
 ^cran-comments\.md$
+^MACOS_SEGFAULT\.md$
 ^doc$
 ^Meta$
 ^benchmarks$

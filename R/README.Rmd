@@ -67,8 +67,8 @@ virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
 
 > **Known issue:** calling `coxphGPU()`/`wceGPU()` from R currently
 > crashes with a native segfault on macOS, specifically when Python is
-> embedded via `reticulate` — this is under active investigation and not
-> yet resolved. It does **not** affect the
+> embedded via `reticulate` — see [MACOS_SEGFAULT.md](MACOS_SEGFAULT.md)
+> for the full investigation. It does **not** affect the
 > [Python package](https://github.com/jeanfeydy/survivalGPU/tree/main/python)
 > used directly, without R. If you're on macOS and need the package
 > working today, use the Python package directly rather than the R

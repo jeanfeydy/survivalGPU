@@ -18,20 +18,6 @@ jobs:
 
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
 
-    # Known issue, not blocking: `R CMD check`'s test step reliably
-    # segfaults on macos-latest inside a real coxphGPU() call
-    # (torch.tensor() construction, deep in PyTorch's native code),
-    # every time, deterministically, regardless of R/Python involvement
-    # specifics. Investigated extensively (OpenMP/libomp, Python
-    # interpreter identity, numpy/torch version floors) without
-    # resolving it -- see R/CRAN_WORK_LOG.md, "macOS segfault" entries,
-    # for the full investigation and what was ruled out. Not blocking
-    # CRAN readiness: CRAN's own check machines never have Python/torch
-    # installed either way, and R-CMD-check-no-python's macOS entry
-    # (which mirrors that) passes. Revisit with real macOS hardware and
-    # a debugger if this needs solving properly.
-    continue-on-error: ${{ matrix.config.os == 'macos-latest' }}
-
     strategy:
       fail-fast: false
       matrix:
@@ -49,24 +35,6 @@ jobs:
       # own OpenMP runtime; on macOS loading both into the same process
       # aborts with "OMP: Error #15: ... libomp.dylib already initialized".
       KMP_DUPLICATE_LIB_OK: "TRUE"
-      # CPython's faulthandler dumps a Python-level traceback to stderr on
-      # a native crash (segfault included) -- left on since it's what
-      # produced the only useful diagnostics for the known macOS issue
-      # above; harmless elsewhere.
-      PYTHONFAULTHANDLER: "1"
-      # python/survivalgpu/datasets.py -- the exact file the macOS
-      # segfault happens in -- imports matplotlib.pyplot at module load
-      # time. matplotlib's default backend auto-selection picks the
-      # interactive, Cocoa/AppKit-based "macosx" backend on macOS (unlike
-      # Linux, macOS doesn't need a $DISPLAY to look display-capable, so
-      # this happens even in headless CI). Cocoa/AppKit generally expects
-      # proper main-thread app initialization, which an embedded
-      # interpreter inside R's process doesn't provide -- a known
-      # category of crash for Python-on-macOS-CI generally. Force the
-      # non-interactive backend before matplotlib ever gets a chance to
-      # auto-select. Safe on every platform regardless of whether this is
-      # the actual cause.
-      MPLBACKEND: "Agg"
 
     steps:
       - uses: actions/checkout@v3
@@ -78,17 +46,6 @@ jobs:
         with:
           python-version: "3.11"
           cache: 'pip' # caching pip dependencies
-
-      - name: Install OpenMP (macOS/Apple Silicon)
-        if: runner.os == 'macOS'
-        run: |
-          # pykeops JIT-compiles its kernels and needs libomp on Apple
-          # Silicon; without it, keopscore disables OpenMP and falls back
-          # to a much less-tested code path. keopscore detects it via
-          # `brew --prefix`/opt/libomp itself at runtime, so installing
-          # the formula is the whole fix -- no extra CFLAGS/LDFLAGS
-          # needed.
-          brew install libomp
 
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
@@ -111,24 +68,6 @@ jobs:
           # Point reticulate at this interpreter instead of letting it
           # auto-provision its own bare ephemeral Python.
           echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
-
-      - name: Pin numpy/torch to known-working versions (macOS debugging)
-        if: runner.os == 'macOS'
-        run: |
-          # getkeops/keops#420 documents a *confirmed* NumPy binary
-          # incompatibility in pykeops/keopscore 2.3 (our exact installed
-          # version) specifically when used through `reticulate` from R:
-          # "reticulate reports incompatible NumPy binary versions
-          # (33554432 vs 16777225 expected)" -- exactly this class of
-          # native crash. The KeOps maintainers' own fix is to pin numpy
-          # to 1.26.4 (NumPy 1.x, not 2.x) or pin pykeops back to 2.2.3.
-          # Trying the numpy pin first, since it's less invasive. Not
-          # changing the published package's own pyproject.toml floors to
-          # an exact pin -- that's installed across a full Python
-          # 3.10-3.13 x OS test matrix in python-tests.yml, and an exact
-          # pin there would risk breaking wheel availability for no good
-          # reason; this stays scoped to the one job under investigation.
-          pip install "numpy==1.26.4" "torch==2.12.1"
 
       - name: R CMD CHECK
         uses: r-lib/actions/check-r-package@v2
