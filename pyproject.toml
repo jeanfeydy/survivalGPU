@@ -32,16 +32,16 @@ keywords = [
   "torch",
   "numpy",
 ]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python"
+]
 
 [project.optional-dependencies]
 # PyKeOps powers the WCE model only; it is not available on Windows, so it
 # is kept out of the base dependencies. The CoxPH model does not need it.
 wce = [
   "pykeops",
-]
-classifiers = [
-  "Development Status :: 4 - Beta",
-  "Programming Language :: Python"
 ]
 
 [dependency-groups]
