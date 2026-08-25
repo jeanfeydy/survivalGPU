@@ -13,6 +13,9 @@ on:
     branches: [main, master]
 
 jobs:
+  # Installs the 'wce' extra (pykeops) everywhere, so this job exercises
+  # test-wceGPU.R for real -- on Linux and macOS, since pykeops isn't
+  # available on Windows at all (see R-CMD-check-no-wce below for that).
   R-CMD-check:
     runs-on: ${{ matrix.config.os }}
 
@@ -23,7 +26,6 @@ jobs:
       matrix:
         config:
           - {os: macos-latest,   r: 'release'}
-          # - {os: windows-latest, r: 'release'}
           - {os: ubuntu-latest,   r: 'devel', http-user-agent: 'release'}
           - {os: ubuntu-latest,   r: 'release'}
           - {os: ubuntu-latest,   r: 'oldrel-1'}
@@ -40,6 +42,14 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: r-lib/actions/setup-pandoc@v2
+
+      - name: Install OpenMP (macOS/Apple Silicon)
+        if: runner.os == 'macOS'
+        run: |
+          # pykeops JIT-compiles its kernels and needs libomp on Apple
+          # Silicon; without it, keopscore disables OpenMP and falls back
+          # to a much less-tested code path that can crash.
+          brew install libomp
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -64,12 +74,69 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install . --group test
+          pip install ".[wce]" --group test
           # Point reticulate at this interpreter instead of letting it
           # auto-provision its own bare ephemeral Python.
           echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
 
       - name: R CMD CHECK
+        uses: r-lib/actions/check-r-package@v2
+        with:
+          upload-snapshots: true
+          working-directory: "R/"
+
+  # Installs Python/torch but deliberately NOT the 'wce' extra (pykeops),
+  # on Linux, macOS AND Windows (pykeops can't install there anyway, so
+  # this is the only way to cover Windows at all). coxphGPU() tests must
+  # pass; wceGPU() tests must skip gracefully with a warning instead of
+  # erroring -- see R/tests/testthat/helper-keops.R.
+  R-CMD-check-no-wce:
+    runs-on: ${{ matrix.os }}
+
+    name: no-wce (${{ matrix.os }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      KMP_DUPLICATE_LIB_OK: "TRUE"
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      - name: Install R dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+          working-directory: "R/"
+
+      - name: Install Python dependencies (without the 'wce' extra)
+        shell: bash
+        run: |
+          pip install --upgrade pip
+          pip install . --group test
+          echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
+
+      - name: R CMD CHECK (no pykeops)
         uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true

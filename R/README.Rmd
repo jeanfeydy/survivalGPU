@@ -20,35 +20,39 @@ knitr::opts_chunk$set(
 <!-- badges: end -->
 
 **GPU-accelerated survival analysis** — Cox Proportional Hazards (CoxPH) and
-Weighted Cumulative Exposure (WCE) models, built on [PyTorch](https://pytorch.org)
-and [KeOps](https://www.kernel-operations.io), with an R interface via
-[reticulate](https://rstudio.github.io/reticulate/). survivalGPU scales
-classical survival models to large datasets and to heavy bootstrap resampling
-by running the core computations on the GPU. It's also possible to use the
-library without a GPU (CPU fallback).
+Weighted Cumulative Exposure (WCE) models, built on [PyTorch](https://pytorch.org),
+with an R interface via [reticulate](https://rstudio.github.io/reticulate/).
+The WCE model additionally relies on [KeOps](https://www.kernel-operations.io).
+survivalGPU scales classical survival models to large datasets and to heavy
+bootstrap resampling by running the core computations on the GPU. It's also
+possible to use the library without a GPU (CPU fallback).
 
 ## Features
 
 - **Cox Proportional Hazards** models (`coxphGPU()`), with Breslow and Efron
-  handling of ties, built as a drop-in companion to `survival::coxph()`.
+  handling of ties, built as a drop-in companion to `survival::coxph()`. Only
+  requires PyTorch — works on Windows.
 - **Weighted Cumulative Exposure (WCE)** models (`wceGPU()`) for time-varying
-  exposure effects, built as a drop-in companion to `WCE::WCE()`.
-- **GPU acceleration** of the likelihood and its gradients via PyTorch +
-  KeOps, with a CPU fallback (`use_cuda()` to check what's available).
+  exposure effects, built as a drop-in companion to `WCE::WCE()`. Requires
+  the optional `pykeops` package, which is **not available on Windows** (see
+  below); `wceGPU()` raises an informative error if it's missing.
+- **GPU acceleration** of the likelihood and its gradients via PyTorch (+
+  KeOps for WCE), with a CPU fallback (`use_cuda()` to check what's available).
 - **Bootstrap** resampling for confidence intervals on both models.
 
 ## Installation
 
 survivalGPU wraps a Python backend (via the `reticulate` R package), so it
-needs a working Python environment with `torch` and `pykeops` installed. To
-configure this properly, check `vignette("python_connect")` — the short
-version:
+needs a working Python environment with `torch` installed (`pykeops` too, if
+you need `wceGPU()`). To configure this properly, check
+`vignette("python_connect")` — the short version:
 
 ```{r, eval=FALSE}
 library(reticulate)
 
 virtualenv_create("survivalGPU")
-virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
+# Add "pykeops" to this list if you need wceGPU() (not available on Windows):
+virtualenv_install("survivalGPU", packages = c("torch", "matplotlib",
                                                "beartype", "jaxtyping"))
 # torch takes a long time to set up
 ```
@@ -57,11 +61,12 @@ virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
 
 - **R >= 4.1**
 - **Python >= 3.10**
-- **A C++ compiler:** [`pykeops`](https://www.kernel-operations.io) just-in-time
-  compiles C++/CUDA kernels at runtime, so a working C++ toolchain must be
-  present. For GPU acceleration you also need the **CUDA toolkit** (`nvcc`)
-  installed, not just a CUDA-capable GPU — the code runs on CPU without one,
-  the GPU is simply where the speedups come from.
+- **A C++ compiler (WCE only):** [`pykeops`](https://www.kernel-operations.io)
+  just-in-time compiles C++/CUDA kernels at runtime, so a working C++ toolchain
+  must be present. For GPU acceleration you also need the **CUDA toolkit**
+  (`nvcc`) installed, not just a CUDA-capable GPU — the code runs on CPU
+  without one, the GPU is simply where the speedups come from. `coxphGPU()`
+  doesn't need any of this.
 
 ### macOS (Apple Silicon)
 
@@ -86,10 +91,11 @@ brew install libomp
 
 ### Windows
 
-**pykeops** compiles C++/CUDA kernels at runtime and is **not supported
+`coxphGPU()` installs and runs natively on Windows. **pykeops**, needed only
+for `wceGPU()`, compiles C++/CUDA kernels at runtime and is **not supported
 natively on Windows**. See the
 [Python package's README](https://github.com/jeanfeydy/survivalGPU/blob/main/python/README.md#windows)
-for working alternatives (WSL2, Docker).
+for working alternatives (WSL2, Docker) if you need `wceGPU()`.
 
 The R package and its Python backend live together in the same
 [GitHub](https://github.com/) repository (no git submodule involved), so you
@@ -190,6 +196,19 @@ Run the test suite with:
 ```{r, eval=FALSE}
 devtools::test()
 ```
+
+`coxphGPU()` tests run as long as `reticulate` can reach a Python
+environment with `torch` installed. `wceGPU()` tests
+([test-wceGPU.R](https://github.com/jeanfeydy/survivalGPU/blob/main/R/tests/testthat/test-wceGPU.R))
+additionally need `pykeops` (not available on Windows) in that same
+environment — see `vignette("python_connect")` to add it to your
+virtualenv. If it's missing, those tests are skipped with an informative
+message instead of failing.
+
+Both cases are exercised in CI (see
+[R-CMD-check.yaml](https://github.com/jeanfeydy/survivalGPU/blob/main/.github/workflows/R-CMD-check.yaml)):
+one matrix leg installs `pykeops` for real WCE coverage, the others don't,
+to check the graceful-skip path.
 
 ## Citation
 

@@ -1,4 +1,5 @@
 testthat::skip_if_not(reticulate::py_module_available("survivalgpu"))
+skip_if_no_pykeops()
 
 # Dataset
 drugdata <- WCE::drugdata

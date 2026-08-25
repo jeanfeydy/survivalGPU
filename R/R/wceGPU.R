@@ -148,12 +148,18 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
 
 
-  wce <- wce_R(
-    data = data, ids = id, covars = py_covariates, start = start, stop = stop,
-    doses = expos, events = event, nknots = nknots,
-    constrained = py_constrained, cutoff = cutoff, aic = aic,
-    bootstrap = nbootstraps, batchsize = batchsize,
-    device = device, double_precision = double_precision,
+  # wce_R is resolved lazily even when pykeops (required only for WCE, not
+  # for coxphGPU) isn't installed, so the informative error only surfaces
+  # here, at call time, rather than at attribute-fetch time above.
+  wce <- tryCatch(
+    wce_R(
+      data = data, ids = id, covars = py_covariates, start = start, stop = stop,
+      doses = expos, events = event, nknots = nknots,
+      constrained = py_constrained, cutoff = cutoff, aic = aic,
+      bootstrap = nbootstraps, batchsize = batchsize,
+      device = device, double_precision = double_precision,
+    ),
+    error = survivalgpu_unavailable_error
   )
 
 
