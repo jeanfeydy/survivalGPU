@@ -10,19 +10,26 @@ this resolves to the wrong interpreter and the compile step fails with
 `pybind11/pybind11.h` or `Python.h: No such file or directory`.
 Setting CPATH explicitly sidesteps that unreliable detection.
 See: https://github.com/getkeops/keops/issues/219
+
+pybind11 is only installed as a transitive dependency of the optional
+'pykeops' extra, so this setup step is skipped entirely when it's absent.
 """
 
 import os
 import sysconfig
 
-import pybind11
+try:
+    import pybind11
+except ImportError:
+    pybind11 = None
 
-_include_dirs = [
-    pybind11.get_include(),
-    sysconfig.get_paths()["include"],
-]
+if pybind11 is not None:
+    _include_dirs = [
+        pybind11.get_include(),
+        sysconfig.get_paths()["include"],
+    ]
 
-_existing = os.environ.get("CPATH", "")
-os.environ["CPATH"] = os.pathsep.join(
-    _include_dirs + ([_existing] if _existing else [])
-)
+    _existing = os.environ.get("CPATH", "")
+    os.environ["CPATH"] = os.pathsep.join(
+        _include_dirs + ([_existing] if _existing else [])
+    )
