@@ -1,28 +1,16 @@
 #' Fast Cox Proportional Hazards Regression Model
 #'
 #' @description Fits a Cox proportional hazards regression model. An extension
-#'   to use (or not) your GPU to speed up calculations, in particular for
-#'   bootstrap.
+#'   to use (or not) your GPU to speed up calculations. Fits a point estimate
+#'   only; call [bootstrap()] on the result for bootstrap-based inference.
 #'
-#' @usage coxphGPU(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
-#'          bootstrap = 0, batchsize = 0, init, all.results = FALSE, control,
+#' @usage coxphGPU(formula, data, ties = c("efron", "breslow"), init, control,
 #'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
 #'
 #' @inheritParams survival::coxph
 #' @param formula a formula object, with the response on the left of a ~
 #'   operator, and the terms on the right. The response must be a survival
 #'   object as returned by the Surv function.
-#' @param patient_id Name of the column in `data` that identifies each patient
-#'   (subject). Required if `bootstrap > 0`, so that bootstrap resampling is
-#'   performed at the patient level rather than at the row level (a patient
-#'   can have several rows, e.g. with time-varying covariates).
-#' @param bootstrap Number of repeats for the bootstrap cross-validation.
-#' @param batchsize Number of bootstrap copies that should be handled at a time.
-#'   Defaults to 0, which means that we handle all copies at once. If you run
-#'   into out of memory errors, please consider using batchsize=100, 10 or 1.
-#' @param all.results Post-processing calculations. If TRUE, coxphGPU returns
-#'   linear.predictors, wald.test, concordance for all bootstraps. Default to
-#'   FALSE if bootstraps.
 #' @param ... Other arguments for methods.
 #'
 #' @import stats
@@ -37,7 +25,7 @@
 #' @references Therneau T (2021). _A Package for Survival Analysis in R_. R
 #'   package version 3.2-13
 #'
-#' @seealso [survival::coxph()]
+#' @seealso [survival::coxph()], [bootstrap()]
 #'
 #' @examples
 #' \dontrun{
@@ -48,31 +36,18 @@
 #' ## Check CUDA drivers (if FALSE you use CPU)
 #' use_cuda()
 #'
-#' ## Cox Proportional Hazards without bootstrap
-#' coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-#'          data = drugdata,
-#'          bootstrap = 1)
+#' ## Cox Proportional Hazards point estimate; x = TRUE is required if you
+#' ## plan to call bootstrap() on the result afterwards.
+#' fit <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+#'                 data = drugdata, x = TRUE)
 #'
-#' ## Cox Proportional Hazards with bootstrap
+#' ## Bootstrap-based inference, as a separate step
+#' fit_boot <- bootstrap(fit, R = 1000, patient_id = "Id", data = drugdata,
+#'                       batchsize = if (use_cuda()) 200 else 10)
 #'
-#' if (use_cuda()) {
-#'   n_bootstrap <- 1000
-#'   batchsize <- 200
-#' } else {
-#'   n_bootstrap <- 50
-#'   batchsize <- 10
+#' summary(fit_boot)
 #' }
-#'
-#' coxph_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-#'                             data = drugdata,
-#'                             patient_id = "Id",
-#'                             bootstrap = n_bootstrap,
-#'                             batchsize = batchsize)
-#'
-#' summary(coxph_bootstrap)
-#' }
-coxphGPU <- function(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
-                     bootstrap = 0, batchsize = 0, init, all.results = FALSE, control,
+coxphGPU <- function(formula, data, ties = c("efron", "breslow"), init, control,
                      singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
                      ...) {
   UseMethod("coxphGPU")
@@ -82,9 +57,8 @@ coxphGPU <- function(formula, data, ties = c("efron", "breslow"), patient_id = N
 #' @noRd
 #' @method coxphGPU default
 #' @exportS3Method coxphGPU default
-coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
-                             bootstrap = 0, batchsize = 0, init,
-                             all.results = FALSE, control, singular.ok = TRUE,
+coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
+                             control, singular.ok = TRUE,
                              model = FALSE, x = FALSE, y = TRUE, ..., weights,
                              subset, na.action, robust, tt, method = ties, id,
                              cluster, istate, statedata,
@@ -150,10 +124,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # Drop coxphGPU-only arguments that survival::coxph() doesn't accept.
   # (a call object errors on `[[<- NULL` for a name it doesn't already
   #  have, unlike a list, so only touch names actually present.)
-  for (nm in c(
-    "patient_id", "bootstrap", "batchsize", "all.results",
-    "device", "double_precision", "singular.ok"
-  )) {
+  for (nm in c("device", "double_precision", "singular.ok")) {
     if (nm %in% names(prep_call)) prep_call[[nm]] <- NULL
   }
 
@@ -412,79 +383,14 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # if(robust == TRUE)
   #   stop("Robust variance is not implemented yet in coxphGPU")
 
-  # Variable 'Stop' and 'Event' for coxph_R.  ytemp gives us the original
-  # variable names used inside Surv(...) in the formula (e.g. "Start","Stop",
-  # "Event"), reused below purely as data.table column labels for the bridge
-  # to Python; all.vars() replaces the vendored terms_inner() used previously.
-  ytemp <- all.vars(formula[1:2])
-  suppressWarnings(z <- as.numeric(ytemp)) # are any of the elements numeric?
-  ytemp <- ytemp[is.na(z)] # toss numerics, e.g. Surv(t, 1-s)
-
-  if (type == "counting") { # if Surv object is counting type
-
-
-    start <- ytemp[1]
-    stop <- ytemp[2]
-    event <- ytemp[3]
-
-
-    data_Y <- data.table(start = y1,
-                       stop = y2,
-                       status = Y[,3])
-
-
-    names(data_Y)[1] <- start
-    names(data_Y)[2] <- stop
-    names(data_Y)[3] <- event
-
-
-
-
-
-  } else { # if Surv object is right (Without Start in Surv)
-    start = NULL
-    stop <- ytemp[1]
-    event <- ytemp[2]
-
-
-    data_Y <- data.table(stop = time,
-                       status = status)
-
-    names(data_Y)[1] <- stop
-    names(data_Y)[2] <- event
-  }
+  db <- .coxphGPU_build_data_Y(formula, type, y1 = y1, y2 = y2, Y = Y,
+                               time = time, status = status)
+  start <- db$start
+  stop <- db$stop
+  event <- db$event
+  data_Y <- db$data_Y
 
   # data_Y <- cbind(data_Y,X)
-
-
-  # Add patient_id data if defined for bootstrap purposes
-
-  # Type check for patient_id
-  if (!is.null(patient_id) &&
-      (!is.character(patient_id) || length(patient_id) != 1)) {
-    stop("patient_id must be NULL or a single string")
-  }
-
-  # Logical constraint with bootstrap
-  if (is.null(patient_id) &&
-      !is.null(bootstrap) &&
-      bootstrap > 0) {
-    stop("patient_id must be provided if bootstrap > 0")
-  }
-
-  if (!is.null(patient_id) && !patient_id %in% names(data)) {
-    stop("patient_id must be the name of a column in data")
-  }
-
-
-  if (!is.null(patient_id)){
-    data_Y <- cbind(data[patient_id],data_Y)
-    names(data_Y[1]) = patient_id
-  }
-
-
-
-
 
   # return(list(y1=y1,
   #             y=y2,
@@ -513,41 +419,12 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # data <- quote(options()$na.action)
   data <- na.omit(data)
 
-
-
-  # Python coxph
-  # survivalgpu <- use_survivalGPU() # change due to .onload
-  coxph_R <- tryCatch(survivalgpu$coxph_R, error = survivalgpu_unavailable_error)
-
-  # time_start = Sys.time()
-  # data_X <- as.data.table(X)
-  # time_stop = Sys.time()
-  # time_data_X = difftime(time_stop, time_start)
-  # print("####### Time data_X")
-  # print(time_data_X)
-
-  # names(data_X) <- colnames(X)
-
-   coxfit <- coxph_R(
-                    data_Y = data_Y,
-                    data_X = X,
-                    start = start,
-                    stop = stop,
-                    death = event,
-                    covars = covar,
-                    ties = ties,
-                    # survtype = type,
-                    strata = strata,
-                    patient_id = patient_id,
-                    bootstrap = bootstrap,
-                    batchsize = batchsize,
-                    maxiter = maxiter,
-                    device = device,
-                    double_precision = double_precision
-                    #init = init
+  coxfit <- .coxphGPU_call_python(
+    data_Y = data_Y, data_X = X, start = start, stop = stop, death = event,
+    covars = covar, ties = ties, strata = strata, patient_id = NULL,
+    bootstrap = 0, batchsize = 0, maxiter = maxiter,
+    init = init, device = device, double_precision = double_precision
   )
-  # maxiter = maxiter (add maxiter argument in coxph_R)
-  # doscale
 
   if (is.character(coxfit)) {
     fit <- list(fail = coxfit)
@@ -621,13 +498,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   )
 
   fit$method <- method
-  fit$nbootstraps <- bootstrap
-  if (bootstrap > 1){
-    coef_bootstrap <- matrix(coxfit$`bootstrap_coef`,
-                             ncol = length(coef))
-    colnames(coef_bootstrap) <- dimnames(X)[[2]]
-    fit$coef_bootstrap <- coef_bootstrap
-  }
+  fit$nbootstraps <- 0 # no bootstrap at fit time; see bootstrap()
 
   # structure(
   #   fit,
@@ -875,6 +746,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     }
     if (y) fit$y <- Y
     fit$timefix <- control$timefix # remember this option
+    fit$control <- control # so bootstrap.coxphGPU() can default maxiter later
   }
 
   if (!is.null(weights) && any(weights != 1)) fit$weights <- weights
@@ -885,11 +757,81 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   fit$contrasts <- contr.save
   if (any(offset != 0)) fit$offset <- offset
 
-  fit$all.results <- all.results
   fit$call <- Call
   fit$pterms <- pterms
 
   return(fit)
+}
+
+
+################################################################################
+
+## Internal helpers, shared between coxphGPU.default() and bootstrap.coxphGPU()
+## ------------------------------------------------------------------------
+
+#' @noRd
+.coxphGPU_build_data_Y <- function(formula, type, y1 = NULL, y2 = NULL, Y,
+                                   time = NULL, status = NULL) {
+  # ytemp gives us the original variable names used inside Surv(...) in the
+  # formula (e.g. "Start","Stop","Event"), reused below purely as data.table
+  # column labels for the bridge to Python.
+  ytemp <- all.vars(formula[1:2])
+  suppressWarnings(z <- as.numeric(ytemp)) # are any of the elements numeric?
+  ytemp <- ytemp[is.na(z)] # toss numerics, e.g. Surv(t, 1-s)
+
+  if (type == "counting") { # if Surv object is counting type
+    start <- ytemp[1]
+    stop <- ytemp[2]
+    event <- ytemp[3]
+
+    data_Y <- data.table(start = y1, stop = y2, status = Y[, 3])
+    names(data_Y)[1] <- start
+    names(data_Y)[2] <- stop
+    names(data_Y)[3] <- event
+  } else { # if Surv object is right (Without Start in Surv)
+    start <- NULL
+    stop <- ytemp[1]
+    event <- ytemp[2]
+
+    data_Y <- data.table(stop = time, status = status)
+    names(data_Y)[1] <- stop
+    names(data_Y)[2] <- event
+  }
+
+  list(data_Y = data_Y, start = start, stop = stop, event = event)
+}
+
+#' @noRd
+.coxphGPU_call_python <- function(data_Y, data_X, start, stop, death, covars,
+                                  ties, strata, patient_id, bootstrap,
+                                  batchsize, maxiter, init, device,
+                                  double_precision) {
+  coxph_R <- tryCatch(survivalgpu$coxph_R, error = survivalgpu_unavailable_error)
+
+  coxph_R(
+    data_Y = data_Y,
+    data_X = data_X,
+    start = start,
+    stop = stop,
+    death = death,
+    covars = covars,
+    ties = ties,
+    strata = strata,
+    patient_id = patient_id,
+    bootstrap = bootstrap,
+    batchsize = batchsize,
+    maxiter = maxiter,
+    init = init,
+    device = device,
+    double_precision = double_precision
+  )
+}
+
+#' @noRd
+.coxphGPU_extract_bootstrap_coef <- function(coxfit, coef_names, ncoef) {
+  coef_bootstrap <- matrix(coxfit$`bootstrap_coef`, ncol = ncoef)
+  colnames(coef_bootstrap) <- coef_names
+  coef_bootstrap
 }
 
 
@@ -921,7 +863,8 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
 #' Summary method for coxphGPU object
 #'
 #' Use `summary()` method to see confidence interval for covariates with two
-#' process : normal distribution and bootstrap (if `bootstrap > 1`).
+#' process : normal distribution and bootstrap (if [bootstrap()] was called
+#' on the object first).
 #' @inheritParams survival::summary.coxph
 #' @param object a coxphGPU object
 #'
@@ -1056,4 +999,150 @@ predict.coxphGPU <- function(object, newdata,
 
   NextMethod("predict", object)
 
+}
+
+
+#' Bootstrap-based inference for an already-fitted coxphGPU model
+#'
+#' Adds bootstrap-based confidence intervals to a model already fit by
+#' [coxphGPU()], without refitting from the formula. This lets you fit once
+#' and decide about bootstrap inference later, while still running all `R`
+#' replicate refits as a single batched GPU call to the Python backend.
+#'
+#' @param object a coxphGPU object.
+#' @param ... additional argument(s) for methods.
+#'
+#' @export
+bootstrap <- function(object, ...) {
+  UseMethod("bootstrap")
+}
+
+#' @param R number of bootstrap replicates.
+#' @param patient_id name of the column in `data` that identifies each
+#'   patient (subject), so that resampling is performed at the patient
+#'   level rather than at the row level. Only relevant to bootstrap, so
+#'   (unlike [coxphGPU()]) it's an argument here rather than at the
+#'   original fit.
+#' @param data the data frame used in the original [coxphGPU()] call (or a
+#'   copy with the same row names — see Details).
+#' @param batchsize number of bootstrap copies handled at a time; see
+#'   [coxphGPU()].
+#' @param init starting coefficients for the GPU refits. `TRUE` (the
+#'   default) reuses `object`'s own fitted coefficients as a warm start;
+#'   `FALSE` starts from zero; or supply a numeric vector directly.
+#' @param control a [survival::coxph.control()] object; defaults to the one
+#'   used at the original fit (stored on `object`).
+#' @param device,double_precision see [coxphGPU()].
+#'
+#' @details
+#' `object` must have been fit with `x = TRUE` (`coxphGPU(..., x = TRUE)`),
+#' so its design matrix is available to reuse without re-parsing the
+#' formula. `data` must have the same row names as the data frame used in
+#' the original call — the ordinary R default, unless explicitly reset —
+#' so that `patient_id`'s values can be correctly realigned to the stored
+#' design matrix even if the original fit used `subset =` or dropped rows
+#' to missing values.
+#'
+#' @return A copy of `object` with `coef_bootstrap` and `nbootstraps`
+#'   updated from the new bootstrap run; every other field (coefficients,
+#'   variance, residuals, ...) is left untouched, so [summary.coxphGPU()]
+#'   picks up the bootstrap confidence intervals automatically.
+#'
+#' @rdname bootstrap
+#' @exportS3Method bootstrap coxphGPU
+#' @examples
+#' \dontrun{
+#' library(survival)
+#' fit <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+#'                 data = drugdata, x = TRUE)
+#' fit_boot <- bootstrap(fit, R = 1000, patient_id = "Id", data = drugdata,
+#'                       batchsize = 200)
+#' summary(fit_boot)
+#' }
+bootstrap.coxphGPU <- function(object, R, patient_id, data, batchsize = 0,
+                               init = TRUE, control,
+                               device = NULL, double_precision = TRUE, ...) {
+
+  if (is.null(object$x)) {
+    stop("bootstrap() requires the design matrix stored on the fitted ",
+         "object. Refit with coxphGPU(..., x = TRUE), then call ",
+         "bootstrap() again.")
+  }
+  if (missing(R) || is.null(R) || R < 1) {
+    stop("R (number of bootstrap replicates) must be a positive integer.")
+  }
+  if (missing(patient_id) || missing(data)) {
+    stop("patient_id and data are required: patient_id is only needed for ",
+         "bootstrap resampling, so it isn't captured at the original ",
+         "coxphGPU() call.")
+  }
+
+  pid_values <- data[rownames(object$x), patient_id]
+  if (anyNA(pid_values)) {
+    stop("data does not have the same row names as the fitted object; ",
+         "pass the same data frame used in the original coxphGPU() call.")
+  }
+
+  Y <- object$y
+  type <- attr(Y, "type")
+  X <- object$x
+  covar <- colnames(X)
+  istrat <- if (!is.null(object$strata)) as.integer(object$strata) else NULL
+
+  if (type == "counting") {
+    # Mirrors coxphGPU.default()'s own counting-type response construction
+    # (the per-stratum time delta that keeps risk sets from spanning
+    # strata boundaries), so resampled data is grouped identically.
+    if (length(istrat) == 0) {
+      y1 <- Y[, 1]
+      y2 <- Y[, 2]
+      strata <- rep(0L, nrow(Y))
+    } else {
+      strata <- istrat
+      delta <- strata * (1 + max(Y[, 2]) - min(Y[, 1]))
+      y1 <- Y[, 1] + delta
+      y2 <- Y[, 2] + delta
+    }
+    storage.mode(X) <- "double"
+    db <- .coxphGPU_build_data_Y(object$formula, type, y1 = y1, y2 = y2, Y = Y)
+  } else {
+    strata <- istrat
+    db <- .coxphGPU_build_data_Y(object$formula, type, Y = Y,
+                                 time = Y[, 1], status = Y[, 2])
+  }
+
+  pid_df <- data.frame(pid_values)
+  names(pid_df) <- patient_id
+  data_Y <- cbind(pid_df, db$data_Y)
+
+  if (missing(control)) {
+    control <- if (!is.null(object$control)) object$control else coxph.control()
+  }
+
+  init_vec <- if (isTRUE(init)) {
+    unname(object$coefficients)
+  } else if (isFALSE(init)) {
+    NULL
+  } else {
+    init
+  }
+
+  coxfit <- .coxphGPU_call_python(
+    data_Y = data_Y, data_X = X, start = db$start, stop = db$stop,
+    death = db$event, covars = covar, ties = object$method, strata = strata,
+    patient_id = patient_id, bootstrap = R, batchsize = batchsize,
+    maxiter = control$iter.max, init = init_vec,
+    device = device, double_precision = double_precision
+  )
+
+  if (is.character(coxfit)) {
+    stop("bootstrap() failed: ", coxfit)
+  }
+
+  fit <- object
+  fit$coef_bootstrap <- .coxphGPU_extract_bootstrap_coef(
+    coxfit, names(object$coefficients), length(object$coefficients)
+  )
+  fit$nbootstraps <- R
+  fit
 }

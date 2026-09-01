@@ -292,7 +292,13 @@ class CoxPHSurvivalAnalysis:
                 )
                 bootstrap_coef.append(res.x)
 
-            self.bootstrap_coef_ = torch.stack(bootstrap_coef).view(
+            # torch.cat, not torch.stack: when nbootstraps isn't a multiple of
+            # batchsize, the last chunk from dataset.bootstraps() is smaller
+            # than the others (see its `B = min(batchsize, nbootstraps - s)`),
+            # so the per-chunk `res.x` tensors being combined here don't all
+            # have the same size along dim 0 -- stack() requires that, cat()
+            # doesn't.
+            self.bootstrap_coef_ = torch.cat(bootstrap_coef, dim=0).view(
                 self.nbootstraps, n_batch, n_covariates
             )
 
@@ -560,7 +566,16 @@ def coxph_R(
 
         dtype = np.float64 if double_precision else np.float32
 
-
+        if init is not None:
+            # np.atleast_1d guards against reticulate unboxing a length-1 R
+            # vector (single-covariate model) into a bare Python scalar,
+            # which would otherwise produce a 0-d array here. Cast to
+            # float64 (not the double_precision-dependent `dtype` below):
+            # like `covariates`/`stop`/`deaths`, .fit()'s raw numpy
+            # boundary always expects float64/int64, regardless of
+            # double_precision -- that flag only affects internal torch
+            # tensor precision, applied later.
+            init = np.atleast_1d(np.array(init, dtype=np.float64))
 
         res = coxph_numpy(
             x=data_X,

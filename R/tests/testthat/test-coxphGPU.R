@@ -38,7 +38,6 @@ coxph_right <- coxph(
 # Counting
 coxphGPU <- coxphGPU(
   Surv(Start, Stop, Event) ~ sex + age,
-  patient_id ="Id",
   drugdata,
   ties = ties,
   double_precision = FALSE
@@ -47,17 +46,18 @@ coxphGPU <- coxphGPU(
 
 coxphGPU_bootstrap <- coxphGPU(
   Surv(Start, Stop, Event) ~ sex + age,
-  patient_id = "Id",
   drugdata2,
   ties = ties,
-  bootstrap = 15,
-  double_precision = FALSE
+  double_precision = FALSE,
+  x = TRUE
+)
+coxphGPU_bootstrap <- bootstrap(
+  coxphGPU_bootstrap, R = 15, patient_id = "Id", data = drugdata2
 )
 
 
 coxphGPU_right <- coxphGPU(
   Surv(Stop, Event) ~ sex + age,
-  # patient_id ="Id",
   drugdata2,
   ties = ties,
   double_precision = FALSE
@@ -417,4 +417,63 @@ test_that("test1 - H", {
     temp2[, "H"],
     tolerance = 1e-5
   )
+})
+
+################################################################################
+# Modular fit-then-bootstrap: bootstrap()
+#
+# coxphGPU() only ever fits a point estimate; bootstrap() is the only way to
+# get bootstrap-based inference. coxphGPU_bootstrap (defined near the top of
+# this file) is already such a fit-then-bootstrap() result, and is compared
+# against plain coxph()/coxphGPU() above like any other fit.
+
+test_that("bootstrap() leaves the point estimate untouched", {
+  expect_equal(coxphGPU_bootstrap$nbootstraps, 15)
+  expect_equal(dim(coxphGPU_bootstrap$coef_bootstrap), c(15, 2))
+})
+
+test_that("bootstrap() feeds into summary()/print() correctly", {
+  s <- summary(coxphGPU_bootstrap)
+  expect_s3_class(s, "summary.coxphGPU")
+  expect_equal(s$nbootstraps, 15)
+  expect_false(is.null(s$conf.int_bootstrap))
+})
+
+test_that("bootstrap() errors clearly when x was not stored at fit time", {
+  fit_no_x <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age, data = drugdata2)
+  expect_error(
+    bootstrap(fit_no_x, R = 10, patient_id = "Id", data = drugdata2),
+    "x = TRUE"
+  )
+})
+
+test_that("bootstrap() errors clearly when patient_id/data are missing", {
+  fit_x <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age, data = drugdata2, x = TRUE)
+  expect_error(
+    bootstrap(fit_x, R = 10),
+    "patient_id and data are required"
+  )
+})
+
+test_that("bootstrap() realigns patient_id correctly under subset=", {
+  fit_subset <- coxphGPU(
+    Surv(Stop, Event) ~ sex + age,
+    data = drugdata2, x = TRUE, subset = (Id <= 40)
+  )
+  fit_subset_boot <- bootstrap(
+    fit_subset, R = 20, patient_id = "Id", data = drugdata2, batchsize = 10
+  )
+  expect_equal(fit_subset$coefficients, fit_subset_boot$coefficients, tolerance = 1e-8)
+  expect_equal(fit_subset_boot$nbootstraps, 20)
+})
+
+test_that("bootstrap() works for a stratified counting-type model", {
+  fit_strata <- coxphGPU(
+    Surv(Start, Stop, Event) ~ strata(sex) + age, data = drugdata, x = TRUE
+  )
+  fit_strata_boot <- bootstrap(
+    fit_strata, R = 15, patient_id = "Id", data = drugdata, batchsize = 10
+  )
+  expect_equal(fit_strata$coefficients, fit_strata_boot$coefficients, tolerance = 1e-8)
+  expect_equal(fit_strata_boot$nbootstraps, 15)
 })
