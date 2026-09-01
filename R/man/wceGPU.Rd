@@ -8,8 +8,8 @@
 \title{Fast WCE}
 \usage{
 wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
-       event, start, stop, expos, covariates = NULL, nbootstraps = 0,
-       batchsize = 0, confint = 0.95, controls = NULL, ...)
+       event, start, stop, expos, covariates = NULL,
+       confint = 0.95, controls = NULL, ...)
 
 \method{summary}{wceGPU}(object, allres = FALSE, ...)
 
@@ -65,12 +65,6 @@ of the variable(s) in data corresponding to the covariate(s) to be included
 in the model. Default to NULL, which corresponds to fitting model(s)
 without covariates.}
 
-\item{nbootstraps}{Number of repeats for the bootstrap cross-validation.}
-
-\item{batchsize}{Number of bootstrap copies that should be handled at a time.
-Defaults to 0, which means that we handle all copies at once. If you run
-into out of memory errors, please consider using batchsize=100, 10 or 1.}
-
 \item{confint}{Level for confidence intervals. Default to 0.95.}
 
 \item{controls}{List corresponding to the control parameters to be passed to
@@ -102,7 +96,8 @@ WCE results
 \description{
 New implementation of the Weighted Cumulative Exposure model
 (see @details), compatible with GPU to accelerate calculation speed and
-work with large datasets.
+work with large datasets. Fits a point estimate only; call \code{\link[=bootstrap]{bootstrap()}}
+on the result for bootstrap-based inference.
 
 Use \code{summary()} and \code{plot()} methods to see results and risk function.
 }
@@ -119,12 +114,11 @@ is estimated using cubic regression splines.
 # Dataset
 drugdata <- WCE::drugdata
 
-# WCE model
+# WCE model, point estimate only
 wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = 90, id = "Id",
                   event = "Event", start = "Start", stop = "Stop",
                   expos = "dose", covariates = c("age", "sex"),
-                  constrained = FALSE, aic = FALSE, confint = 0.95,
-                  nbootstraps = 1, batchsize = 0)
+                  constrained = FALSE, aic = FALSE, confint = 0.95)
 
 # Results
 wce_gpu
@@ -133,14 +127,8 @@ summary(wce_gpu)
 # See estimated weight function
 plot(wce_gpu)
 
-# WCE model with bootstrap (example with 20 bootstraps, but normally
-# nbootstraps > 500)
-wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = 90,
-                            id = "Id", event = "Event", start = "Start",
-                            stop = "Stop", expos = "dose",
-                            covariates = c("age", "sex"),
-                            constrained = FALSE, aic = FALSE, confint = 0.95,
-                            nbootstraps = 20, batchsize = 0)
+# Bootstrap-based inference, as a separate step (normally R > 500)
+wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20, data = drugdata, batchsize = 0)
 
 # See confidence bands for the estimated weight function due to bootstrap
 plot(wce_gpu_bootstrap)
@@ -159,4 +147,7 @@ HR(wce_gpu_bootstrap, exposed, unexposed)
 Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative
 effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov
 30;28(27):3437-53.
+}
+\seealso{
+\code{\link[=bootstrap]{bootstrap()}}
 }

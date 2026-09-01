@@ -742,7 +742,12 @@ def wce_R(
     if strata is not None:
         strata = np.array(strata, dtype=np.int64)
 
-
+    if init is not None:
+        # np.atleast_1d guards against reticulate unboxing a length-1 R
+        # vector into a bare Python scalar; cast to float64 regardless of
+        # double_precision, matching the raw numpy .fit() boundary's own
+        # dtype contract (see the analogous fix in coxph.py).
+        init = np.atleast_1d(np.array(init, dtype=np.float64))
 
     with myprof as prof:
         res = wce_numpy(

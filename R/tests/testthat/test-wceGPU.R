@@ -11,16 +11,10 @@ wce_gpu <- wceGPU(
   event = "Event", start = "Start", stop = "Stop",
   expos = "dose", covariates = c("age", "sex"),
   constrained = FALSE, aic = FALSE, confint = 0.95,
-  nbootstraps = 0, batchsize = 0, verbosity = 3, double_precision = TRUE
+  verbosity = 3, double_precision = TRUE
 )
 
-wce_gpu_bootstrap <- wceGPU(
-  data = drugdata, nknots = 1, cutoff = 90, id = "Id",
-  event = "Event", start = "Start", stop = "Stop",
-  expos = "dose", covariates = c("age", "sex"),
-  constrained = FALSE, aic = FALSE, confint = 0.95,
-  nbootstraps = 15, batchsize = 0, double_precision = TRUE
-)
+wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 15, data = drugdata, batchsize = 0)
 
 # Original WCE
 wce <- WCE::WCE(
@@ -117,8 +111,7 @@ test_that("WCE - no covariates", {
     data = drugdata, nknots = 1, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose",
-    constrained = FALSE, aic = FALSE, confint = 0.95,
-    nbootstraps = 0, batchsize = 0
+    constrained = FALSE, aic = FALSE, confint = 0.95
   )
   expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
 })
@@ -134,8 +127,7 @@ test_that("WCE - one covariate", {
     data = drugdata, nknots = 1, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose", covariates = c("age"),
-    constrained = FALSE, aic = FALSE, confint = 0.95,
-    nbootstraps = 0, batchsize = 0
+    constrained = FALSE, aic = FALSE, confint = 0.95
   )
   expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
   expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
@@ -152,8 +144,7 @@ test_that("WCE - two covariates", {
     data = drugdata, nknots = 1, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose", covariates = c("age", "sex"),
-    constrained = FALSE, aic = FALSE, confint = 0.95,
-    nbootstraps = 0, batchsize = 0
+    constrained = FALSE, aic = FALSE, confint = 0.95
   )
   expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
   expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
@@ -170,8 +161,7 @@ test_that("WCE - AIC", {
     data = drugdata, nknots = 1, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose", covariates = c("age", "sex"),
-    constrained = FALSE, aic = TRUE, confint = 0.95,
-    nbootstraps = 0, batchsize = 0
+    constrained = FALSE, aic = TRUE, confint = 0.95
   )
   expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
   expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
@@ -190,8 +180,7 @@ test_that("WCE - right constraint", {
     data = drugdata, nknots = 1, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose", covariates = c("age", "sex"),
-    constrained = "R", aic = FALSE, confint = 0.95,
-    nbootstraps = 0, batchsize = 0
+    constrained = "R", aic = FALSE, confint = 0.95
   )
   expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
   expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
@@ -208,8 +197,7 @@ test_that("WCE - left constraint", {
     data = drugdata, nknots = 1, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose", covariates = c("age", "sex"),
-    constrained = "L", aic = FALSE, confint = 0.95,
-    nbootstraps = 0, batchsize = 0
+    constrained = "L", aic = FALSE, confint = 0.95
   )
   expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
   expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
@@ -226,8 +214,7 @@ test_that("WCE - 3 knots", {
     data = drugdata, nknots = 3, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose", covariates = c("age", "sex"),
-    constrained = FALSE, aic = FALSE, confint = 0.95,
-    nbootstraps = 0, batchsize = 0
+    constrained = FALSE, aic = FALSE, confint = 0.95
   )
   expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
   expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
