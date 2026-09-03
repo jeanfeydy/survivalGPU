@@ -128,7 +128,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                            confint = 0.95, controls = NULL, device = NULL, double_precision = TRUE, ...) {
   # survivalgpu <- use_survivalGPU()
 
-  wce_R <- survivalgpu$wce_R
+  wce_R <- tryCatch(survivalgpu$wce_R, error = survivalgpu_unavailable_error)
 
 
   # Minor changes for python inputs
@@ -148,12 +148,18 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
 
 
-  wce <- wce_R(
-    data = data, ids = id, covars = py_covariates, start = start, stop = stop,
-    doses = expos, events = event, nknots = nknots,
-    constrained = py_constrained, cutoff = cutoff, aic = aic,
-    bootstrap = nbootstraps, batchsize = batchsize,
-    device = device, double_precision = double_precision,
+  # wce_R is resolved lazily even when pykeops (required only for WCE, not
+  # for coxphGPU) isn't installed, so the informative error only surfaces
+  # here, at call time, rather than at attribute-fetch time above.
+  wce <- tryCatch(
+    wce_R(
+      data = data, ids = id, covars = py_covariates, start = start, stop = stop,
+      doses = expos, events = event, nknots = nknots,
+      constrained = py_constrained, cutoff = cutoff, aic = aic,
+      bootstrap = nbootstraps, batchsize = batchsize,
+      device = device, double_precision = double_precision,
+    ),
+    error = survivalgpu_unavailable_error
   )
 
 
@@ -393,7 +399,7 @@ sumWCEall <- function(object, objname, ...) {
 
   best <- which.min(object$info.criterion)
 
-  if (is.na(object$loglik[best]) == T) {cat('Warning : the model did not converge, and no \npartial log-likelihood was produced. Results \nfor this model should be ignored.\n\n')}
+  if (is.na(object$loglik[best]) == TRUE) {cat('Warning : the model did not converge, and no \npartial log-likelihood was produced. Results \nfor this model should be ignored.\n\n')}
   if (sum(object$SED[[best]]==0) >0) {cat('Warning : some of the SE for the spline \nvariables in the model are exactlty zero, probably \nbecause the model did not converge. Variable(s)',  names(which(object$SED[[1]]==0)), ' \nhad SE=0. Consider re-parametrizing or increasing \nthe number of iterations\n\n')}
 
   if (object$analysis == 'Cox') lab <- 'Proportional hazards model'
@@ -411,8 +417,8 @@ sumWCEall <- function(object, objname, ...) {
     cat("\n*** Right-constrained estimated WCE function  (",lab ,").***\n", sep='')}
   if (object$constrained == FALSE) {
     cat("\nUnconstrained estimated WCE function (",lab ,").***\n", sep='')}
-  if (object$aic == F) {criterion <- "BIC: "} else {criterion <- "AIC: "}
-  if (is.null(object$covariates[1]) == F){
+  if (object$aic == FALSE) {criterion <- "BIC: "} else {criterion <- "AIC: "}
+  if (is.null(object$covariates[1]) == FALSE){
     cat("\nEstimated coefficients for the covariates: \n")
     bhat <- unlist(object$beta.hat.covariates[best,])
     s_hat <- unlist(object$se.covariates[best,])
@@ -595,8 +601,8 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 
 #' Hazard Ratio for WCE model
 #'
-#' Calcul the hazard ratio from a wceGPU object to compare two scenarios of
-#' time-dependant exposures.
+#' Calculate the hazard ratio from a wceGPU object to compare two scenarios of
+#' time-dependent exposures.
 #'
 #' @param object wceGPU object.
 #' @param vecnum 	A vector of time-dependent exposures corresponding to a

@@ -21,7 +21,7 @@
 #'   Defaults to 0, which means that we handle all copies at once. If you run
 #'   into out of memory errors, please consider using batchsize=100, 10 or 1.
 #' @param all.results Post-processing calculations. If TRUE, coxphGPU returns
-#'   linears.predictors, wald.test, concordance for all bootstraps. Default to
+#'   linear.predictors, wald.test, concordance for all bootstraps. Default to
 #'   FALSE if bootstraps.
 #' @param ... Other arguments for methods.
 #'
@@ -29,7 +29,6 @@
 #' @import survival
 #' @importFrom utils methods
 #' @importFrom utils head
-#' @importFrom data.table data.table
 #'
 #' @return A coxphGPU object representing the fit.
 #' @export
@@ -325,10 +324,10 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
   # Formula check
   if (length(attr(Terms, "variables")) > 2) { # a ~1 formula has length 2
-    ytemp <- terms.inner(formula[1:2])
+    ytemp <- terms_inner(formula[1:2])
     suppressWarnings(z <- as.numeric(ytemp)) # are any of the elements numeric?
     ytemp <- ytemp[is.na(z)] # toss numerics, e.g. Surv(t, 1-s)
-    xtemp <- terms.inner(formula[-2])
+    xtemp <- terms_inner(formula[-2])
     if (any(!is.na(match(xtemp, ytemp)))) {
       warning("a variable appears on both the left and right sides of the formula")
     }
@@ -981,7 +980,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     event <- ytemp[3]
 
 
-    data_Y <- data.table(start = y1,
+    data_Y <- data.frame(start = y1,
                        stop = y2,
                        status = Y[,3])
 
@@ -1000,7 +999,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     event <- ytemp[2]
 
 
-    data_Y <- data.table(stop = time,
+    data_Y <- data.frame(stop = time,
                        status = status)
 
     names(data_Y)[1] <- stop
@@ -1072,16 +1071,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
   # Python coxph
   # survivalgpu <- use_survivalGPU() # change due to .onload
-  coxph_R <- survivalgpu$coxph_R
-
-  # time_start = Sys.time()
-  # data_X <- as.data.table(X)
-  # time_stop = Sys.time()
-  # time_data_X = difftime(time_stop, time_start)
-  # print("####### Time data_X")
-  # print(time_data_X)
-
-  # names(data_X) <- colnames(X)
+  coxph_R <- tryCatch(survivalgpu$coxph_R, error = survivalgpu_unavailable_error)
 
    coxfit <- coxph_R(
                     data_Y = data_Y,
@@ -1322,7 +1312,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
       fit$rscore <- coxph.wtest(t(temp0) %*% temp0, u, control$toler.chol)$test
     }
 
-    # plusieurs tests de Wald nécessaire ? il faut la matrice de variance covar pour tous les bootstraps
+    # multiple Wald tests needed? requires the variance-covariance matrix for all bootstraps
 
     # # Wald test
     # if (length(fit$coefficients) && is.null(fit$wald.test)) {

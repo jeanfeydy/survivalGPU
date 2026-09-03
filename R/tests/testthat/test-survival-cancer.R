@@ -1,3 +1,5 @@
+testthat::skip_if_not(reticulate::py_module_available("survivalgpu"))
+
 library(survival)
 
 options(na.action=na.exclude) # preserve missing

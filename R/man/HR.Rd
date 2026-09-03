@@ -22,8 +22,8 @@ Returns a HR according to the scenarios. If bootstrap is present
 in the wceGPU object, this function returns a confidence interval for the HR.
 }
 \description{
-Calcul the hazard ratio from a wceGPU object to compare two scenarios of
-time-dependant exposures.
+Calculate the hazard ratio from a wceGPU object to compare two scenarios of
+time-dependent exposures.
 }
 \examples{
 \dontrun{

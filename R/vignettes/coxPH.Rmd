@@ -12,7 +12,7 @@ vignette: >
 
 
 
-Présenter le modèle de Cox[^cox1] [^cox2]
+The Cox proportional hazards model[^cox1] [^cox2] is a semi-parametric regression model for survival (time-to-event) data. It relates the hazard of an event at time $t$ to a set of covariates through a hazard ratio, without requiring the baseline hazard to follow a specific parametric form, and its coefficients are estimated by maximizing a partial likelihood.
 
 
 
@@ -93,9 +93,9 @@ summary(coxphGPU_bootstrap)
 #>  ----------------
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>             2.5%   97.5%
-#> age     0.994041 1.02634
-#> sexMale 1.308830 2.34278
-#> ph.ecog 1.279370 2.11125
+#> age     0.993525 1.02171
+#> sexMale 1.294340 2.08536
+#> ph.ecog 1.302860 2.12898
 ```
 
 ## Survival Curves
