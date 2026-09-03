@@ -33,10 +33,6 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
-      # R (BLAS/LAPACK) and PyTorch (loaded via reticulate) each bundle their
-      # own OpenMP runtime; on macOS loading both into the same process
-      # aborts with "OMP: Error #15: ... libomp.dylib already initialized".
-      KMP_DUPLICATE_LIB_OK: "TRUE"
 
     steps:
       - uses: actions/checkout@v3
@@ -103,7 +99,6 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
-      KMP_DUPLICATE_LIB_OK: "TRUE"
 
     steps:
       - uses: actions/checkout@v3

@@ -29,7 +29,6 @@
 #' @import survival
 #' @importFrom utils methods
 #' @importFrom utils head
-#' @importFrom data.table data.table
 #'
 #' @return A coxphGPU object representing the fit.
 #' @export
@@ -981,7 +980,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     event <- ytemp[3]
 
 
-    data_Y <- data.table(start = y1,
+    data_Y <- data.frame(start = y1,
                        stop = y2,
                        status = Y[,3])
 
@@ -1000,7 +999,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     event <- ytemp[2]
 
 
-    data_Y <- data.table(stop = time,
+    data_Y <- data.frame(stop = time,
                        status = status)
 
     names(data_Y)[1] <- stop
@@ -1073,15 +1072,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # Python coxph
   # survivalgpu <- use_survivalGPU() # change due to .onload
   coxph_R <- tryCatch(survivalgpu$coxph_R, error = survivalgpu_unavailable_error)
-
-  # time_start = Sys.time()
-  # data_X <- as.data.table(X)
-  # time_stop = Sys.time()
-  # time_data_X = difftime(time_stop, time_start)
-  # print("####### Time data_X")
-  # print(time_data_X)
-
-  # names(data_X) <- colnames(X)
 
    coxfit <- coxph_R(
                     data_Y = data_Y,
