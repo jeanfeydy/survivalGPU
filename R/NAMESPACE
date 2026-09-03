@@ -19,7 +19,6 @@ export(use_cuda)
 export(wceGPU)
 import(stats)
 import(survival)
-importFrom(data.table,data.table)
 importFrom(graphics,
   hist,
   matplot,
