@@ -353,7 +353,7 @@ class WCESurvivalAnalysis:
             start=start,
             stop=stop,
             event=event,
-            # patient=patient,
+            patient=patient,
             strata=strata,
             batch=batch,
             init=init,
