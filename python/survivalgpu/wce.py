@@ -495,10 +495,9 @@ def wce_numpy(
     dtype = np.float64,
     **kwargs,
 ):
-    """Functional interface to WCESurvivalAnalysis: fits a WCE model and returns the results as a dict.
-
-    Builds a CoxPHSurvivalAnalysis from `kwargs`, wraps it in a WCESurvivalAnalysis
-    with the given WCE parameters, fits it on the data, and collects the results.
+    """Internal function: this is not meant to be called directly by end users.
+    It is the computational backend used by `wce_R`, which is the function
+    actually invoked from R (via reticulate) as part of the R WCE interface.
 
     Args:
         ids ((I,) array): patient id for each interval.
@@ -629,7 +628,8 @@ def wce_R(
     device = None,
     double_precision = True,
 ):
-    """R-facing wrapper around wce_numpy: fits a WCE model from a long-format data.frame.
+    """Internal function: this is not meant to be called directly by end users.
+    R-facing wrapper around wce_numpy: fits a WCE model from a long-format data.frame.
 
     Args:
         data (pandas.DataFrame): the long-format dataset.
