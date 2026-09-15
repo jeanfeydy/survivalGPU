@@ -94,6 +94,108 @@ class CoxPHSurvivalAnalysis:
 
 
     @typecheck
+    def _prepare(
+        self,
+        covariates: Float64Array["intervals covariates"],
+        stop: Int64Array["intervals"],
+        *,
+        start: Int64Array["intervals"] | None = None,
+        event: Int64Array["intervals"] | None = None,
+        patient: Int64Array["intervals"] | None = None,
+        strata: Int64Array["intervals"] | None = None,
+        batch: Int64Array["patient"] | None = None,
+    ):
+        """Builds and pre-processes a TorchSurvivalDataset from raw input arrays.
+
+        Shared by `fit()` and `bootstrap()`: both need the same sorted/scaled
+        dataset, the auto-selected `mode`, and a `loss(*, bootstrap)` closure
+        around the CoxPH objective, built with the same `scales`/`mode` so
+        that a bootstrap resample is optimized exactly like the main fit.
+
+        Returns:
+            dataset, means, scales, n_batch, n_covariates, mode, loss
+        """
+        # Pre-process the input data: ----------------------------------------------------
+        # Create a dataset object: this enforces checks on the input data
+        dataset = SurvivalDataset(
+            covariates=covariates,
+            stop=stop,
+            start=start,
+            event=event,
+            patient=patient,
+            strata=strata,
+            batch=batch,
+        )
+
+        # Re-encode the data arrays as PyTorch tensors on the correct device,
+        # with the correct dtype (float64 -> float32)
+
+        dataset = dataset.to_torch(self.device)
+
+        # Re-order the input arrays by lexicographical order on (batch, strata, stop, event):
+        dataset.sort()
+
+        # Scale the covariates for the sake of numerical stability:
+        means, scales = dataset.scale(rescale=self.doscale)
+
+        # Count the number of death times:
+        dataset.count_deaths()
+
+        # Filter out the times that have no impact on the CoxPH model
+        # (e.g. censoring that occurs before the first death):
+
+        # dataset.prune(mode=self.mode)
+
+        n_batch, n_covariates = dataset.n_batch, dataset.n_covariates
+
+        # Choose the fastest implementation of the CoxPH objective, ----------------------
+        # i.e. the partial neg-log-likelihood of the CoxPH model.
+
+        if self.mode is None:
+            # Case 1: all the intervals are )t-1, t] (i.e. no-interval mode),
+            # we can group times using equality conditions on the stop times.
+            # This is typically the case when using time-dependent covariates as in the WCE model.
+            if torch.all(dataset.stop == dataset.start + 1):
+                mode = "unit length"
+
+            # Case 2: all the intervals are )0, t]:
+            # this opens the door to a more efficient implementation using a cumulative hazard.
+            elif torch.all(dataset.start == 0):
+                mode = "start zero"
+
+            # Case 3: general case )start, stop], we use two cumulative hazards:
+            else:
+                mode = "any"
+
+        else:
+            mode = self.mode
+
+        # Define the loss function:
+        def loss(*, bootstrap):
+            """Our loss function, including the L2 regularization term."""
+
+            def aux(coef):
+                """Wrapper around the CoxPH objective."""
+                B = len(bootstrap)
+                assert coef.shape == (B * n_batch, n_covariates)
+
+                obj = coxph_objective(
+                    coef=coef.view(B, n_batch, n_covariates),
+                    dataset=dataset,
+                    ties=self.ties,
+                    bootstrap=bootstrap,
+                    l2_reg=self.alpha,
+                    scales=scales,
+                    mode=mode,
+                )
+
+                return obj.view(B * n_batch)
+
+            return aux
+
+        return dataset, means, scales, n_batch, n_covariates, mode, loss
+
+    @typecheck
     def fit(
         self,
         covariates: Float64Array["intervals covariates"],
@@ -132,9 +234,7 @@ class CoxPHSurvivalAnalysis:
         loglik_init_, sctest_init_, hessian_, imat_, iter_, and (if
         nbootstraps is set) bootstrap_coef_.
         """
-        # Pre-process the input data: ----------------------------------------------------
-        # Create a dataset object: this enforces checks on the input data
-        dataset = SurvivalDataset(
+        dataset, means, scales, n_batch, n_covariates, mode, loss = self._prepare(
             covariates=covariates,
             stop=stop,
             start=start,
@@ -143,77 +243,6 @@ class CoxPHSurvivalAnalysis:
             strata=strata,
             batch=batch,
         )
-
-
-
-
-        # Re-encode the data arrays as PyTorch tensors on the correct device,
-        # with the correct dtype (float64 -> float32)
-
-        dataset = dataset.to_torch(self.device)
-
-        # Re-order the input arrays by lexicographical order on (batch, strata, stop, event):
-        dataset.sort()
-
-        # Scale the covariates for the sake of numerical stability:
-        means, scales = dataset.scale(rescale=self.doscale)
-
-        # Count the number of death times:
-        dataset.count_deaths()
-
-        # Filter out the times that have no impact on the CoxPH model
-        # (e.g. censoring that occurs before the first death):
-
-        # dataset.prune(mode=self.mode)
-
-
-        n_batch, n_covariates = dataset.n_batch, dataset.n_covariates
-
-        # Choose the fastest implementation of the CoxPH objective, ----------------------
-        # i.e. the partial neg-log-likelihood of the CoxPH model.
-
-        if self.mode is None:
-            # Case 1: all the intervals are )t-1, t] (i.e. no-interval mode),
-            # we can group times using equality conditions on the stop times.
-            # This is typically the case when using time-dependent covariates as in the WCE model.
-            if torch.all(dataset.stop == dataset.start + 1):
-                mode = "unit length"
-
-            # Case 2: all the intervals are )0, t]:
-            # this opens the door to a more efficient implementation using a cumulative hazard.
-            elif torch.all(dataset.start == 0):
-                mode = "start zero"
-
-            # Case 3: general case )start, stop], we use two cumulative hazards:
-            else:
-                mode = "any"
-
-        else:
-            mode = self.mode
-
-
-        # Define the loss function:
-        def loss(*, bootstrap):
-            """Our loss function, including the L2 regularization term."""
-
-            def aux(coef):
-                """Wrapper around the CoxPH objective."""
-                B = len(bootstrap)
-                assert coef.shape == (B * n_batch, n_covariates)
-
-                obj = coxph_objective(
-                    coef=coef.view(B, n_batch, n_covariates),
-                    dataset=dataset,
-                    ties=self.ties,
-                    bootstrap=bootstrap,
-                    l2_reg=self.alpha,
-                    scales=scales,
-                    mode=mode,
-                )
-
-                return obj.view(B * n_batch)
-
-            return aux
 
         # Run the Newton optimizer: ------------------------------------------------------
 
