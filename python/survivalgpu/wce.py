@@ -385,15 +385,6 @@ class WCESurvivalAnalysis:
 
             raise NotImplementedError(msg)
 
-        if self.nbootstraps is not None and len(self.nknots_candidates) > 1:
-            msg = (
-                "Bootstrapping with several candidate nknots values is not "
-                "supported yet: each bootstrap replicate should select its "
-                "own best nknots, which requires sharing resamples across "
-                "candidates -- a separate, upcoming change."
-            )
-            raise NotImplementedError(msg)
-
         if covariates is None:
             # No external covariates, just drug doses:
             self.n_covariates = 0
@@ -417,8 +408,17 @@ class WCESurvivalAnalysis:
         loglik_grid = []
         info_criterion_grid = []
 
+        bootstrap_coef_grid = []
+        bootstrap_WCE_coef_grid = []
+        bootstrap_risk_functions_grid = []
+        bootstrap_loglik_grid = []
+        # Shared across every candidate, so that a given bootstrap replicate
+        # resamples the exact same patients regardless of nknots: drawn once
+        # by the first candidate (below), then replayed by every other one.
+        shared_bootstrap_indices = None
+
         # Fit one WCE model per candidate nknots value. -----------------------------------
-        for nknots in self.nknots_candidates:
+        for i, nknots in enumerate(self.nknots_candidates):
             n_atoms = self._n_atoms_for(nknots)
             atoms = self._atoms_for(nknots)
 
@@ -444,6 +444,8 @@ class WCESurvivalAnalysis:
                 strata=strata,
                 batch=batch,
                 init=init,
+                bootstrap_indices=shared_bootstrap_indices,
+                keep_bootstrap_indices=(i == 0),
             )
 
             # Step 3: extract this candidate's results ------------------------------------
@@ -486,9 +488,23 @@ class WCESurvivalAnalysis:
             loglik_grid.append(loglik)
             info_criterion_grid.append(info_criterion)
 
-            # Batch coefficients: ----------------------------------------------------------
-            # Reachable only when there is a single candidate (see the guard above).
+            # Bootstrap results for this candidate: --------------------------------------
+            # every candidate reuses the same resample plan, drawn once by
+            # the first candidate above (bootstrap_indices=shared_bootstrap_indices).
             if self.nbootstraps is not None:
+                if i == 0:
+                    shared_bootstrap_indices = self.survival_model.bootstrap_indices_
+                    # Candidate-invariant (depends on the resamples and the
+                    # fixed event data, not on nknots): capture it once.
+                    self.bootstrap_n_events_ = self.survival_model.bootstrap_n_events_
+                else:
+                    # Self-verifying invariant: if this ever fails, resamples
+                    # were redrawn instead of shared across candidates.
+                    assert np.allclose(
+                        self.survival_model.bootstrap_n_events_,
+                        self.bootstrap_n_events_,
+                    )
+
                 assert self.survival_model.bootstrap_coef_.shape == (
                     self.nbootstraps,
                     n_batch,
@@ -496,20 +512,20 @@ class WCESurvivalAnalysis:
                 )
 
                 # Bootstrap coefficients for the covariates:
-                self.bootstrap_coef_ = self.survival_model.bootstrap_coef_[
+                bootstrap_coef = self.survival_model.bootstrap_coef_[
                     :, :, : self.n_covariates
                 ]
-                assert self.bootstrap_coef_.shape == (
+                assert bootstrap_coef.shape == (
                     self.nbootstraps,
                     n_batch,
                     self.n_covariates,
                 )
 
                 # Bootstrap weights for the WCE B-Spline features:
-                self.bootstrap_WCE_coef_ = self.survival_model.bootstrap_coef_[
+                bootstrap_WCE_coef = self.survival_model.bootstrap_coef_[
                     :, :, self.n_covariates :
                 ]
-                assert self.bootstrap_WCE_coef_.shape == (
+                assert bootstrap_WCE_coef.shape == (
                     self.nbootstraps,
                     n_batch,
                     n_atoms,
@@ -517,7 +533,12 @@ class WCESurvivalAnalysis:
 
                 # Estimated risk function:
                 # (nbootstraps, n_batch, n_atoms) @ (n_atoms, cutoff) -> (nbootstraps, n_batch, cutoff)
-                self.bootstrap_risk_functions_ = torch.tensor(self.bootstrap_WCE_coef_, dtype=self.dtype).to(self.device) @ atoms.to(self.dtype).T
+                bootstrap_risk_functions = torch.tensor(bootstrap_WCE_coef, dtype=self.dtype).to(self.device) @ atoms.to(self.dtype).T
+
+                bootstrap_coef_grid.append(bootstrap_coef)
+                bootstrap_WCE_coef_grid.append(bootstrap_WCE_coef)
+                bootstrap_risk_functions_grid.append(bootstrap_risk_functions)
+                bootstrap_loglik_grid.append(np.asarray(self.survival_model.bootstrap_loglik_))
 
             # Usual CoxPH results: reflect the last candidate fitted below --
             # only meaningful as-is when there is a single candidate; revisit
@@ -539,6 +560,25 @@ class WCESurvivalAnalysis:
         self.risk_function_grid_ = torch.stack(risk_function_grid)
         self.loglik_grid_ = np.stack(loglik_grid)
         self.info_criterion_grid_ = np.stack(info_criterion_grid)
+
+        if self.nbootstraps is not None:
+            # (n_candidates, nbootstraps, n_batch, n_covariates):
+            self.bootstrap_coef_grid_ = np.stack(bootstrap_coef_grid)
+            # Ragged (width depends on nknots): list of (nbootstraps, n_batch, n_atoms_c).
+            self.bootstrap_WCE_coef_grid_ = bootstrap_WCE_coef_grid
+            # (n_candidates, nbootstraps, n_batch, cutoff):
+            self.bootstrap_risk_functions_grid_ = torch.stack(bootstrap_risk_functions_grid)
+            # (n_candidates, nbootstraps, n_batch):
+            self.bootstrap_loglik_grid_ = np.stack(bootstrap_loglik_grid)
+
+            # Flat views, matching today's scalar-nknots contract: only
+            # unambiguous when there is a single candidate. Selecting a
+            # per-replicate winner across several candidates is not
+            # implemented yet.
+            if len(self.nknots_candidates) == 1:
+                self.bootstrap_coef_ = self.bootstrap_coef_grid_[0]
+                self.bootstrap_WCE_coef_ = self.bootstrap_WCE_coef_grid_[0]
+                self.bootstrap_risk_functions_ = self.bootstrap_risk_functions_grid_[0]
 
         # Select the candidate that minimizes the information criterion, per batch column.
         self.best_index_ = self.info_criterion_grid_.argmin(axis=0)

@@ -225,21 +225,49 @@ def test_wce_drugdata_single_candidate_list_matches_scalar():
 
 
 @pytest.mark.needs_keops()
-def test_wce_drugdata_multi_knot_bootstrap_not_yet_supported():
-    """Combining several candidate nknots with bootstrapping fails loudly for now.
+def test_wce_drugdata_multi_knot_bootstrap_grid_shapes():
+    """Combining several candidate nknots with bootstrapping populates the bootstrap grid.
 
-    Per-replicate knot selection needs resamples shared across candidates,
-    which is a separate, upcoming change -- this guard avoids silently
-    bootstrapping the wrong thing in the meantime.
+    Each candidate reuses the same resample plan -- checked via the
+    `bootstrap_n_events_` invariant asserted inside `.fit()` itself, which
+    would fail loudly if resamples were ever redrawn per candidate instead
+    of shared. Selecting a per-replicate winner across candidates isn't
+    implemented yet, so no flat `bootstrap_coef_`/`bootstrap_risk_functions_`
+    is expected here.
     """
+    cutoff = 90
+    candidates = (1, 2, 3)
+    nbootstraps = 8
     model = WCESurvivalAnalysis(
-        cutoff=90, constrained="right", nknots=[1, 2], nbootstraps=10
+        cutoff=cutoff,
+        constrained="right",
+        nknots=list(candidates),
+        nbootstraps=nbootstraps,
+        batchsize=4,
     )
-    with pytest.raises(NotImplementedError):
-        model.fit(
-            dose=_dose,
-            stop=_stop,
-            start=_start,
-            patient=_patient,
-            event=_event,
-        )
+
+    model.fit(
+        dose=_dose,
+        stop=_stop,
+        start=_start,
+        patient=_patient,
+        event=_event,
+    )
+
+    n_candidates = len(candidates)
+    assert model.bootstrap_coef_grid_.shape == (
+        n_candidates,
+        nbootstraps,
+        1,
+        model.n_covariates,
+    )
+    assert model.bootstrap_risk_functions_grid_.shape == (
+        n_candidates,
+        nbootstraps,
+        1,
+        cutoff,
+    )
+    assert model.bootstrap_loglik_grid_.shape == (n_candidates, nbootstraps, 1)
+    assert len(model.bootstrap_WCE_coef_grid_) == n_candidates
+    assert model.bootstrap_n_events_.shape == (nbootstraps,)
+    assert not hasattr(model, "bootstrap_coef_")
