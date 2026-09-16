@@ -377,7 +377,12 @@ class CoxPHSurvivalAnalysis:
                 `bootstrap_indices_`, so a caller can replay the exact same
                 resamples in a later `bootstrap()` call. Defaults to False.
 
-        Sets `self.bootstrap_coef_`, of shape (nbootstraps, n_batch, n_covariates).
+        Sets `self.bootstrap_coef_`, of shape (nbootstraps, n_batch, n_covariates);
+        `self.bootstrap_loglik_`, of shape (nbootstraps, n_batch); and
+        `self.bootstrap_n_events_`, of shape (nbootstraps,) -- the number of
+        events in each replicate's own resampled data (not the original
+        dataset's fixed event count), needed to compute a per-replicate
+        information criterion.
         """
         if indices is None:
             indices = dataset.bootstrap_indices(
@@ -389,6 +394,8 @@ class CoxPHSurvivalAnalysis:
             self.bootstrap_indices_ = indices
 
         bootstrap_coef = []
+        bootstrap_loglik = []
+        bootstrap_n_events = []
         for chunk in indices:
             bootstrap = Resampling(indices=chunk, patient=dataset.patient)
             B = len(bootstrap)
@@ -417,9 +424,21 @@ class CoxPHSurvivalAnalysis:
             # of different sizes be concatenated below -- the last chunk is
             # smaller than the others whenever nbootstraps % batchsize != 0.
             bootstrap_coef.append(res.x.reshape(B, n_batch, n_covariates))
+            # Log-likelihood at the optimum, same sign convention as loglik_ above:
+            bootstrap_loglik.append((-res.fun).reshape(B, n_batch))
+            # Weighted number of events actually present in this replicate's
+            # resampled data, matching how interval_weights already enters
+            # the likelihood itself:
+            bootstrap_n_events.append(
+                (bootstrap.interval_weights.to(self.dtype) * dataset.event.to(self.dtype)).sum(dim=-1)
+            )
 
         self.bootstrap_coef_ = torch.cat(bootstrap_coef, dim=0)
+        self.bootstrap_loglik_ = torch.cat(bootstrap_loglik, dim=0)
+        self.bootstrap_n_events_ = torch.cat(bootstrap_n_events, dim=0)
         assert self.bootstrap_coef_.shape == (self.nbootstraps, n_batch, n_covariates)
+        assert self.bootstrap_loglik_.shape == (self.nbootstraps, n_batch)
+        assert self.bootstrap_n_events_.shape == (self.nbootstraps,)
 
     @typecheck
     def _rescale(
@@ -474,6 +493,8 @@ class CoxPHSurvivalAnalysis:
 
         if hasattr(self, "bootstrap_coef_"):
             self.bootstrap_coef_ = numpy(self.bootstrap_coef_)
+            self.bootstrap_loglik_ = numpy(self.bootstrap_loglik_)
+            self.bootstrap_n_events_ = numpy(self.bootstrap_n_events_)
 
 
 # Functional Numpy API, called by our R wrapper:

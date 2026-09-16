@@ -391,3 +391,51 @@ def test_coxph_bootstrap_indices_are_patient_sized_not_interval_sized():
 
     assert model.bootstrap_indices_[0].shape == (batchsize, n_patients)
     assert model.bootstrap_indices_[0].shape != (batchsize, len(stop))
+
+
+def test_coxph_bootstrap_loglik_and_n_events_shapes():
+    """bootstrap_loglik_ and bootstrap_n_events_ have the expected shapes."""
+    covariates, stop, start, event, patient = _simple_coxph_arrays()
+    nbootstraps = 6
+
+    model = CoxPHSurvivalAnalysis(nbootstraps=nbootstraps, batchsize=4)
+    model.fit(
+        covariates=covariates,
+        stop=stop,
+        start=start,
+        event=event,
+        patient=patient,
+    )
+
+    assert model.bootstrap_loglik_.shape == (nbootstraps, 1)
+    assert model.bootstrap_n_events_.shape == (nbootstraps,)
+    assert np.all(np.isfinite(model.bootstrap_loglik_))
+    assert np.all(np.isfinite(model.bootstrap_n_events_))
+
+
+def test_coxph_bootstrap_n_events_matches_hand_computed_weighted_count():
+    """bootstrap_n_events_ is the resample-weighted event count, not the raw one.
+
+    Two patients, each with a single event; a known (not randomly drawn)
+    resample draws patient 0 three times and patient 1 once, so the
+    weighted event count is 3*1 + 1*1 = 4 -- not the original dataset's
+    raw count of 2.
+    """
+    covariates = np.array([[0.5], [-0.5]])
+    start = np.array([0, 0])
+    stop = np.array([1, 2])
+    event = np.array([1, 1])
+    patient = np.array([0, 1])
+
+    model = CoxPHSurvivalAnalysis(nbootstraps=1, batchsize=1)
+    model.fit(
+        covariates=covariates,
+        stop=stop,
+        start=start,
+        event=event,
+        patient=patient,
+        bootstrap_indices=[torch.tensor([[0, 0, 0, 1]], dtype=torch.int64)],
+    )
+
+    assert model.bootstrap_n_events_.shape == (1,)
+    assert model.bootstrap_n_events_[0] == 4.0
