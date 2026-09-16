@@ -378,6 +378,18 @@ class WCESurvivalAnalysis:
         Every candidate's own results are kept in parallel `*_grid_`
         attributes: knots_grid_, coef_grid_, WCE_coef_grid_, std_grid_,
         SED_grid_, risk_function_grid_, loglik_grid_, info_criterion_grid_.
+
+        If, in addition, `nbootstraps` is set, every bootstrap replicate
+        independently selects its own best candidate by information
+        criterion on its own resampled data (all candidates share the same
+        resamples, drawn once): bootstrap_coef_ and bootstrap_risk_functions_
+        reflect that per-replicate winner, and bootstrap_best_index_,
+        bootstrap_best_nknots_ record which candidate won each replicate.
+        The full per-candidate bootstrap grid is kept in
+        bootstrap_coef_grid_, bootstrap_WCE_coef_grid_,
+        bootstrap_risk_functions_grid_, bootstrap_loglik_grid_,
+        bootstrap_info_criterion_grid_, plus the (candidate-invariant)
+        bootstrap_n_events_.
         """
 
         if not np.all(stop == start + 1):
@@ -412,6 +424,7 @@ class WCESurvivalAnalysis:
         bootstrap_WCE_coef_grid = []
         bootstrap_risk_functions_grid = []
         bootstrap_loglik_grid = []
+        bootstrap_info_criterion_grid = []
         # Shared across every candidate, so that a given bootstrap replicate
         # resamples the exact same patients regardless of nknots: drawn once
         # by the first candidate (below), then replayed by every other one.
@@ -540,6 +553,19 @@ class WCESurvivalAnalysis:
                 bootstrap_risk_functions_grid.append(bootstrap_risk_functions)
                 bootstrap_loglik_grid.append(np.asarray(self.survival_model.bootstrap_loglik_))
 
+                # Per-replicate information criterion for this candidate,
+                # using this replicate's own (resample-weighted) event count
+                # rather than the fixed self.n_events_ used for the main fit:
+                if self.criterion == "aic":
+                    bootstrap_penalty_per_df = 2.0
+                else:
+                    bootstrap_penalty_per_df = np.log(self.bootstrap_n_events_)[:, None]
+                bootstrap_info_criterion = (
+                    -2 * np.asarray(self.survival_model.bootstrap_loglik_)
+                    + (n_atoms + self.n_covariates) * bootstrap_penalty_per_df
+                )
+                bootstrap_info_criterion_grid.append(bootstrap_info_criterion)
+
             # Usual CoxPH results: reflect the last candidate fitted below --
             # only meaningful as-is when there is a single candidate; revisit
             # if a future summary needs them for the best candidate specifically.
@@ -570,15 +596,31 @@ class WCESurvivalAnalysis:
             self.bootstrap_risk_functions_grid_ = torch.stack(bootstrap_risk_functions_grid)
             # (n_candidates, nbootstraps, n_batch):
             self.bootstrap_loglik_grid_ = np.stack(bootstrap_loglik_grid)
+            self.bootstrap_info_criterion_grid_ = np.stack(bootstrap_info_criterion_grid)
 
-            # Flat views, matching today's scalar-nknots contract: only
-            # unambiguous when there is a single candidate. Selecting a
-            # per-replicate winner across several candidates is not
-            # implemented yet.
+            # Select, independently for every replicate (and batch column),
+            # the candidate that minimizes the information criterion on that
+            # replicate's own resampled data -- this is what lets the
+            # bootstrap distribution reflect knot-selection uncertainty,
+            # instead of conditioning on a single fixed nknots.
+            self.bootstrap_best_index_ = self.bootstrap_info_criterion_grid_.argmin(axis=0)
+            self.bootstrap_best_nknots_ = np.asarray(self.nknots_candidates)[
+                self.bootstrap_best_index_
+            ]
+
+            boot_idx = np.arange(self.nbootstraps).reshape(-1, 1)
+            batch_idx2 = np.arange(n_batch).reshape(1, -1)
+            self.bootstrap_coef_ = self.bootstrap_coef_grid_[
+                self.bootstrap_best_index_, boot_idx, batch_idx2
+            ]
+            self.bootstrap_risk_functions_ = self.bootstrap_risk_functions_grid_[
+                self.bootstrap_best_index_, boot_idx, batch_idx2
+            ]
+
+            # Ragged (width depends on nknots): only dense when there is a
+            # single candidate, matching today's scalar-nknots contract.
             if len(self.nknots_candidates) == 1:
-                self.bootstrap_coef_ = self.bootstrap_coef_grid_[0]
                 self.bootstrap_WCE_coef_ = self.bootstrap_WCE_coef_grid_[0]
-                self.bootstrap_risk_functions_ = self.bootstrap_risk_functions_grid_[0]
 
         # Select the candidate that minimizes the information criterion, per batch column.
         self.best_index_ = self.info_criterion_grid_.argmin(axis=0)

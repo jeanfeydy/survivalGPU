@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import rpy2.robjects as ro
 import rpy2.robjects.packages as rpackages
+import torch
 from rpy2.robjects import conversion, pandas2ri
 from survivalgpu import WCESurvivalAnalysis
 
@@ -231,9 +232,7 @@ def test_wce_drugdata_multi_knot_bootstrap_grid_shapes():
     Each candidate reuses the same resample plan -- checked via the
     `bootstrap_n_events_` invariant asserted inside `.fit()` itself, which
     would fail loudly if resamples were ever redrawn per candidate instead
-    of shared. Selecting a per-replicate winner across candidates isn't
-    implemented yet, so no flat `bootstrap_coef_`/`bootstrap_risk_functions_`
-    is expected here.
+    of shared.
     """
     cutoff = 90
     candidates = (1, 2, 3)
@@ -270,4 +269,92 @@ def test_wce_drugdata_multi_knot_bootstrap_grid_shapes():
     assert model.bootstrap_loglik_grid_.shape == (n_candidates, nbootstraps, 1)
     assert len(model.bootstrap_WCE_coef_grid_) == n_candidates
     assert model.bootstrap_n_events_.shape == (nbootstraps,)
-    assert not hasattr(model, "bootstrap_coef_")
+
+
+@pytest.mark.needs_keops()
+def test_wce_drugdata_bootstrap_selects_best_knot_per_replicate():
+    """Each bootstrap replicate independently selects its own best nknots.
+
+    This is the actual feature: bootstrap_coef_/bootstrap_risk_functions_
+    reflect, for every replicate, whichever candidate minimized the
+    information criterion on that replicate's own resampled data.
+    """
+    cutoff = 90
+    candidates = (1, 2, 3)
+    nbootstraps = 20
+    model = WCESurvivalAnalysis(
+        cutoff=cutoff,
+        constrained="right",
+        nknots=list(candidates),
+        nbootstraps=nbootstraps,
+        batchsize=10,
+    )
+
+    model.fit(
+        dose=_dose,
+        stop=_stop,
+        start=_start,
+        patient=_patient,
+        event=_event,
+    )
+
+    assert model.bootstrap_best_index_.shape == (nbootstraps, 1)
+    assert model.bootstrap_best_nknots_.shape == (nbootstraps, 1)
+    assert set(np.unique(model.bootstrap_best_nknots_)).issubset(
+        set(candidates)
+    )
+    assert model.bootstrap_risk_functions_.shape == (nbootstraps, 1, cutoff)
+    assert model.bootstrap_coef_.shape == (nbootstraps, 1, model.n_covariates)
+
+    # Argmin correctness: the selected candidate's own criterion must equal
+    # the row-wise minimum across all candidates, for every replicate.
+    for r in range(nbootstraps):
+        selected = model.bootstrap_best_index_[r, 0]
+        assert (
+            model.bootstrap_info_criterion_grid_[selected, r, 0]
+            == model.bootstrap_info_criterion_grid_[:, r, 0].min()
+        )
+
+
+@pytest.mark.needs_keops()
+def test_wce_drugdata_single_candidate_list_matches_scalar_with_bootstrap():
+    """`nknots=[2]` bootstrap output must match `nknots=2`'s, byte for byte.
+
+    Proves the grid-of-one bootstrap path (Commits 5a/5b) is identical to
+    today's scalar-nknots bootstrap path (Commit 0), just routed through the
+    per-replicate selection machinery with a single candidate to "select".
+    """
+    cutoff = 90
+    nbootstraps = 10
+
+    torch.manual_seed(0)
+    scalar_model = WCESurvivalAnalysis(
+        cutoff=cutoff,
+        constrained="right",
+        nknots=2,
+        nbootstraps=nbootstraps,
+        batchsize=5,
+    )
+    scalar_model.fit(
+        dose=_dose, stop=_stop, start=_start, patient=_patient, event=_event
+    )
+
+    torch.manual_seed(0)
+    list_model = WCESurvivalAnalysis(
+        cutoff=cutoff,
+        constrained="right",
+        nknots=[2],
+        nbootstraps=nbootstraps,
+        batchsize=5,
+    )
+    list_model.fit(
+        dose=_dose, stop=_stop, start=_start, patient=_patient, event=_event
+    )
+
+    assert np.array_equal(
+        scalar_model.bootstrap_coef_, list_model.bootstrap_coef_
+    )
+    assert torch.equal(
+        scalar_model.bootstrap_risk_functions_,
+        list_model.bootstrap_risk_functions_,
+    )
