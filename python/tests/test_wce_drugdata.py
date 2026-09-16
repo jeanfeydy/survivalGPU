@@ -5,6 +5,7 @@ import rpy2.robjects.packages as rpackages
 import torch
 from rpy2.robjects import conversion, pandas2ri
 from survivalgpu import WCESurvivalAnalysis
+from survivalgpu.wce import wce_numpy, wce_R
 
 # rpy2 + R's WCE package are a pre-existing hard dependency of the `test`
 # dependency-group, unrelated to pykeops -- kept at module level.
@@ -358,3 +359,63 @@ def test_wce_drugdata_single_candidate_list_matches_scalar_with_bootstrap():
         scalar_model.bootstrap_risk_functions_,
         list_model.bootstrap_risk_functions_,
     )
+
+
+@pytest.mark.needs_keops()
+def test_wce_numpy_accepts_nknots_list():
+    """wce_numpy (the R bridge's computational backend) forwards a list nknots.
+
+    Also checks the new diagnostic keys it exposes for the R port: best_nknots,
+    nknots_grid, info_criterion_grid, loglik_grid.
+    """
+    res = wce_numpy(
+        ids=_patient,
+        covariates=None,
+        doses=_dose,
+        events=_event,
+        start=_start,
+        stop=_stop,
+        cutoff=90,
+        nknots=[1, 2, 3],
+        constrained="right",
+    )
+
+    assert res["nknots_grid"].tolist() == [1, 2, 3]
+    assert res["info_criterion_grid"].shape == (3, 1)
+    assert res["loglik_grid"].shape == (3, 1)
+    assert res["best_nknots"].shape == (1,)
+    assert res["best_nknots"][0] in (1, 2, 3)
+    assert res["info_criterion"] == res["info_criterion_grid"].min()
+
+
+@pytest.mark.needs_keops()
+def test_wce_r_accepts_nknots_vector():
+    """wce_R (the actual R-facing entry point) accepts a list or a NumPy array
+    for nknots -- covering both a plain Python list and whatever reticulate is
+    likely to hand over for an R numeric vector -- as well as a plain scalar.
+    """
+    common_kwargs = dict(
+        data=drugdata_df,
+        ids="Id",
+        covars=None,
+        start="Start",
+        stop="Stop",
+        doses="dose",
+        events="Event",
+        cutoff=90,
+        constrained="R",
+        aic=False,
+        bootstrap=0,
+        batchsize=0,
+    )
+
+    res_list = wce_R(nknots=[1, 2, 3], **common_kwargs)
+    assert res_list["nknots_grid"].tolist() == [1, 2, 3]
+    assert res_list["best_nknots"][0] in (1, 2, 3)
+
+    res_array = wce_R(nknots=np.array([1, 2, 3]), **common_kwargs)
+    assert res_array["nknots_grid"].tolist() == [1, 2, 3]
+
+    res_scalar = wce_R(nknots=2, **common_kwargs)
+    assert res_scalar["nknots_grid"].tolist() == [2]
+    assert res_scalar["best_nknots"][0] == 2

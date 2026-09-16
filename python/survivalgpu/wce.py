@@ -689,7 +689,7 @@ def wce_numpy(
     start,
     stop,
     cutoff: Int,
-    nknots: Int = 1,
+    nknots=1,
     order: Int = 3,
     constrained: Literal["right", "left"] | None = None,
     criterion: Literal["aic", "bic"] = "bic",
@@ -715,7 +715,9 @@ def wce_numpy(
         start ((I,) array): start time of each interval.
         stop ((I,) array): end time of each interval.
         cutoff (int): size of the time window for the risk function.
-        nknots (int, optional): number of knots for the B-splines. Defaults to 1.
+        nknots (int or list[int], optional): number of knots for the
+            B-splines, or a list of candidate values to try -- the candidate
+            that minimizes `criterion` is selected. Defaults to 1.
         order (int, optional): order of the B-splines. Defaults to 3.
         constrained ("left", "right" or None, optional): boundary constraint
             on the B-splines. Defaults to None.
@@ -736,9 +738,11 @@ def wce_numpy(
     Returns:
         dict: with keys "knotsmat", "coef", "std", "WCE_coef", "SED",
             "risk_function", "info_criterion", "means", "score", "sctest_init",
-            "loglik_init", "loglik", "hessian", "imat", "iter", and (if
-            nbootstraps is set) "bootstrap_coef", "bootstrap_WCE_coef",
-            "bootstrap_risk_functions".
+            "loglik_init", "loglik", "hessian", "imat", "iter", "best_nknots",
+            "nknots_grid", "info_criterion_grid", "loglik_grid", and (if
+            nbootstraps is set) "bootstrap_coef", "bootstrap_risk_functions",
+            "bootstrap_best_nknots", and (only when a single nknots candidate
+            was given) "bootstrap_WCE_coef".
     """
     if nbootstraps == 0:
         nbootstraps = None
@@ -793,15 +797,29 @@ def wce_numpy(
         hessian=model.hessian_,
         imat=model.imat_,
         iter=model.iter_,
+        # Diagnostics for the candidate-selection grid -- always present,
+        # even for a single nknots value (a grid of size one):
+        best_nknots=model.best_nknots_,
+        nknots_grid=np.asarray(model.nknots_candidates),
+        info_criterion_grid=model.info_criterion_grid_,
+        loglik_grid=model.loglik_grid_,
     )
 
 
     if nbootstraps is not None:
         output.update(
             bootstrap_coef=model.bootstrap_coef_,
-            bootstrap_WCE_coef=model.bootstrap_WCE_coef_,
             bootstrap_risk_functions=model.bootstrap_risk_functions_.squeeze(axis=1).cpu().numpy(),
+            # Which candidate won each replicate -- the actual measure of
+            # knot-selection uncertainty this feature is about:
+            bootstrap_best_nknots=model.bootstrap_best_nknots_,
         )
+        if hasattr(model, "bootstrap_WCE_coef_"):
+            # Only meaningful when there was a single candidate: with several
+            # candidates, different replicates may have selected different
+            # (differently-sized) spline coefficients, so there is no single
+            # dense array to report here.
+            output["bootstrap_WCE_coef"] = model.bootstrap_WCE_coef_
 
 
     return output
@@ -847,7 +865,10 @@ def wce_R(
         doses (str): name of the column with drug doses.
         events (str): name of the column with the event indicator.
         cutoff (int): size of the time window for the risk function.
-        nknots (int, optional): number of knots for the B-splines. Defaults to 1.
+        nknots (int or array-like of int, optional): number of knots for the
+            B-splines, or several candidate values to try (as sent by R for a
+            numeric vector) -- the candidate that minimizes the information
+            criterion is selected. Defaults to 1.
         order (int, optional): order of the B-splines. Defaults to 3.
         constrained (str or None, optional): one of "None"/None, "left"/"Left"/"l"/"L"
             or "right"/"Right"/"r"/"R". Defaults to None.
@@ -874,9 +895,11 @@ def wce_R(
     Returns:
         dict: with keys "knotsmat", "coef", "std", "WCE_coef", "SED",
             "risk_function", "info_criterion", "means", "score", "sctest_init",
-            "loglik_init", "loglik", "hessian", "imat", "iter", and (if
-            bootstrap > 0) "bootstrap_coef", "bootstrap_WCE_coef",
-            "bootstrap_risk_functions".
+            "loglik_init", "loglik", "hessian", "imat", "iter", "best_nknots",
+            "nknots_grid", "info_criterion_grid", "loglik_grid", and (if
+            bootstrap > 0) "bootstrap_coef", "bootstrap_risk_functions",
+            "bootstrap_best_nknots", and (only when a single nknots candidate
+            was given) "bootstrap_WCE_coef".
     """
 
     if constrained == "None":
@@ -949,7 +972,12 @@ def wce_R(
     if strata is not None:
         strata = np.array(strata, dtype=np.int64)
 
-
+    # nknots may be a single value or (for an R numeric vector, converted by
+    # reticulate into e.g. a NumPy array) several candidates to try -- either
+    # way, coerce it into a plain Python int or list[int]:
+    nknots_arg = np.atleast_1d(nknots).astype(int).tolist()
+    if len(nknots_arg) == 1:
+        nknots_arg = nknots_arg[0]
 
     with myprof as prof:
         res = wce_numpy(
@@ -960,7 +988,7 @@ def wce_R(
             start=start,
             stop=stop,
             cutoff=int(cutoff),
-            nknots=int(nknots),
+            nknots=nknots_arg,
             order=int(order),
             constrained=constrained,
             criterion="aic" if aic else "bic",
