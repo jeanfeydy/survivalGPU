@@ -4,6 +4,11 @@ import numpy as np
 import torch
 from hypothesis import given
 from hypothesis import strategies as st
+from survivalgpu import (
+    ConstantCovariate,
+    CoxPHSurvivalAnalysis,
+    simulate_dataset,
+)
 from survivalgpu.bootstrap import Resampling
 from survivalgpu.datasets import SurvivalDataset
 from survivalgpu.group_reduction import group_sum
@@ -265,3 +270,124 @@ def test_bootstraps_stratification_1(
         assert torch.allclose(
             probas, torch.ones_like(probas), atol=10 / sqrt(nbootstraps)
         )
+
+
+# Test CoxPHSurvivalAnalysis.bootstrap() end-to-end ======================================
+
+
+def _simple_coxph_arrays():
+    """Raw numpy arrays for a small, well-conditioned simulated CoxPH dataset.
+
+    Uses survivalGPU's simualator to test bootstrap resemple
+    """
+    sex = ConstantCovariate(
+        name="sex", values=[0, 1], weights=[1, 1], coef=0.7
+    )
+    biomarker = ConstantCovariate(
+        name="biomarker", values=[0, 1, 2], weights=[1, 1, 1], coef=0.4
+    )
+    df = simulate_dataset(
+        max_time=50,
+        n_patients=40,
+        list_covariates=[sex, biomarker],
+        compress=False,
+        seed=0,
+    )
+    covariates = df[["sex", "biomarker"]].to_numpy(dtype=np.float64)
+    start = df["start"].to_numpy(dtype=np.int64)
+    stop = df["stop"].to_numpy(dtype=np.int64)
+    event = df["events"].to_numpy(dtype=np.int64)
+    patient = df["patients"].to_numpy(dtype=np.int64)
+    return covariates, stop, start, event, patient
+
+
+def test_coxph_bootstrap_uneven_batchsize_does_not_crash():
+    """nbootstraps % batchsize != 0 must not crash.
+
+    Regression test: the bootstrap loop used to do
+    `torch.stack(bootstrap_coef).view(...)`, which requires every chunk to
+    have the same size -- but the last chunk is smaller than the others
+    whenever nbootstraps isn't a multiple of batchsize.
+    """
+    covariates, stop, start, event, patient = _simple_coxph_arrays()
+    n_covariates = covariates.shape[1]
+
+    model = CoxPHSurvivalAnalysis(nbootstraps=6, batchsize=4)
+    model.fit(
+        covariates=covariates,
+        stop=stop,
+        start=start,
+        event=event,
+        patient=patient,
+    )
+
+    assert model.bootstrap_coef_.shape == (6, 1, n_covariates)
+    assert np.all(np.isfinite(model.bootstrap_coef_))
+
+
+def test_coxph_bootstrap_index_reuse_gives_identical_coef():
+    """Replaying the same index chunks reproduces the same bootstrap_coef_."""
+    covariates, stop, start, event, patient = _simple_coxph_arrays()
+
+    model1 = CoxPHSurvivalAnalysis(nbootstraps=5, batchsize=2)
+    model1.fit(
+        covariates=covariates,
+        stop=stop,
+        start=start,
+        event=event,
+        patient=patient,
+        keep_bootstrap_indices=True,
+    )
+    saved_indices = model1.bootstrap_indices_
+
+    model2 = CoxPHSurvivalAnalysis(nbootstraps=5, batchsize=2)
+    model2.fit(
+        covariates=covariates,
+        stop=stop,
+        start=start,
+        event=event,
+        patient=patient,
+        bootstrap_indices=saved_indices,
+    )
+
+    assert np.allclose(model1.bootstrap_coef_, model2.bootstrap_coef_)
+
+    # Contrast: two independently-drawn (non-shared) fits should differ --
+    # the space of possible resamples is large enough that a coincidental
+    # exact match is negligible.
+    model3 = CoxPHSurvivalAnalysis(nbootstraps=5, batchsize=2)
+    model3.fit(
+        covariates=covariates,
+        stop=stop,
+        start=start,
+        event=event,
+        patient=patient,
+    )
+
+    assert not np.allclose(model1.bootstrap_coef_, model3.bootstrap_coef_)
+
+
+def test_coxph_bootstrap_indices_are_patient_sized_not_interval_sized():
+    """`bootstrap_indices_` chunks must be (batchsize, n_patients), not (batchsize, n_intervals).
+
+    Guards against accidentally reverting to storing full `Resampling`
+    objects (which hold (B, n_intervals) tensors) instead of the compact,
+    pre-expansion (B, n_patients) index tensors -- the whole point of the
+    `bootstrap_indices()`/`bootstrap()` split is to keep this cheap.
+    """
+    covariates, stop, start, event, patient = _simple_coxph_arrays()
+    n_patients = len(np.unique(patient))
+    batchsize = 4
+
+    model = CoxPHSurvivalAnalysis(nbootstraps=6, batchsize=batchsize)
+    model.fit(
+        covariates=covariates,
+        stop=stop,
+        start=start,
+        event=event,
+        patient=patient,
+        keep_bootstrap_indices=True,
+    )
+
+    assert model.bootstrap_indices_[0].shape == (batchsize, n_patients)
+    assert model.bootstrap_indices_[0].shape != (batchsize, len(stop))

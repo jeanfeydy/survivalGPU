@@ -21,6 +21,7 @@ import numpy as np
 import torch
 
 # The convex CoxPH objective:
+from .bootstrap import Resampling
 from .coxph_likelihood import coxph_objective
 from .datasets import SurvivalDataset
 
@@ -207,6 +208,8 @@ class CoxPHSurvivalAnalysis:
         strata: Int64Array["intervals"] | None = None,
         batch: Int64Array["patient"] | None = None,
         init: Float64Array["covariates"] | None = None,
+        bootstrap_indices=None,
+        keep_bootstrap_indices: Bool = False,
 
     ):
         """Fits the CoxPH model to the data and stores the results as attributes.
@@ -229,6 +232,13 @@ class CoxPHSurvivalAnalysis:
                 Defaults to a single batch for all patients.
             init ((D,) float64 array, optional): initial values for the
                 coefficients. Defaults to zeros.
+            bootstrap_indices (optional): a list of raw (B,P) patient-index
+                tensors to replay instead of drawing new ones -- see
+                `bootstrap()`. Defaults to None, i.e. draw fresh indices.
+            keep_bootstrap_indices (bool, optional): if True, store the
+                (freshly-drawn or replayed) index chunks as
+                `bootstrap_indices_`, so they can be replayed later by another
+                `fit()` call. Defaults to False.
 
         Results are stored as attributes: coef_, std_, means_, score_, loglik_,
         loglik_init_, sctest_init_, hessian_, imat_, iter_, and (if
@@ -294,35 +304,15 @@ class CoxPHSurvivalAnalysis:
         self.iter_ = res.iterations
 
         # If required, compute a distribution of the coefficients using bootstrap: -------
-        if (self.nbootstraps is not None) and (self.nbootstraps >0):
-            bootstrap_coef = []
-            for bootstrap in dataset.bootstraps(
-                nbootstraps=self.nbootstraps, batchsize=self.batchsize
-            ):
-                # Vector of initial values of the Newton iteration.
-                # Zero for all variables by default.
-                if init is None:
-                    init_tensor = torch.zeros(
-                        (len(bootstrap) * n_batch, n_covariates),
-                        dtype=self.dtype,
-                        device=self.device,
-                    )
-                else:
-                    init_tensor = torch.tensor(init, dtype=self.dtype, device=self.device)
-                    assert init_tensor.shape == (n_covariates,)
-                    init_tensor = init_tensor.repeat(len(bootstrap) * n_batch, 1)
-
-                res = newton(
-                    loss=loss(bootstrap=bootstrap),
-                    start=init_tensor,
-                    maxiter=self.maxiter,
-                    eps=self.eps,
-                    verbosity=self.verbosity,
-                )
-                bootstrap_coef.append(res.x)
-
-            self.bootstrap_coef_ = torch.stack(bootstrap_coef).view(
-                self.nbootstraps, n_batch, n_covariates
+        if (self.nbootstraps is not None) and (self.nbootstraps > 0):
+            self.bootstrap(
+                dataset=dataset,
+                n_batch=n_batch,
+                n_covariates=n_covariates,
+                loss=loss,
+                init=init,
+                indices=bootstrap_indices,
+                keep_indices=keep_bootstrap_indices,
             )
 
         # If the covariates have been normalized for the sake of stability,
@@ -350,11 +340,86 @@ class CoxPHSurvivalAnalysis:
         assert self.hessian_.shape == hessian_shape
         assert self.imat_.shape == hessian_shape
 
+    @typecheck
+    def bootstrap(
+        self,
+        *,
+        dataset,
+        n_batch: int,
+        n_covariates: int,
+        loss,
+        init: Float64Array["covariates"] | None = None,
+        indices=None,
+        keep_indices: Bool = False,
+    ):
+        """Fits the CoxPH model on a collection of bootstrap resamples.
 
-        if (self.nbootstraps is not None) and (self.nbootstraps >0 ):
-            assert self.bootstrap_coef_.shape == (self.nbootstraps, n_batch, n_covariates)
+        Shared building block for `fit()`'s own bootstrap loop, and for
+        external callers (e.g. `WCESurvivalAnalysis`) that need to reuse the
+        exact same resamples across several model configurations (e.g.
+        several `nknots` candidates), so that each replicate is compared
+        fairly across configurations.
 
+        Args:
+            dataset: the (sorted, scaled) `TorchSurvivalDataset` built by `_prepare()`.
+            n_batch (int): number of independent batches, as in `fit()`.
+            n_covariates (int): number of covariates, as in `fit()`.
+            loss: the `loss(*, bootstrap)` closure built by `_prepare()`.
+            init ((D,) float64 array, optional): initial values for the
+                coefficients. Defaults to zeros.
+            indices (optional): a list of raw (B,P) patient-index tensors to
+                replay instead of drawing new ones (see
+                `TorchSurvivalDataset.bootstrap_indices()`). Defaults to None,
+                i.e. draw `self.nbootstraps` fresh indices, chunked by
+                `self.batchsize`.
+            keep_indices (bool, optional): if True, store the index chunks
+                (freshly-drawn, or replayed from `indices`) as
+                `bootstrap_indices_`, so a caller can replay the exact same
+                resamples in a later `bootstrap()` call. Defaults to False.
 
+        Sets `self.bootstrap_coef_`, of shape (nbootstraps, n_batch, n_covariates).
+        """
+        if indices is None:
+            indices = dataset.bootstrap_indices(
+                nbootstraps=self.nbootstraps, batchsize=self.batchsize
+            )
+
+        if keep_indices:
+            indices = list(indices)
+            self.bootstrap_indices_ = indices
+
+        bootstrap_coef = []
+        for chunk in indices:
+            bootstrap = Resampling(indices=chunk, patient=dataset.patient)
+            B = len(bootstrap)
+
+            # Vector of initial values of the Newton iteration.
+            # Zero for all variables by default.
+            if init is None:
+                init_tensor = torch.zeros(
+                    (B * n_batch, n_covariates),
+                    dtype=self.dtype,
+                    device=self.device,
+                )
+            else:
+                init_tensor = torch.tensor(init, dtype=self.dtype, device=self.device)
+                assert init_tensor.shape == (n_covariates,)
+                init_tensor = init_tensor.repeat(B * n_batch, 1)
+
+            res = newton(
+                loss=loss(bootstrap=bootstrap),
+                start=init_tensor,
+                maxiter=self.maxiter,
+                eps=self.eps,
+                verbosity=self.verbosity,
+            )
+            # Reshaping (instead of stacking un-reshaped chunks) lets chunks
+            # of different sizes be concatenated below -- the last chunk is
+            # smaller than the others whenever nbootstraps % batchsize != 0.
+            bootstrap_coef.append(res.x.reshape(B, n_batch, n_covariates))
+
+        self.bootstrap_coef_ = torch.cat(bootstrap_coef, dim=0)
+        assert self.bootstrap_coef_.shape == (self.nbootstraps, n_batch, n_covariates)
 
     @typecheck
     def _rescale(
