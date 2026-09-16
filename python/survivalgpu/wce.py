@@ -420,6 +420,17 @@ class WCESurvivalAnalysis:
         loglik_grid = []
         info_criterion_grid = []
 
+        # "Usual" CoxPH diagnostics, ragged across candidates (their width
+        # depends on nknots) -- kept per candidate and resolved to the
+        # selected winner's own values after the loop, alongside coef_ etc.
+        means_grid = []
+        score_grid = []
+        sctest_init_grid = []
+        loglik_init_grid = []
+        hessian_grid = []
+        imat_grid = []
+        iter_grid = []
+
         bootstrap_coef_grid = []
         bootstrap_WCE_coef_grid = []
         bootstrap_risk_functions_grid = []
@@ -566,16 +577,16 @@ class WCESurvivalAnalysis:
                 )
                 bootstrap_info_criterion_grid.append(bootstrap_info_criterion)
 
-            # Usual CoxPH results: reflect the last candidate fitted below --
-            # only meaningful as-is when there is a single candidate; revisit
-            # if a future summary needs them for the best candidate specifically.
-            self.means_ = self.survival_model.means_
-            self.score_ = self.survival_model.score_
-            self.sctest_init_ = self.survival_model.sctest_init_
-            self.loglik_init_ = self.survival_model.loglik_init_
-            self.hessian_ = self.survival_model.hessian_
-            self.imat_ = self.survival_model.imat_
-            self.iter_ = self.survival_model.iter_
+            # Usual CoxPH results: kept per candidate (ragged, like WCE_coef_
+            # above) and resolved to the selected winner's own values below,
+            # alongside coef_/risk_function_/etc.
+            means_grid.append(self.survival_model.means_)
+            score_grid.append(self.survival_model.score_)
+            sctest_init_grid.append(self.survival_model.sctest_init_)
+            loglik_init_grid.append(self.survival_model.loglik_init_)
+            hessian_grid.append(self.survival_model.hessian_)
+            imat_grid.append(self.survival_model.imat_)
+            iter_grid.append(self.survival_model.iter_)
 
         # Stack the fixed-width results into dense (n_candidates, ...) grids. ------------
         self.knots_grid_ = knots_grid
@@ -626,6 +637,19 @@ class WCESurvivalAnalysis:
         self.best_index_ = self.info_criterion_grid_.argmin(axis=0)
         self.best_nknots_ = np.asarray(self.nknots_candidates)[self.best_index_]
 
+        # "Usual" CoxPH diagnostics for the selected winner. Like means_/
+        # score_/hessian_/imat_ themselves (see the "TODO batch this" note on
+        # means_' shape), this picks a single winner rather than one per
+        # batch column: not batch-aware, but no worse than before.
+        winner = int(self.best_index_[0])
+        self.means_ = means_grid[winner]
+        self.score_ = score_grid[winner]
+        self.sctest_init_ = sctest_init_grid[winner]
+        self.loglik_init_ = loglik_init_grid[winner]
+        self.hessian_ = hessian_grid[winner]
+        self.imat_ = imat_grid[winner]
+        self.iter_ = iter_grid[winner]
+
         batch_idx = np.arange(n_batch)
         self.coef_ = self.coef_grid_[self.best_index_, batch_idx]
         self.std_ = self.std_grid_[self.best_index_, batch_idx]
@@ -634,13 +658,16 @@ class WCESurvivalAnalysis:
         self.info_criterion_ = self.info_criterion_grid_[self.best_index_, batch_idx]
 
         # Ragged across candidates (their width depends on nknots): stay dense
-        # when there is a single candidate (today's default, and every
-        # currently-tested case); otherwise, one entry per batch column,
-        # matching that column's own best candidate.
-        if len(self.nknots_candidates) == 1:
-            self.knots_ = self.knots_grid_[0]
-            self.WCE_coef_ = self.WCE_coef_grid_[0]
-            self.SED_ = self.SED_grid_[0]
+        # whenever every batch column agrees on the same winning candidate
+        # (true whenever there is a single candidate, and in practice always
+        # true today, since `batch` -- and thus more than one column -- is
+        # never used); only fall back to one entry per batch column when
+        # different columns genuinely pick different candidates.
+        if len(set(self.best_index_.tolist())) == 1:
+            winner = int(self.best_index_[0])
+            self.knots_ = self.knots_grid_[winner]
+            self.WCE_coef_ = self.WCE_coef_grid_[winner]
+            self.SED_ = self.SED_grid_[winner]
         else:
             self.knots_ = [self.knots_grid_[i] for i in self.best_index_]
             self.WCE_coef_ = [self.WCE_coef_grid_[i][b] for b, i in enumerate(self.best_index_)]
