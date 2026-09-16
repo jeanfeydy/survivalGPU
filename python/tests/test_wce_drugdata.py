@@ -49,3 +49,36 @@ def test_wce_drugdata(cutoff, nknots):
     assert model.risk_function_.shape == (1, cutoff)
     assert np.all(np.isfinite(model.coef_))
     assert np.all(np.isfinite(model.WCE_coef_))
+
+
+@pytest.mark.needs_keops()
+def test_wce_drugdata_bootstrap():
+    """Characterizes WCESurvivalAnalysis's existing bootstrap support.
+
+    This combination (nbootstraps set on a WCE model) has no prior test coverage
+    anywhere in the suite, so this is a safety net ahead of upcoming changes that
+    let the bootstrap select the best nknots per replicate from a candidate list.
+    """
+    cutoff = 90
+    nbootstraps = 20
+    model = WCESurvivalAnalysis(
+        cutoff=cutoff,
+        constrained="right",
+        nknots=2,
+        nbootstraps=nbootstraps,
+        batchsize=10,
+    )
+
+    model.fit(
+        dose=_dose,
+        stop=_stop,
+        start=_start,
+        patient=_patient,
+        event=_event,
+    )
+
+    assert model.bootstrap_coef_.shape == (nbootstraps, 1, model.n_covariates)
+    assert model.bootstrap_WCE_coef_.shape == (nbootstraps, 1, model.n_atoms)
+    assert model.bootstrap_risk_functions_.shape == (nbootstraps, 1, cutoff)
+    assert np.all(np.isfinite(model.bootstrap_coef_))
+    assert np.all(np.isfinite(model.bootstrap_WCE_coef_))
