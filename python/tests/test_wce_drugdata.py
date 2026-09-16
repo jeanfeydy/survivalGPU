@@ -157,6 +157,27 @@ def test_wce_drugdata_multi_knot_grid_shapes():
     assert model.best_nknots_[0] in candidates
     assert np.all(np.isfinite(model.info_criterion_grid_))
 
+    # Regression: with a single batch column (always true today, since
+    # `batch` is never used), WCE_coef_/knots_/SED_ must stay dense arrays,
+    # not a length-1 list -- a list here would convert to an R *list* (not a
+    # matrix/vector) via reticulate, breaking wceGPU()'s ncol()/rownames()
+    # calls even though there is no genuine per-batch raggedness to justify it.
+    assert isinstance(model.WCE_coef_, np.ndarray)
+    assert isinstance(model.SED_, np.ndarray)
+    assert isinstance(model.knots_, np.ndarray)
+    assert model.WCE_coef_.shape == (
+        1,
+        model._n_atoms_for(model.best_nknots_[0]),
+    )
+
+    # Regression: "usual CoxPH results" (imat_ in particular) must reflect
+    # the *selected* candidate, not simply whichever one was fitted last in
+    # the loop -- otherwise imat_'s dimensions (sized by the last candidate's
+    # n_atoms) would mismatch coef_/WCE_coef_'s (sized by the winner's).
+    n_total = model.n_covariates + model._n_atoms_for(model.best_nknots_[0])
+    assert model.imat_.shape == (1, n_total, n_total)
+    assert model.means_.shape == (n_total,)
+
 
 @pytest.mark.needs_keops()
 def test_wce_drugdata_multi_knot_matches_independent_scalar_fits():
