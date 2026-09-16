@@ -95,3 +95,151 @@ def test_wce_n_atoms_for_is_parametrized():
     assert model.n_atoms == 1 + model.order + 1
     assert model._n_atoms_for(3) == 3 + model.order + 1
     assert model.n_atoms == 1 + model.order + 1
+
+
+def test_wce_nknots_type_is_checked():
+    """nknots accepts an int or a list/tuple of ints, and rejects other types.
+
+    `nknots` is annotated `Int | list[Int] | tuple[Int, ...]` on `__init__`,
+    the same pattern used for `constrained: Literal[...] | None`: a fast,
+    signature-level type gate on top of the exhaustive value checks already
+    done in the `nknots` setter.
+    """
+    assert WCESurvivalAnalysis(cutoff=90, nknots=3).nknots == 3
+
+    with pytest.raises(TypeError):
+        WCESurvivalAnalysis(cutoff=90, nknots="3")
+
+    with pytest.raises(TypeError):
+        WCESurvivalAnalysis(cutoff=90, nknots=[1, "2", 3])
+
+
+def test_wce_nknots_candidates_sorted_and_deduplicated():
+    """A list of candidate nknots is stored sorted and without duplicates.
+
+    Mirrors the reference WCE R package's own `nknots <- sort(unique(nknots))`.
+    """
+    model = WCESurvivalAnalysis(cutoff=90, nknots=[3, 1, 2, 1])
+    assert model.nknots_candidates == (1, 2, 3)
+
+
+@pytest.mark.needs_keops()
+def test_wce_drugdata_multi_knot_grid_shapes():
+    """Fitting several candidate nknots values populates the `*_grid_` attributes."""
+    cutoff = 90
+    candidates = (1, 2, 3)
+    model = WCESurvivalAnalysis(
+        cutoff=cutoff, constrained="right", nknots=list(candidates)
+    )
+
+    model.fit(
+        dose=_dose,
+        stop=_stop,
+        start=_start,
+        patient=_patient,
+        event=_event,
+    )
+
+    n_candidates = len(candidates)
+    assert model.nknots_candidates == candidates
+    assert model.info_criterion_grid_.shape == (n_candidates, 1)
+    assert model.loglik_grid_.shape == (n_candidates, 1)
+    assert model.coef_grid_.shape == (n_candidates, 1, model.n_covariates)
+    assert model.std_grid_.shape == (n_candidates, 1, model.n_covariates)
+    assert model.risk_function_grid_.shape == (n_candidates, 1, cutoff)
+    assert len(model.knots_grid_) == n_candidates
+    assert len(model.WCE_coef_grid_) == n_candidates
+    assert len(model.SED_grid_) == n_candidates
+    assert model.best_index_.shape == (1,)
+    assert model.best_nknots_.shape == (1,)
+    assert model.best_nknots_[0] in candidates
+    assert np.all(np.isfinite(model.info_criterion_grid_))
+
+
+@pytest.mark.needs_keops()
+def test_wce_drugdata_multi_knot_matches_independent_scalar_fits():
+    """Each candidate in the grid reproduces its own independent scalar fit."""
+    cutoff = 90
+    candidates = (1, 2, 3)
+
+    grid_model = WCESurvivalAnalysis(
+        cutoff=cutoff, constrained="right", nknots=list(candidates)
+    )
+    grid_model.fit(
+        dose=_dose, stop=_stop, start=_start, patient=_patient, event=_event
+    )
+
+    for i, nknots in enumerate(candidates):
+        scalar_model = WCESurvivalAnalysis(
+            cutoff=cutoff, constrained="right", nknots=nknots
+        )
+        scalar_model.fit(
+            dose=_dose,
+            stop=_stop,
+            start=_start,
+            patient=_patient,
+            event=_event,
+        )
+        assert np.allclose(
+            grid_model.info_criterion_grid_[i, 0],
+            scalar_model.info_criterion_[0],
+        )
+        assert np.allclose(
+            grid_model.loglik_grid_[i, 0], scalar_model.loglik_[0]
+        )
+
+    assert (
+        grid_model.info_criterion_[0]
+        == grid_model.info_criterion_grid_[:, 0].min()
+    )
+
+
+@pytest.mark.needs_keops()
+def test_wce_drugdata_single_candidate_list_matches_scalar():
+    """`nknots=2` and `nknots=[2]` (a grid of one) must be numerically identical."""
+    cutoff = 90
+
+    scalar_model = WCESurvivalAnalysis(
+        cutoff=cutoff, constrained="right", nknots=2
+    )
+    scalar_model.fit(
+        dose=_dose, stop=_stop, start=_start, patient=_patient, event=_event
+    )
+
+    list_model = WCESurvivalAnalysis(
+        cutoff=cutoff, constrained="right", nknots=[2]
+    )
+    list_model.fit(
+        dose=_dose, stop=_stop, start=_start, patient=_patient, event=_event
+    )
+
+    assert np.allclose(scalar_model.coef_, list_model.coef_)
+    assert np.allclose(scalar_model.WCE_coef_, list_model.WCE_coef_)
+    assert np.allclose(
+        scalar_model.risk_function_.cpu().numpy(),
+        list_model.risk_function_.cpu().numpy(),
+    )
+    assert np.allclose(
+        scalar_model.info_criterion_, list_model.info_criterion_
+    )
+
+
+@pytest.mark.needs_keops()
+def test_wce_drugdata_multi_knot_bootstrap_not_yet_supported():
+    """Combining several candidate nknots with bootstrapping fails loudly for now.
+
+    Per-replicate knot selection needs resamples shared across candidates,
+    which is a separate, upcoming change -- this guard avoids silently
+    bootstrapping the wrong thing in the meantime.
+    """
+    model = WCESurvivalAnalysis(
+        cutoff=90, constrained="right", nknots=[1, 2], nbootstraps=10
+    )
+    with pytest.raises(NotImplementedError):
+        model.fit(
+            dose=_dose,
+            stop=_stop,
+            start=_start,
+            patient=_patient,
+            event=_event,
+        )
