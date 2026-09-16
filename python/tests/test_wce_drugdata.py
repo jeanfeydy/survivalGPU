@@ -82,3 +82,16 @@ def test_wce_drugdata_bootstrap():
     assert model.bootstrap_risk_functions_.shape == (nbootstraps, 1, cutoff)
     assert np.all(np.isfinite(model.bootstrap_coef_))
     assert np.all(np.isfinite(model.bootstrap_WCE_coef_))
+
+
+def test_wce_n_atoms_for_is_parametrized():
+    """`_n_atoms_for` must depend on its `nknots` argument, not on `self.nknots`.
+
+    Regression test for the refactor that turns `n_atoms` into a thin wrapper
+    around `_n_atoms_for(self.nknots)`, ahead of `nknots` becoming a list of
+    candidates: proves the parameter is really used, not silently ignored.
+    """
+    model = WCESurvivalAnalysis(cutoff=90, nknots=1)
+    assert model.n_atoms == 1 + model.order + 1
+    assert model._n_atoms_for(3) == 3 + model.order + 1
+    assert model.n_atoms == 1 + model.order + 1

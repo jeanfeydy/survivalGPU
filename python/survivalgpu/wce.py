@@ -194,28 +194,32 @@ class WCESurvivalAnalysis:
         self._constrained = new_c
 
     # The number of WCE features depends on nknots, the order and constrained -----------
-    @property
-    def n_atoms(self):
+    def _n_atoms_for(self, nknots):
         if self.constrained is None:
-            return self.nknots + self.order + 1
+            return nknots + self.order + 1
         else:
             # TODO: fix when self.order != 3
-            return self.nknots + 2
+            return nknots + 2
+
+    @property
+    def n_atoms(self):
+        return self._n_atoms_for(self.nknots)
 
     # Functions related to the B-Spline atoms --------------------------------------------
-    def _constrain(self, features):
+    def _constrain(self, features, *, nknots):
         """Enforces a boundary condition on the B-Spline by discarding some basis functions.
 
         Args:
             features ((N,D) tensor): Time-dependent WCE features.
                 Each line corresponds to a sampling time.
                 Each column corresponds to a WCE basis function (= "atom").
+            nknots: Number of interior knots used to build `features`.
 
         Returns:
             truncated features ((N,D) or (N,D-(order-1)) tensor: Relevant WCE features.
         """
         assert len(features.shape) == 2
-        assert features.shape[1] == self.nknots + self.order + 1
+        assert features.shape[1] == nknots + self.order + 1
 
         # TODO: fix when self.order != 3
 
@@ -234,16 +238,20 @@ class WCESurvivalAnalysis:
             )
             raise ValueError(msg)
 
+    def _atoms_for(self, nknots):
+        """Samples the B-spline basis functions on the interval [0, cutoff-1]."""
+        atoms, _ = bspline_atoms(
+            cutoff=self.cutoff, order=self.order, nknots=nknots, dtype=self.dtype,
+            device=self.device,
+        )
+        atoms = self._constrain(atoms, nknots=nknots)
+        assert atoms.shape == (self.cutoff, self._n_atoms_for(nknots))
+        return atoms
+
     @property
     def atoms(self):
         """Samples the B-spline basis functions on the interval [0, cutoff-1]."""
-        atoms, _ = bspline_atoms(
-            cutoff=self.cutoff, order=self.order, nknots=self.nknots, dtype=self.dtype,
-            device=self.device,
-        )
-        atoms = self._constrain(atoms)
-        assert atoms.shape == (self.cutoff, self.n_atoms)
-        return atoms
+        return self._atoms_for(self.nknots)
 
     @property
     def atom_areas(self):
@@ -261,6 +269,7 @@ class WCESurvivalAnalysis:
         patient: Int64Array["intervals"],
         dose: Float64Array["intervals"],
         time: Int64Array["intervals"],
+        nknots: Int,
     ):
         """Computes the WCE B-Spline covariates on a batch of patients and drugs."""
 
@@ -272,7 +281,7 @@ class WCESurvivalAnalysis:
             ids=patient,
             times=time,
             doses=dose,
-            nknots=self.nknots,
+            nknots=nknots,
             cutoff=self.cutoff,
             order=self.order,
             dtype=self.dtype,
@@ -282,8 +291,8 @@ class WCESurvivalAnalysis:
         wce_features = wce_features.cpu().numpy()
         knots = knots.cpu().numpy()
 
-        wce_features = self._constrain(wce_features)
-        assert wce_features.shape == (len(time), self.n_atoms)
+        wce_features = self._constrain(wce_features, nknots=nknots)
+        assert wce_features.shape == (len(time), self._n_atoms_for(nknots))
         return wce_features, knots
 
     @typecheck
@@ -332,7 +341,9 @@ class WCESurvivalAnalysis:
             raise NotImplementedError(msg)
 
         # Step 1: compute the time-dependent features (= exposures)
-        exposures, knots = self._wce_features(patient=patient, dose=dose, time=stop)
+        exposures, knots = self._wce_features(
+            patient=patient, dose=dose, time=stop, nknots=self.nknots
+        )
         assert exposures.shape == (len(stop), self.n_atoms)
         exposures = np.array(exposures, dtype=np.float64)
 
