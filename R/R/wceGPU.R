@@ -624,7 +624,10 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
   pct <- paste(format(100 * a, trim = TRUE, scientific = FALSE, digits = digits), "%")
   fac <- qnorm(a)
   ci <- array(NA, dim = c(length(parm), 2L), dimnames = list(parm, pct))
-  ses <- sqrt(diag(object$vcovmat))[parm] # seems to be same thing as object$se.covariates
+  # vcovmat is a named list with a single element (the selected model's
+  # covariance matrix) -- unwrap it before indexing into its diagonal.
+  vcovmat <- object$vcovmat[[1]]
+  ses <- sqrt(diag(vcovmat))[parm] # seems to be same thing as object$se.covariates
   ci[] <- cf[parm] + ses %o% fac
   ci
 }

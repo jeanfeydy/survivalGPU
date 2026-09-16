@@ -99,6 +99,27 @@ test_that("HR", {
   )
 })
 
+# Regression: confint.wceGPU() used to crash with
+# "'list' object cannot be coerced to type 'integer'", since object$vcovmat
+# is a named list (holding the selected model's covariance matrix), and
+# confint() called diag() on it directly instead of unwrapping it first.
+test_that("confint.wceGPU returns Wald CIs matching beta.hat +/- z*se", {
+  ci <- confint(wce_gpu)
+
+  expected_age <- wce_gpu$beta.hat.covariates[1, "age"] +
+    qnorm(c(0.025, 0.975)) * wce_gpu$se.covariates[1, "age"]
+  expected_sex <- wce_gpu$beta.hat.covariates[1, "sex"] +
+    qnorm(c(0.025, 0.975)) * wce_gpu$se.covariates[1, "sex"]
+
+  expect_equal(unname(ci["age", ]), expected_age, tolerance = 1e-8)
+  expect_equal(unname(ci["sex", ]), expected_sex, tolerance = 1e-8)
+  expect_equal(rownames(ci), c("age", "sex"))
+
+  # parm subsetting, by name and by index:
+  expect_equal(confint(wce_gpu, parm = "age"), ci["age", , drop = FALSE])
+  expect_equal(confint(wce_gpu, parm = 1), ci["age", , drop = FALSE])
+})
+
 
 # Each of these compares wceGPU() against the reference WCE::WCE()
 # implementation for the same arguments, rather than snapshotting the
