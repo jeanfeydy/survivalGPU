@@ -10,6 +10,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
+    "sphinx_gallery.gen_gallery",
 ]
 
 templates_path = ["_templates"]
@@ -26,6 +27,15 @@ napoleon_google_docstring = True
 napoleon_numpy_docstring = False
 napoleon_use_param = True
 napoleon_use_rtype = False
+
+# sphinx-gallery: executes python/examples/*.py and renders the output.
+sphinx_gallery_conf = {
+    "examples_dirs": "../../python/examples",
+    "gallery_dirs": "python/auto_examples",
+    "filename_pattern": r"/\d+_.*\.py$",
+    "ignore_pattern": r"common\.py",
+    "doc_module": ("survivalgpu",),
+}
 
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
