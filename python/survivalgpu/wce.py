@@ -41,58 +41,48 @@ class WCESurvivalAnalysis:
 
         The total number of degrees of freedom for the risk function (i.e. WCE covariates)
         is equal to:
+
             nknots + order + 1 if constrained is None,
             nknots + 2         if constrained is "left" or "right".
 
-        Parameters
-    ----------
-        cutoff
-            Size of the time window for the risk function.
-        nknots
-            Number of knots for the B-splines.
-        order
-            Order of the B-splines used to model the risk function.
-            `order == 0` corresponds to a piecewise constant risk function,
-            `order == 1` corresponds to a piecewise linear risk function,
-            `order == 3` corresponds to a piecewise cubic risk function.
-        criterion
-            Which information criterion to report in `self.info_criterion_`: "aic"
-            (penalty = 2 per degree of freedom) or "bic" (penalty =
-            log(n_events) per degree of freedom). Defaults to "bic".
-            Matches the `my_bic_c()` formula from the reference `WCE` R
-            package.
-        constrained
-            Whether the B-splines should be constrained.
-            Defaults to None (i.e. no constraint).
+        Args:
+            cutoff (int): Size of the time window for the risk function.
+            nknots (int): Number of knots for the B-splines.
+            order (int): Order of the B-splines used to model the risk function.
+                `order == 0` corresponds to a piecewise constant risk function,
+                `order == 1` corresponds to a piecewise linear risk function,
+                `order == 3` corresponds to a piecewise cubic risk function.
+            criterion (str): Which information criterion to report in `self.info_criterion_`: "aic"
+                (penalty = 2 per degree of freedom) or "bic" (penalty =
+                log(n_events) per degree of freedom). Defaults to "bic".
+                Matches the `my_bic_c()` formula from the reference `WCE` R
+                package.
+            constrained (str or None): Whether the B-splines should be constrained.
+                Defaults to None (i.e. no constraint).
 
-            Other options are:
+                Other options are:
 
-            - "Left" or "L": the drug has no immediate effect on the risk.
-                We remove features that correspond to basis functions that have
-                a non-zero value or derivative on the "left" of the domain,
-                i.e. around the exposure time.
-                This is useful to model a risk function that has no "immediate" impact.
+                - "Left" or "L": the drug has no immediate effect on the risk.
+                    We remove features that correspond to basis functions that have
+                    a non-zero value or derivative on the "left" of the domain,
+                    i.e. around the exposure time.
+                    This is useful to model a risk function that has no "immediate" impact.
 
-            - "Right" or "R": the drug has no effect on the risk around the cutoff time.
-                We remove features that correspond to basis functions that have
-                a non-zero value or derivative on the "right" of the domain,
-                i.e. around the "exposure+cutoff" time.
-                This is useful to model a risk function that vanishes "at infinity".
-        survival_model
-            Estimator that will be used to
-            perform a risk analysis from the WCE covariates.
-            For now, we only support the CoxPHSurvivalAnalysis model.
-        dtype
-            Either np.float32 or np.float64. Defaults to np.float64.
-        device
-            Device (e.g. "cpu" or "cuda") on which to run the computations.
-            Defaults to the best available device.
-        nbootstraps
-            Number of bootstrap resamples to fit, in addition to the main model.
-            Defaults to None (i.e. no bootstrapping).
-        batchsize
-            Number of bootstrap resamples to process at once on the GPU.
-            Defaults to None, i.e. all the bootstraps are processed at once.
+                - "Right" or "R": the drug has no effect on the risk around the cutoff time.
+                    We remove features that correspond to basis functions that have
+                    a non-zero value or derivative on the "right" of the domain,
+                    i.e. around the "exposure+cutoff" time.
+                    This is useful to model a risk function that vanishes "at infinity".
+            survival_model: Estimator that will be used to
+                perform a risk analysis from the WCE covariates.
+                For now, we only support the CoxPHSurvivalAnalysis model.
+            dtype: Either np.float32 or np.float64. Defaults to np.float64.
+            device: Device (e.g. "cpu" or "cuda") on which to run the computations.
+                Defaults to the best available device.
+            nbootstraps (int, optional): Number of bootstrap resamples to fit, in addition to the main model.
+                Defaults to None (i.e. no bootstrapping).
+            batchsize (int, optional): Number of bootstrap resamples to process at once on the GPU.
+                Defaults to None, i.e. all the bootstraps are processed at once.
         """
         # Let the model remember the parameters of the analysis.
         # Note that all type and value checks are performed in the attribute setters:
@@ -319,11 +309,12 @@ class WCESurvivalAnalysis:
             init ((C + n_atoms,) float64 array, optional): initial values for
                 the coefficients. Defaults to zeros.
 
-        Results are stored as attributes: knots_, coef_, WCE_coef_,
-        risk_function_, std_, SED_, means_, score_, loglik_, loglik_init_,
-        sctest_init_, hessian_, imat_, iter_, n_events_, info_criterion_, and
-        (if nbootstraps is set) bootstrap_coef_, bootstrap_WCE_coef_,
-        bootstrap_risk_functions_.
+        Results are stored as attributes: ``knots_``, ``coef_``,
+        ``WCE_coef_``, ``risk_function_``, ``std_``, ``SED_``, ``means_``,
+        ``score_``, ``loglik_``, ``loglik_init_``, ``sctest_init_``,
+        ``hessian_``, ``imat_``, ``iter_``, ``n_events_``,
+        ``info_criterion_``, and (if nbootstraps is set) ``bootstrap_coef_``,
+        ``bootstrap_WCE_coef_``, ``bootstrap_risk_functions_``.
         """
 
         if not np.all(stop == start + 1):

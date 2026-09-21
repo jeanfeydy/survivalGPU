@@ -128,9 +128,10 @@ class CoxPHSurvivalAnalysis:
             init ((D,) float64 array, optional): initial values for the
                 coefficients. Defaults to zeros.
 
-        Results are stored as attributes: coef_, std_, means_, score_, loglik_,
-        loglik_init_, sctest_init_, hessian_, imat_, iter_, and (if
-        nbootstraps is set) bootstrap_coef_.
+        Results are stored as attributes: ``coef_``, ``std_``, ``means_``,
+        ``score_``, ``loglik_``, ``loglik_init_``, ``sctest_init_``,
+        ``hessian_``, ``imat_``, ``iter_``, and (if nbootstraps is set)
+        ``bootstrap_coef_``.
         """
         # Pre-process the input data: ----------------------------------------------------
         # Create a dataset object: this enforces checks on the input data
