@@ -11,10 +11,22 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
     "sphinx_gallery.gen_gallery",
+    "myst_nb",
 ]
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "**.ipynb_checkpoints"]
+exclude_patterns = [
+    "_build",
+    "**.ipynb_checkpoints",
+    # sphinx-gallery's own .ipynb downloads, not myst-nb notebook sources:
+    "python/auto_examples/*.ipynb",
+]
+
+# myst-nb: parses .md as MyST (subsumes myst_parser) and executes pages that
+# declare a Jupyter `kernelspec` in their front matter. Plain .md files
+# (e.g. ones knitted from R) have no kernelspec, so they're never executed.
+nb_execution_mode = "cache"
+nb_execution_timeout = 120
 
 # autodoc / autosummary / napoleon: survivalgpu's docstrings are Google-style.
 autosummary_generate = True
