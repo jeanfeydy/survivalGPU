@@ -11,13 +11,13 @@ vignette: >
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>"
+  collapse = FALSE,
+  comment = NA
 )
 ```
 
 
-Présenter le modèle de Cox[^cox1] [^cox2]
+The Cox proportional hazards model[^cox1] [^cox2] is a semi-parametric regression model for survival (time-to-event) data. It relates the hazard of an event at time $t$ to a set of covariates through a hazard ratio, without requiring the baseline hazard to follow a specific parametric form, and its coefficients are estimated by maximizing a partial likelihood.
 
 
 

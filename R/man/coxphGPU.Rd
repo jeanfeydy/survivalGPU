@@ -50,7 +50,7 @@ into out of memory errors, please consider using batchsize=100, 10 or 1.}
   }
 
 \item{all.results}{Post-processing calculations. If TRUE, coxphGPU returns
-linears.predictors, wald.test, concordance for all bootstraps. Default to
+linear.predictors, wald.test, concordance for all bootstraps. Default to
 FALSE if bootstraps.}
 
 \item{control}{

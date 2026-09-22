@@ -1,3 +1,5 @@
+testthat::skip_if_not(reticulate::py_module_available("survivalgpu"))
+
 options(na.action=na.exclude) # preserve missing
 options(contrasts=c('contr.treatment', 'contr.poly')) #ensure contrast type
 library(survival)

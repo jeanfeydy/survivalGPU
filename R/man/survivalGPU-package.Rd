@@ -6,8 +6,9 @@
 \alias{survivalGPU}
 \title{survivalGPU: Fast survival analysis}
 \description{
-Allows to perform survivals analysis on GPU with coxph and WCE
-models, and several features to use bootstrap and manage memory.
+Performs survival analysis on GPU-accelerated hardware using
+Cox proportional hazards and weighted cumulative exposure (WCE) models,
+with support for bootstrap resampling and memory management.
 
 To learn more about survivalGPU, start with the vignette :
 \code{vignette("survivalGPU")}
@@ -21,6 +22,14 @@ To learn more about survivalGPU, start with the vignette :
 }
 }
 
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/jeanfeydy/survivalGPU}
+  \item Report bugs at \url{https://github.com/jeanfeydy/survivalGPU/issues}
+}
+
+}
 \author{
 \itemize{
 \item \href{https://www.jeanfeydy.com}{Jean FEYDY}
