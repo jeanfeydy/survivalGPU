@@ -11,3 +11,4 @@ backend via `reticulate <https://rstudio.github.io/reticulate/>`_.
    :caption: Contents
 
    python/index
+   r/index
