@@ -71,12 +71,11 @@ instance/
 
 # Sphinx documentation
 docs/_build/
-doc/_build/
-doc/source/python/generated/
-doc/source/r/user_guide/coxPH.md
-doc/source/r/user_guide/coxPH_files/
-doc/source/r/user_guide/WCE.md
-doc/source/r/user_guide/WCE_files/
+docs/source/python/generated/
+docs/source/r/user_guide/coxPH.md
+docs/source/r/user_guide/coxPH_files/
+docs/source/r/user_guide/WCE.md
+docs/source/r/user_guide/WCE_files/
 
 # PyBuilder
 target/

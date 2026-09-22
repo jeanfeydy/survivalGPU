@@ -2,7 +2,7 @@
 #
 # Knits the live-chunk vignette sources (R/vignettes/*.Rmd.orig) a *second*
 # time, into plain Markdown pages for the Sphinx docs site
-# (doc/source/r/user_guide/*.md), with the R (and, via reticulate, Python)
+# (docs/source/r/user_guide/*.md), with the R (and, via reticulate, Python)
 # code already executed and its real output baked in. Sphinx's MyST parser
 # then treats these as ordinary static pages -- Sphinx itself never executes
 # R.
@@ -17,16 +17,16 @@
 # vignette("python_connect") to already exist and be usable.
 #
 # Usage (from the repository root):
-#   Rscript doc/scripts/knit_r_pages.R
+#   Rscript docs/scripts/knit_r_pages.R
 
 library(knitr)
 render_markdown()
 
 src_dir <- "R/vignettes"
-out_dir <- "doc/source/r/user_guide"
+out_dir <- "docs/source/r/user_guide"
 
 # survivalGPU.Rmd.orig is deliberately excluded: it overlaps heavily with
-# coxPH + WCE combined, and doc/source/r/index.md already serves as the
+# coxPH + WCE combined, and docs/source/r/index.md already serves as the
 # section's lightweight overview instead.
 pages <- c("coxPH", "WCE")
 

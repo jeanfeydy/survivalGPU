@@ -1,4 +1,4 @@
-# Builds the unified R + Python documentation site (doc/). On pull request
+# Builds the unified R + Python documentation site (docs/). On pull request
 # and push to main, builds it as a test (with an uploaded artifact) but does
 # not publish it. On release or manual trigger, builds and publishes it to
 # GitHub Pages.
@@ -59,25 +59,25 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install ".[wce]" --group test
-          pip install -r doc/requirements_docs.txt
+          pip install -r docs/requirements_docs.txt
           # Point reticulate at this interpreter instead of letting it
           # auto-provision its own bare ephemeral Python -- same recipe as
           # R-CMD-check.yaml.
           echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
 
       - name: Build documentation (knit R pages, sphinx-build, pkgdown)
-        run: bash doc/build_docs.sh
+        run: bash docs/build_docs.sh
 
       - name: Upload documentation artifact
         uses: actions/upload-artifact@v4
         with:
           name: documentation-html
-          path: doc/_build/html
+          path: docs/_build/html
 
       - name: Deploy to GitHub Pages
         if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: doc/_build/html
+          publish_dir: docs/_build/html
           force_orphan: true

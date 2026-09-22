@@ -40,5 +40,5 @@ html_static_path = ["_static"]
 # Sphinx's own default ("python3") would otherwise apply Python syntax
 # highlighting to fenced code blocks with no explicit language tag -- the
 # only such blocks in this site are the R knit pipeline's plain-text output
-# blocks (doc/scripts/knit_r_pages.R), which should render as plain text.
+# blocks (docs/scripts/knit_r_pages.R), which should render as plain text.
 highlight_language = "none"
