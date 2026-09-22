@@ -14,6 +14,10 @@ same Python backend as the `survivalgpu` Python package, via
 [reticulate](https://rstudio.github.io/reticulate/) — see
 {doc}`installation` to set that up.
 
+For full function-level documentation, see the
+<a href="reference/index.html">R API reference</a> (built with
+[pkgdown](https://pkgdown.r-lib.org/)).
+
 ```{toctree}
 :maxdepth: 2
 
