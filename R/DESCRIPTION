@@ -26,7 +26,9 @@ Imports:
 Suggests:
     dplyr,
     knitr,
+    pkgdown,
     rmarkdown,
+    survminer,
     testthat (>= 3.0.0),
     WCE
 Config/testthat/edition: 3
