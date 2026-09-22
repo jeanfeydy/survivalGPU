@@ -10,17 +10,11 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
-    "sphinx_gallery.gen_gallery",
     "myst_nb",
 ]
 
 templates_path = ["_templates"]
-exclude_patterns = [
-    "_build",
-    "**.ipynb_checkpoints",
-    # sphinx-gallery's own .ipynb downloads, not myst-nb notebook sources:
-    "python/auto_examples/*.ipynb",
-]
+exclude_patterns = ["_build", "**.ipynb_checkpoints"]
 
 # myst-nb: parses .md as MyST (subsumes myst_parser) and executes pages that
 # declare a Jupyter `kernelspec` in their front matter. Plain .md files
@@ -40,14 +34,11 @@ napoleon_numpy_docstring = False
 napoleon_use_param = True
 napoleon_use_rtype = False
 
-# sphinx-gallery: executes python/examples/*.py and renders the output.
-sphinx_gallery_conf = {
-    "examples_dirs": "../../python/examples",
-    "gallery_dirs": "python/auto_examples",
-    "filename_pattern": r"/\d+_.*\.py$",
-    "ignore_pattern": r"common\.py",
-    "doc_module": ("survivalgpu",),
-}
-
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+
+# Sphinx's own default ("python3") would otherwise apply Python syntax
+# highlighting to fenced code blocks with no explicit language tag -- the
+# only such blocks in this site are the R knit pipeline's plain-text output
+# blocks (doc/scripts/knit_r_pages.R), which should render as plain text.
+highlight_language = "none"

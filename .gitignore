@@ -73,8 +73,6 @@ instance/
 docs/_build/
 doc/_build/
 doc/source/python/generated/
-doc/source/python/auto_examples/
-doc/source/sg_execution_times.rst
 doc/source/r/user_guide/coxPH.md
 doc/source/r/user_guide/coxPH_files/
 doc/source/r/user_guide/WCE.md

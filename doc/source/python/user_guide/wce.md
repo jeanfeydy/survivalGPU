@@ -115,7 +115,4 @@ print(f"95% bootstrap CI: [{hr['CI_lower']:.3f}, {hr['CI_upper']:.3f}]")
 
 ## Going further
 
-- Runnable, standalone versions of the examples above:
-  {doc}`../auto_examples/03_wce_basic`,
-  {doc}`../auto_examples/04_wce_bootstrap`.
-- Full API reference: {class}`~survivalgpu.WCESurvivalAnalysis`.
+Full API reference: {class}`~survivalgpu.WCESurvivalAnalysis`.

@@ -105,7 +105,4 @@ quadratic near the optimum.
 
 ## Going further
 
-- Runnable, standalone versions of the examples above:
-  {doc}`../auto_examples/01_coxph_basic`,
-  {doc}`../auto_examples/02_coxph_bootstrap`.
-- Full API reference: {class}`~survivalgpu.CoxPHSurvivalAnalysis`.
+Full API reference: {class}`~survivalgpu.CoxPHSurvivalAnalysis`.

@@ -8,5 +8,4 @@ Documentation for the ``survivalgpu`` Python package.
 
    installation
    user_guide/index
-   auto_examples/index
    api

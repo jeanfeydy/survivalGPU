@@ -26,13 +26,13 @@ use_virtualenv(virtualenv = "survivalGPU")
 
 
 ```
-#>   Id Event Start Stop sex age dose
-#> 1  1     0     0    1   1  40    0
-#> 2  1     0     1    2   1  40    0
-#> 3  1     0     2    3   1  40    0
-#> 4  1     0     3    4   1  40    0
-#> 5  1     0     4    5   1  40    0
-#> 6  1     0     5    6   1  40    0
+  Id Event Start Stop sex age dose
+1  1     0     0    1   1  40    0
+2  1     0     1    2   1  40    0
+3  1     0     2    3   1  40    0
+4  1     0     3    4   1  40    0
+5  1     0     4    5   1  40    0
+6  1     0     5    6   1  40    0
 ```
 
 Check if CUDA is detected :
@@ -40,7 +40,10 @@ Check if CUDA is detected :
 
 ``` r
 use_cuda()
-#> [1] FALSE
+```
+
+```
+[1] FALSE
 ```
 
 By default, functions run with GPU if detected. Then we specify the number of bootstrap, and consequently the batchsize argument, according to CUDA drivers detection.
