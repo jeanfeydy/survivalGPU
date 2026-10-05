@@ -73,6 +73,29 @@ Results are stored as attributes on `model`: `knots_`, `coef_`,
 `loglik_`, `n_events_`, `info_criterion_` and more — see
 {class}`~survivalgpu.WCESurvivalAnalysis` for the full list.
 
+## Choosing the number of knots
+
+The number of interior knots is usually not known in advance. Instead of a
+single value, `nknots` accepts a list of candidates: one model is fitted per
+candidate, and the one that minimizes the information criterion is selected
+(`criterion="bic"` by default, or `criterion="aic"`). All the flat attributes
+(`coef_`, `risk_function_`, `loglik_`, ...) then describe that selected
+model, while every candidate's results are kept in parallel `*_grid_`
+attributes.
+
+```{code-cell} python3
+model = WCESurvivalAnalysis(
+    cutoff=180, nknots=[1, 2, 3], order=3, constrained="right", device="cpu",
+)
+model.fit(dose=dose_arr, stop=stop, start=start, event=event, patient=patient, covariates=covariates)
+
+for nknots, loglik, bic in zip(
+    model.nknots_candidates, model.loglik_grid_[:, 0], model.info_criterion_grid_[:, 0]
+):
+    print(f"nknots={nknots}: loglik={loglik:.2f}, BIC={bic:.2f}")
+print("Selected number of knots:", model.best_nknots_[0])
+```
+
 ## Comparing exposure profiles
 
 `model.HR()` computes the hazard ratio between two dose "profiles" over the
@@ -94,24 +117,58 @@ print(f"(dataset was simulated with a target HR of {WCE_TRUE_HR})")
 Just like {class}`~survivalgpu.CoxPHSurvivalAnalysis`,
 {class}`~survivalgpu.WCESurvivalAnalysis` accepts `nbootstraps`/`batchsize`:
 the model is fitted once on the full data and `nbootstraps` times on
-patient-level resamples. `model.HR()` automatically detects that bootstrapping
-was requested and returns a percentile confidence interval for the hazard
-ratio alongside the point estimate.
+patient-level resamples.
+
+When `nknots` is a list of candidates, **the number of knots is selected
+again in every bootstrap replicate**:
+
+1. the resamples are drawn once and shared by all the candidates, so that
+   they are compared on exactly the same data;
+2. every candidate is fitted on every resample;
+3. each replicate keeps the candidate that minimizes the information
+   criterion computed on its own resampled data (for the BIC, with that
+   replicate's own number of events).
+
+The bootstrap distribution therefore reflects the uncertainty on the choice
+of the number of knots, and not only the uncertainty on the coefficients for
+a fixed, pre-selected number of knots.
 
 ```{code-cell} python3
 boot_model = WCESurvivalAnalysis(
-    cutoff=180, nknots=1, order=3, constrained="right",
-    device="cpu", nbootstraps=200, batchsize=50,
+    cutoff=180, nknots=[1, 2, 3], order=3, constrained="right",
+    device="cpu", nbootstraps=100, batchsize=50,
 )
 boot_model.fit(dose=dose_arr, stop=stop, start=start, event=event, patient=patient, covariates=covariates)
 
-print("bootstrap_WCE_coef_ shape (nbootstraps, n_batch, n_atoms):", boot_model.bootstrap_WCE_coef_.shape)
+print("Selected number of knots on the full data:", boot_model.best_nknots_[0])
+values, counts = np.unique(boot_model.bootstrap_best_nknots_, return_counts=True)
+for nknots, count in zip(values, counts):
+    print(f"nknots={nknots} selected in {count} / {boot_model.nbootstraps} replicates")
+```
+
+`bootstrap_coef_` (covariates) and `bootstrap_risk_functions_` hold, for
+every replicate, the results of the candidate selected for that replicate.
+The results of every candidate on every replicate are kept in
+`bootstrap_coef_grid_`, `bootstrap_WCE_coef_grid_`,
+`bootstrap_risk_functions_grid_`, `bootstrap_loglik_grid_` and
+`bootstrap_info_criterion_grid_`. Since different replicates may select
+spline bases of different sizes, `bootstrap_WCE_coef_` is only available when
+a single `nknots` value is given.
+
+`model.HR()` automatically detects that bootstrapping was requested and
+returns a percentile confidence interval for the hazard ratio alongside the
+point estimate, using each replicate's selected risk function:
+
+```{code-cell} python3
 print("bootstrap_risk_functions_ shape (nbootstraps, n_batch, cutoff):", boot_model.bootstrap_risk_functions_.shape)
 
 hr = boot_model.HR(exposed, unexposed, level=0.95)
 print(f"HR(30 days of exposure vs. none) = {hr['HR']:.3f}")
 print(f"95% bootstrap CI: [{hr['CI_lower']:.3f}, {hr['CI_upper']:.3f}]")
 ```
+
+With a single value such as `nknots=1`, there is nothing to select: every
+replicate uses that number of knots, as in a standard bootstrap.
 
 ## Going further
 

@@ -4,7 +4,7 @@ We provide:
 
 - CoxPHSurvivalAnalysis, a scikit-learn-like estimator.
 - coxph_R, a functional wrapper around CoxPHSurvivalAnalysis that is used
-  by our R survivalGPU package via reticulate.
+by our R survivalGPU package via reticulate.
 
 """
 
@@ -21,6 +21,7 @@ import numpy as np
 import torch
 
 # The convex CoxPH objective:
+from .bootstrap import Resampling
 from .coxph_likelihood import coxph_objective
 from .datasets import SurvivalDataset
 
@@ -94,39 +95,23 @@ class CoxPHSurvivalAnalysis:
 
 
     @typecheck
-    def fit(
+    def _prepare(
         self,
         covariates: Float64Array["intervals covariates"],
         stop: Int64Array["intervals"],
         *,
         start: Int64Array["intervals"] | None = None,
         event: Int64Array["intervals"] | None = None,
-        patient: Int64Array["intervals"] | None = None, # patient Id is needed for bootstraps purposes
+        patient: Int64Array["intervals"] | None = None,
         strata: Int64Array["intervals"] | None = None,
         batch: Int64Array["patient"] | None = None,
-        init: Float64Array["covariates"] | None = None,
-
     ):
-        """Fits the CoxPH model to the data and stores the results as attributes.
+        """Builds and pre-processes a TorchSurvivalDataset from raw input arrays.
 
-        Args:
-            covariates ((I,D) float64 array): covariate values for each interval.
-            stop ((I,) int64 array): end time of each interval.
-            start ((I,) int64 array, optional): start time of each interval.
-                Defaults to 0 for every interval.
-            event ((I,) int64 array, optional): 1 if the interval ends with an
-                event (death), 0 if it is censored. Defaults to 1 for every interval.
-            patient ((I,) int64 array, optional): patient id for each interval.
-                Required to draw consistent bootstrap samples when several
-                intervals belong to the same patient. Defaults to one interval
-                per patient, i.e. patient = [0, 1, ..., I-1].
-            strata ((I,) int64 array, optional): stratum id for each interval.
-                Defaults to a single stratum for all patients.
-            batch ((P,) int64 array, optional): batch id for each patient.
-                Independent CoxPH models are fitted for each batch.
-                Defaults to a single batch for all patients.
-            init ((D,) float64 array, optional): initial values for the
-                coefficients. Defaults to zeros.
+        Shared by `fit()` and `bootstrap()`: both need the same sorted/scaled
+        dataset, the auto-selected `mode`, and a `loss(*, bootstrap)` closure
+        around the CoxPH objective, built with the same `scales`/`mode` so
+        that a bootstrap resample is optimized exactly like the main fit.
 
         Results are stored as attributes: ``coef_``, ``std_``, ``means_``,
         ``score_``, ``loglik_``, ``loglik_init_``, ``sctest_init_``,
@@ -144,9 +129,6 @@ class CoxPHSurvivalAnalysis:
             strata=strata,
             batch=batch,
         )
-
-
-
 
         # Re-encode the data arrays as PyTorch tensors on the correct device,
         # with the correct dtype (float64 -> float32)
@@ -166,7 +148,6 @@ class CoxPHSurvivalAnalysis:
         # (e.g. censoring that occurs before the first death):
 
         # dataset.prune(mode=self.mode)
-
 
         n_batch, n_covariates = dataset.n_batch, dataset.n_covariates
 
@@ -192,7 +173,6 @@ class CoxPHSurvivalAnalysis:
         else:
             mode = self.mode
 
-
         # Define the loss function:
         def loss(*, bootstrap):
             """Our loss function, including the L2 regularization term."""
@@ -215,6 +195,68 @@ class CoxPHSurvivalAnalysis:
                 return obj.view(B * n_batch)
 
             return aux
+
+        return dataset, means, scales, n_batch, n_covariates, mode, loss
+
+    @typecheck
+    def fit(
+        self,
+        covariates: Float64Array["intervals covariates"],
+        stop: Int64Array["intervals"],
+        *,
+        start: Int64Array["intervals"] | None = None,
+        event: Int64Array["intervals"] | None = None,
+        patient: Int64Array["intervals"] | None = None, # patient Id is needed for bootstraps purposes
+        strata: Int64Array["intervals"] | None = None,
+        batch: Int64Array["patient"] | None = None,
+        init: Float64Array["covariates"] | None = None,
+        bootstrap_indices=None,
+        keep_bootstrap_indices: Bool = False,
+
+    ):
+        """Fits the CoxPH model to the data and stores the results as attributes.
+
+        Args:
+            covariates ((I,D) float64 array): covariate values for each interval.
+            stop ((I,) int64 array): end time of each interval.
+            start ((I,) int64 array, optional): start time of each interval.
+                Defaults to 0 for every interval.
+            event ((I,) int64 array, optional): 1 if the interval ends with an
+                event (death), 0 if it is censored. Defaults to 1 for every interval.
+            patient ((I,) int64 array, optional): patient id for each interval.
+                Required to draw consistent bootstrap samples when several
+                intervals belong to the same patient. Defaults to one interval
+                per patient, i.e. patient = [0, 1, ..., I-1].
+            strata ((I,) int64 array, optional): stratum id for each interval.
+                Defaults to a single stratum for all patients.
+            batch ((P,) int64 array, optional): batch id for each patient.
+                Independent CoxPH models are fitted for each batch.
+                Defaults to a single batch for all patients.
+            init ((D,) float64 array, optional): initial values for the
+                coefficients. Defaults to zeros.
+            bootstrap_indices (optional): a list of raw (B,P) patient-index
+                tensors to replay instead of drawing new ones -- see
+                `bootstrap()`. Defaults to None, i.e. draw fresh indices.
+            keep_bootstrap_indices (bool, optional): if True, store the
+                (freshly-drawn or replayed) index chunks as
+                `bootstrap_indices_`, so they can be replayed later by another
+                `fit()` call. Defaults to False.
+
+        Results are stored as attributes: ``coef_``, ``std_``, ``means_``,
+        ``score_``, ``loglik_``, ``loglik_init_``, ``sctest_init_``,
+        ``hessian_``, ``imat_``, ``iter_``, and (if nbootstraps is set)
+        ``bootstrap_coef_``, ``bootstrap_loglik_`` and ``bootstrap_n_events_``
+        (see `bootstrap()`).
+        """
+        dataset, means, scales, n_batch, n_covariates, mode, loss = self._prepare(
+            covariates=covariates,
+            stop=stop,
+            start=start,
+            event=event,
+            patient=patient,
+            strata=strata,
+            batch=batch,
+        )
 
         # Run the Newton optimizer: ------------------------------------------------------
 
@@ -266,35 +308,15 @@ class CoxPHSurvivalAnalysis:
         self.iter_ = res.iterations
 
         # If required, compute a distribution of the coefficients using bootstrap: -------
-        if (self.nbootstraps is not None) and (self.nbootstraps >0):
-            bootstrap_coef = []
-            for bootstrap in dataset.bootstraps(
-                nbootstraps=self.nbootstraps, batchsize=self.batchsize
-            ):
-                # Vector of initial values of the Newton iteration.
-                # Zero for all variables by default.
-                if init is None:
-                    init_tensor = torch.zeros(
-                        (len(bootstrap) * n_batch, n_covariates),
-                        dtype=self.dtype,
-                        device=self.device,
-                    )
-                else:
-                    init_tensor = torch.tensor(init, dtype=self.dtype, device=self.device)
-                    assert init_tensor.shape == (n_covariates,)
-                    init_tensor = init_tensor.repeat(len(bootstrap) * n_batch, 1)
-
-                res = newton(
-                    loss=loss(bootstrap=bootstrap),
-                    start=init_tensor,
-                    maxiter=self.maxiter,
-                    eps=self.eps,
-                    verbosity=self.verbosity,
-                )
-                bootstrap_coef.append(res.x)
-
-            self.bootstrap_coef_ = torch.stack(bootstrap_coef).view(
-                self.nbootstraps, n_batch, n_covariates
+        if (self.nbootstraps is not None) and (self.nbootstraps > 0):
+            self.bootstrap(
+                dataset=dataset,
+                n_batch=n_batch,
+                n_covariates=n_covariates,
+                loss=loss,
+                init=init,
+                indices=bootstrap_indices,
+                keep_indices=keep_bootstrap_indices,
             )
 
         # If the covariates have been normalized for the sake of stability,
@@ -322,11 +344,105 @@ class CoxPHSurvivalAnalysis:
         assert self.hessian_.shape == hessian_shape
         assert self.imat_.shape == hessian_shape
 
+    @typecheck
+    def bootstrap(
+        self,
+        *,
+        dataset,
+        n_batch: int,
+        n_covariates: int,
+        loss,
+        init: Float64Array["covariates"] | None = None,
+        indices=None,
+        keep_indices: Bool = False,
+    ):
+        """Fits the CoxPH model on a collection of bootstrap resamples.
 
-        if (self.nbootstraps is not None) and (self.nbootstraps >0 ):
-            assert self.bootstrap_coef_.shape == (self.nbootstraps, n_batch, n_covariates)
+        Shared building block for `fit()`'s own bootstrap loop, and for
+        external callers (e.g. `WCESurvivalAnalysis`) that need to reuse the
+        exact same resamples across several model configurations (e.g.
+        several `nknots` candidates), so that each replicate is compared
+        fairly across configurations.
 
+        Args:
+            dataset: the (sorted, scaled) `TorchSurvivalDataset` built by `_prepare()`.
+            n_batch (int): number of independent batches, as in `fit()`.
+            n_covariates (int): number of covariates, as in `fit()`.
+            loss: the `loss(*, bootstrap)` closure built by `_prepare()`.
+            init ((D,) float64 array, optional): initial values for the
+                coefficients. Defaults to zeros.
+            indices (optional): a list of raw (B,P) patient-index tensors to
+                replay instead of drawing new ones (see
+                `TorchSurvivalDataset.bootstrap_indices()`). Defaults to None,
+                i.e. draw `self.nbootstraps` fresh indices, chunked by
+                `self.batchsize`.
+            keep_indices (bool, optional): if True, store the index chunks
+                (freshly-drawn, or replayed from `indices`) as
+                `bootstrap_indices_`, so a caller can replay the exact same
+                resamples in a later `bootstrap()` call. Defaults to False.
 
+        Sets `self.bootstrap_coef_`, of shape (nbootstraps, n_batch, n_covariates);
+        `self.bootstrap_loglik_`, of shape (nbootstraps, n_batch); and
+        `self.bootstrap_n_events_`, of shape (nbootstraps,) -- the number of
+        events in each replicate's own resampled data (not the original
+        dataset's fixed event count), needed to compute a per-replicate
+        information criterion.
+        """
+        if indices is None:
+            indices = dataset.bootstrap_indices(
+                nbootstraps=self.nbootstraps, batchsize=self.batchsize
+            )
+
+        if keep_indices:
+            indices = list(indices)
+            self.bootstrap_indices_ = indices
+
+        bootstrap_coef = []
+        bootstrap_loglik = []
+        bootstrap_n_events = []
+        for chunk in indices:
+            bootstrap = Resampling(indices=chunk, patient=dataset.patient)
+            B = len(bootstrap)
+
+            # Vector of initial values of the Newton iteration.
+            # Zero for all variables by default.
+            if init is None:
+                init_tensor = torch.zeros(
+                    (B * n_batch, n_covariates),
+                    dtype=self.dtype,
+                    device=self.device,
+                )
+            else:
+                init_tensor = torch.tensor(init, dtype=self.dtype, device=self.device)
+                assert init_tensor.shape == (n_covariates,)
+                init_tensor = init_tensor.repeat(B * n_batch, 1)
+
+            res = newton(
+                loss=loss(bootstrap=bootstrap),
+                start=init_tensor,
+                maxiter=self.maxiter,
+                eps=self.eps,
+                verbosity=self.verbosity,
+            )
+            # Reshaping (instead of stacking un-reshaped chunks) lets chunks
+            # of different sizes be concatenated below -- the last chunk is
+            # smaller than the others whenever nbootstraps % batchsize != 0.
+            bootstrap_coef.append(res.x.reshape(B, n_batch, n_covariates))
+            # Log-likelihood at the optimum, same sign convention as loglik_ above:
+            bootstrap_loglik.append((-res.fun).reshape(B, n_batch))
+            # Weighted number of events actually present in this replicate's
+            # resampled data, matching how interval_weights already enters
+            # the likelihood itself:
+            bootstrap_n_events.append(
+                (bootstrap.interval_weights.to(self.dtype) * dataset.event.to(self.dtype)).sum(dim=-1)
+            )
+
+        self.bootstrap_coef_ = torch.cat(bootstrap_coef, dim=0)
+        self.bootstrap_loglik_ = torch.cat(bootstrap_loglik, dim=0)
+        self.bootstrap_n_events_ = torch.cat(bootstrap_n_events, dim=0)
+        assert self.bootstrap_coef_.shape == (self.nbootstraps, n_batch, n_covariates)
+        assert self.bootstrap_loglik_.shape == (self.nbootstraps, n_batch)
+        assert self.bootstrap_n_events_.shape == (self.nbootstraps,)
 
     @typecheck
     def _rescale(
@@ -381,6 +497,8 @@ class CoxPHSurvivalAnalysis:
 
         if hasattr(self, "bootstrap_coef_"):
             self.bootstrap_coef_ = numpy(self.bootstrap_coef_)
+            self.bootstrap_loglik_ = numpy(self.bootstrap_loglik_)
+            self.bootstrap_n_events_ = numpy(self.bootstrap_n_events_)
 
 
 # Functional Numpy API, called by our R wrapper:
