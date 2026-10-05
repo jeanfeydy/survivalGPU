@@ -12,8 +12,9 @@ Description: Performs survival analysis on GPU-accelerated hardware using
     Cox proportional hazards and weighted cumulative exposure (WCE)
     models, with support for bootstrap resampling and memory management.
     Computations are delegated to 'PyTorch' via 'reticulate'; the WCE
-    model additionally requires 'PyKeOps', which is not available on
-    Windows.
+    model additionally requires 'PyKeOps', which is not available
+    natively on Windows, but can be used there through the Windows
+    Subsystem for Linux ('WSL').
 License: LGPL (>= 2.1)
 Language: en-US
 Encoding: UTF-8
@@ -34,7 +35,8 @@ Suggests:
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 SystemRequirements: python, pytorch, pykeops (optional, required only for
-    wceGPU(); not available on Windows)
+    wceGPU(); not available natively on Windows but can be used there through the Windows
+    Subsystem for Linux ('WSL'))
 URL: https://github.com/jeanfeydy/survivalGPU
 BugReports: https://github.com/jeanfeydy/survivalGPU/issues
 Config/roxygen2/version: 8.1.0
