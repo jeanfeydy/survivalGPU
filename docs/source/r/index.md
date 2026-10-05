@@ -1,4 +1,4 @@
-# R
+# R overview
 
 The `survivalGPU` R package performs survival analysis on GPU-accelerated
 hardware. Currently, two models are implemented:
@@ -17,10 +17,3 @@ same Python backend as the `survivalgpu` Python package, via
 For full function-level documentation, see the
 <a href="reference/index.html">R API reference</a> (built with
 [pkgdown](https://pkgdown.r-lib.org/)).
-
-```{toctree}
-:maxdepth: 2
-
-installation
-user_guide/index
-```

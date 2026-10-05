@@ -68,8 +68,27 @@ In practice, this means:
   to think about afterwards.
 
 .. toctree::
+   :maxdepth: 1
+   :hidden:
+
+   self
+   getting_started
+
+.. toctree::
+   :caption: Python
    :maxdepth: 2
-   :caption: Contents
+   :hidden:
 
    python/index
+   python/installation
+   python/user_guide/index
+   python/api
+
+.. toctree::
+   :caption: R
+   :maxdepth: 2
+   :hidden:
+
    r/index
+   r/installation
+   r/user_guide/index
