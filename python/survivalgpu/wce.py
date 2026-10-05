@@ -47,7 +47,11 @@ class WCESurvivalAnalysis:
 
         Args:
             cutoff (int): Size of the time window for the risk function.
-            nknots (int): Number of knots for the B-splines.
+            nknots (int or list of int): Number of knots for the B-splines.
+                If several candidates are given, one model is fitted per
+                candidate and the one that minimizes the information
+                criterion is selected; with `nbootstraps`, this selection is
+                repeated in every bootstrap replicate (see `fit()`).
             order (int): Order of the B-splines used to model the risk function.
                 `order == 0` corresponds to a piecewise constant risk function,
                 `order == 1` corresponds to a piecewise linear risk function,
@@ -352,30 +356,32 @@ class WCESurvivalAnalysis:
             init ((C + n_atoms,) float64 array, optional): initial values for
                 the coefficients. Defaults to zeros.
 
-        Results are stored as attributes: knots_, coef_, WCE_coef_,
-        risk_function_, std_, SED_, means_, score_, loglik_, loglik_init_,
-        sctest_init_, hessian_, imat_, iter_, n_events_, info_criterion_, and
-        (if nbootstraps is set) bootstrap_coef_, bootstrap_WCE_coef_,
-        bootstrap_risk_functions_.
+        Results are stored as attributes: ``knots_``, ``coef_``, ``WCE_coef_``,
+        ``risk_function_``, ``std_``, ``SED_``, ``means_``, ``score_``,
+        ``loglik_``, ``loglik_init_``, ``sctest_init_``, ``hessian_``,
+        ``imat_``, ``iter_``, ``n_events_``, ``info_criterion_``, and (if
+        nbootstraps is set) ``bootstrap_coef_``, ``bootstrap_risk_functions_``
+        and, only when a single nknots value is given, ``bootstrap_WCE_coef_``.
 
         When `nknots` is a list of candidates, one model is fitted per
         candidate and the flat attributes above reflect whichever one
-        minimizes `info_criterion_` (see also `best_index_`, `best_nknots_`).
-        Every candidate's own results are kept in parallel `*_grid_`
-        attributes: knots_grid_, coef_grid_, WCE_coef_grid_, std_grid_,
-        SED_grid_, risk_function_grid_, loglik_grid_, info_criterion_grid_.
+        minimizes ``info_criterion_`` (see also ``best_index_``,
+        ``best_nknots_``). Every candidate's own results are kept in parallel
+        ``*_grid_`` attributes: ``knots_grid_``, ``coef_grid_``,
+        ``WCE_coef_grid_``, ``std_grid_``, ``SED_grid_``,
+        ``risk_function_grid_``, ``loglik_grid_``, ``info_criterion_grid_``.
 
         If, in addition, `nbootstraps` is set, every bootstrap replicate
         independently selects its own best candidate by information
         criterion on its own resampled data (all candidates share the same
-        resamples, drawn once): bootstrap_coef_ and bootstrap_risk_functions_
-        reflect that per-replicate winner, and bootstrap_best_index_,
-        bootstrap_best_nknots_ record which candidate won each replicate.
-        The full per-candidate bootstrap grid is kept in
-        bootstrap_coef_grid_, bootstrap_WCE_coef_grid_,
-        bootstrap_risk_functions_grid_, bootstrap_loglik_grid_,
-        bootstrap_info_criterion_grid_, plus the (candidate-invariant)
-        bootstrap_n_events_.
+        resamples, drawn once): ``bootstrap_coef_`` and
+        ``bootstrap_risk_functions_`` reflect that per-replicate winner, and
+        ``bootstrap_best_index_``, ``bootstrap_best_nknots_`` record which
+        candidate won each replicate. The full per-candidate bootstrap grid
+        is kept in ``bootstrap_coef_grid_``, ``bootstrap_WCE_coef_grid_``,
+        ``bootstrap_risk_functions_grid_``, ``bootstrap_loglik_grid_``,
+        ``bootstrap_info_criterion_grid_``, plus the (candidate-invariant)
+        ``bootstrap_n_events_``.
         """
 
         if not np.all(stop == start + 1):

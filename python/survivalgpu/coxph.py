@@ -242,9 +242,11 @@ class CoxPHSurvivalAnalysis:
                 `bootstrap_indices_`, so they can be replayed later by another
                 `fit()` call. Defaults to False.
 
-        Results are stored as attributes: coef_, std_, means_, score_, loglik_,
-        loglik_init_, sctest_init_, hessian_, imat_, iter_, and (if
-        nbootstraps is set) bootstrap_coef_.
+        Results are stored as attributes: ``coef_``, ``std_``, ``means_``,
+        ``score_``, ``loglik_``, ``loglik_init_``, ``sctest_init_``,
+        ``hessian_``, ``imat_``, ``iter_``, and (if nbootstraps is set)
+        ``bootstrap_coef_``, ``bootstrap_loglik_`` and ``bootstrap_n_events_``
+        (see `bootstrap()`).
         """
         dataset, means, scales, n_batch, n_covariates, mode, loss = self._prepare(
             covariates=covariates,
