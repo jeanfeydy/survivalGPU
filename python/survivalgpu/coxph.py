@@ -4,7 +4,7 @@ We provide:
 
 - CoxPHSurvivalAnalysis, a scikit-learn-like estimator.
 - coxph_R, a functional wrapper around CoxPHSurvivalAnalysis that is used
-  by our R survivalGPU package via reticulate.
+by our R survivalGPU package via reticulate.
 
 """
 
@@ -113,8 +113,10 @@ class CoxPHSurvivalAnalysis:
         around the CoxPH objective, built with the same `scales`/`mode` so
         that a bootstrap resample is optimized exactly like the main fit.
 
-        Returns:
-            dataset, means, scales, n_batch, n_covariates, mode, loss
+        Results are stored as attributes: ``coef_``, ``std_``, ``means_``,
+        ``score_``, ``loglik_``, ``loglik_init_``, ``sctest_init_``,
+        ``hessian_``, ``imat_``, ``iter_``, and (if nbootstraps is set)
+        ``bootstrap_coef_``.
         """
         # Pre-process the input data: ----------------------------------------------------
         # Create a dataset object: this enforces checks on the input data

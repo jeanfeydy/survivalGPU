@@ -296,7 +296,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # several types : right, left, counting, etc...
   multi <- FALSE
   if (type == "mright" || type == "mcounting") {
-    multi <- TRUE
+    stop("coxphGPU() does not yet support multi-state survival data ",
+         "(response type \"", type, "\"); only single-endpoint \"right\" ",
+         "and \"counting\" responses are currently supported.")
   } else if (type != "right" && type != "counting") {
     stop(paste("Cox model doesn't support \"", type,
                "\" survival data",

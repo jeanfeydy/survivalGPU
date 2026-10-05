@@ -1,4 +1,6 @@
-"""WCE, class API, WITH bootstrap resampling, CPU.
+"""
+WCE, class API, WITH bootstrap resampling, CPU
+==================================================
 
 Just like `CoxPHSurvivalAnalysis`, `WCESurvivalAnalysis` accepts
 `nbootstraps`/`batchsize`: the WCE model is fitted once on the full data and
@@ -11,7 +13,7 @@ requested and returns a 95% percentile confidence interval for the hazard
 ratio alongside the point estimate.
 
 Run with:
-    python 05_wce_bootstrap.py
+    python 04_wce_bootstrap.py
 """
 
 import numpy as np

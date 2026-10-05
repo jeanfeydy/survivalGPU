@@ -1,4 +1,6 @@
-"""CoxPH, scikit-learn-style class API, no bootstrap, CPU.
+"""
+CoxPH, scikit-learn-style class API, no bootstrap, CPU
+========================================================
 
 This is the simplest way to fit a Cox Proportional Hazards model with
 survivalGPU: build a `CoxPHSurvivalAnalysis`, call `.fit()`, then read the
