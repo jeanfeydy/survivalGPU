@@ -16,41 +16,53 @@ knitr::opts_chunk$set(
 ```
 
 
-survivalGPU is a package based on a package written in python, dependent on the `reticulate` R package. To use it, it's necessary to have installed some python libraries such as `torch` in your python environment. `pykeops` is only required if you want to use `wceGPU()` (the WCE model) -- it is not available on Windows, so `coxphGPU()` works without it.
+survivalGPU relies on a Python backend, through the `reticulate` R package. It needs a Python environment (Python >= 3.10) with a few libraries installed, such as `torch`. `pykeops` is only required for `wceGPU()` (the WCE model): it is not available on Windows, where `coxphGPU()` works without it. To use `wceGPU()` on Windows, install R inside [WSL2](https://learn.microsoft.com/windows/wsl/install) (the Windows Subsystem for Linux) and follow the Linux instructions.
 
-Maybe it's installed in your python default system, but it's better if your create your own virtualenv for your project. Let's make the steps to configure properly a virtual python environment to use `survivalGPU` in R.
+
+## Install the Python libraries
+
+Create a Python environment called `survivalGPU`, and install the libraries in it. You only do this once; `torch` is a large download, so it takes a few minutes.
 
 ```{r}
 library(reticulate)
 
-# you create the 'survivalGPU' environment
-virtualenv_create("survivalGPU")
-virtualenv_list()
-# you can check python libraries in this python environment
-py_list_packages(envname = "survivalGPU") # numpy by default
+virtualenv_create("survivalGPU", version = ">=3.10")
+virtualenv_install("survivalGPU", c("numpy", "torch", "pandas", "scipy",
+                                    "matplotlib", "beartype", "jaxtyping"))
 
-# now, install all the survivalgpu python dependencies
-# add "pykeops" to this list if you need wceGPU() (not available on Windows)
-virtualenv_install("survivalGPU", packages = c("torch", "matplotlib",
-                                               "beartype", "jaxtyping"))
-py_list_packages(envname = "survivalGPU")
+# Only for the WCE model, wceGPU() -- not available on Windows:
+virtualenv_install("survivalGPU", "pykeops")
+```
+
+On macOS, `pykeops` also needs OpenMP: run `brew install libomp` in a terminal.
+
+If `virtualenv_create()` fails with "Suitable Python installation for creating a venv not found", the Python it picked can't create virtual environments (e.g. on Ubuntu, without the `python3.X-venv` package). Give it another Python explicitly:
+
+```{r}
+virtualenv_create("survivalGPU", python = "/usr/bin/python3.10")
+# or, if you don't have a Python >= 3.10:
+virtualenv_create("survivalGPU", python = install_python("3.11"))
 ```
 
 
-```{r}
-#  /!\ Restart your R session  /!\
-library(reticulate)
+## Use it
 
-# Check if it's the correct python executable
-py_discover_config()
-use_virtualenv(virtualenv = "survivalGPU")
+At the start of each R session, select the Python environment **before** loading survivalGPU:
+
+```{r}
+library(reticulate)
+use_virtualenv("survivalGPU")
+
+library(survivalGPU)
+use_cuda() # TRUE if a GPU is detected
+```
+
+You can also use your own Python environment, selected with `reticulate::use_virtualenv()`, `reticulate::use_condaenv()` or the `RETICULATE_PYTHON` environment variable (e.g. in your `.Renviron` file). Check that the right Python is used with:
+
+```{r}
 py_config()
 ```
 
+If R offers to install Miniconda, be careful: your Python executable would then change to that new Miniconda environment.
 
-As you can see, you're connect at your survivalGPU python environment. So now, if you load `survivalGPU` R package after exec `reticulate::use_virtualenv(virtualenv = "survivalGPU")`, the package will use this python environment.
-
-
-Attention, if you don't have install the `reticluate` R package, install it (with `install.packages("reticulate")`). During installation, R will offer you to install miniconda. If you accept, be careful because your python executable & python home will change for your new miniconda environment. You can change your python environment after starting a new R session.
-
-Check the [`reticulate` R documentation](https://rstudio.github.io/reticulate/articles/versions.html) to see other options to manage your python configuration.
+Check the [`reticulate` documentation](https://rstudio.github.io/reticulate/articles/versions.html) for other ways to manage your Python configuration.

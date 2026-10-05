@@ -31,15 +31,22 @@ It's also possible to use the library without having Graphics Processing Units (
 
 An important thing for this package was to take the same inputs from `survival::coxph()` for Cox models and `WCE::WCE` for WCE models. So after being inspired by these functions, they were rewritten in python with CUDA to make it compatible with CUDA drivers.
 
+Before loading `survivalGPU`, select the Python environment created during the installation (see `vignette("python_connect")`).
+
+```{r}
+library(reticulate)
+use_virtualenv(virtualenv = "survivalGPU")
+```
+
 ```{r setup}
 library(survivalGPU)
 library(survival)
 library(WCE)
 ```
 
-During the library loading, we can see if CUDA drivers were detected, and if they are operational. It's also possible to check it with `use_cuda()` function.
+The `use_cuda()` function checks whether CUDA drivers were detected and are operational, i.e. whether the computations run on the GPU.
 For the examples, we will define in advance the number of bootstraps we will use: if the CUDA drivers are operational, we will execute 1000 bootstraps with the GPU, otherwise 50 bootstraps with the CPU, also adjusting the batchsize argument.
-Batchsize argument is used to put a limit on the number of models to do at the same time. This is very important if you want to run several bootstraps, because too many models at the same time can saturate the RAM memory. Also, the number of bootstrap should be a multiple of the batchsize.
+Batchsize argument is used to put a limit on the number of models to do at the same time. This is very important if you want to run several bootstraps, because too many models at the same time can saturate the RAM memory.
 
 
 ```{r cuda}

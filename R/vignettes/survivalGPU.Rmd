@@ -1,7 +1,7 @@
 ---
 title: "survivalGPU : Fast survival analysis"
 author: "Alexis van STRAATEN"
-date: "2026-08-17"
+date: "2026-10-05"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{survivalGPU : Fast survival analysis}
@@ -23,6 +23,16 @@ It's also possible to use the library without having Graphics Processing Units (
 
 An important thing for this package was to take the same inputs from `survival::coxph()` for Cox models and `WCE::WCE` for WCE models. So after being inspired by these functions, they were rewritten in python with CUDA to make it compatible with CUDA drivers.
 
+Before loading `survivalGPU`, select the Python environment created during the installation (see `vignette("python_connect")`).
+
+
+``` r
+library(reticulate)
+use_virtualenv(virtualenv = "survivalGPU")
+#> Error in `use_virtualenv()`:
+#> ! Directory ~/.virtualenvs/survivalGPU is not a Python virtualenv
+```
+
 
 ``` r
 library(survivalGPU)
@@ -30,9 +40,9 @@ library(survival)
 library(WCE)
 ```
 
-During the library loading, we can see if CUDA drivers were detected, and if they are operational. It's also possible to check it with `use_cuda()` function.
+The `use_cuda()` function checks whether CUDA drivers were detected and are operational, i.e. whether the computations run on the GPU.
 For the examples, we will define in advance the number of bootstraps we will use: if the CUDA drivers are operational, we will execute 1000 bootstraps with the GPU, otherwise 50 bootstraps with the CPU, also adjusting the batchsize argument.
-Batchsize argument is used to put a limit on the number of models to do at the same time. This is very important if you want to run several bootstraps, because too many models at the same time can saturate the RAM memory. Also, the number of bootstrap should be a multiple of the batchsize.
+Batchsize argument is used to put a limit on the number of models to do at the same time. This is very important if you want to run several bootstraps, because too many models at the same time can saturate the RAM memory.
 
 
 
@@ -44,6 +54,11 @@ if (use_cuda()) {
   n_bootstrap <- 50
   batchsize <- 10
 }
+#> Error:
+#> ! survivalGPU requires a working Python installation with the necessary packages installed ('torch' for coxphGPU(); additionally 'pykeops', not available on Windows, for wceGPU()), which could not be loaded.
+#> See vignette("python_connect", package = "survivalGPU") for setup instructions, and run use_cuda() for diagnostics.
+#> Original error: ValueError: list.remove(x): x not in list
+#> Run `reticulate::py_last_error()` for details.
 ```
 
 Let's make an example with `drugdata` dataset from WCE package.
@@ -74,28 +89,15 @@ coxphGPU <- coxphGPU(
   formula = Surv(time = Start, time2 = Stop, event = Event) ~ sex + age,
   data = drugdata
 )
+#> Error:
+#> ! survivalGPU requires a working Python installation with the necessary packages installed ('torch' for coxphGPU(); additionally 'pykeops', not available on Windows, for wceGPU()), which could not be loaded.
+#> See vignette("python_connect", package = "survivalGPU") for setup instructions, and run use_cuda() for diagnostics.
+#> Original error: ValueError: list.remove(x): x not in list
+#> Run `reticulate::py_last_error()` for details.
 
 summary(coxphGPU)
-#> Call:
-#> coxphGPU.default(formula = Surv(time = Start, time2 = Stop, event = Event) ~
-#>     sex + age, data = drugdata)
-#>
-#>   n= 77038, number of events= 383
-#>
-#>         coef exp(coef) se(coef)     z Pr(>|z|)
-#> sex 0.620634  1.860106 0.117783 5.269 1.37e-07 ***
-#> age 0.010696  1.010754 0.003964 2.698  0.00697 **
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#>
-#>     exp(coef) exp(-coef) lower .95 upper .95
-#> sex     1.860     0.5376     1.477     2.343
-#> age     1.011     0.9894     1.003     1.019
-#>
-#> Concordance= 0.59  (se = 0.018 )
-#> Likelihood ratio test= 33.88  on 2 df,   p=4e-08
-#> Wald test            = 36.27  on 2 df,   p=1e-08
-#> Score (logrank) test = 37.27  on 2 df,   p=8e-09
+#> Error in `object[[i]]`:
+#> ! object of type 'closure' is not subsettable
 ```
 
 The advantage of survivalGPU is to use bootstrap more easily. The `summary` gives the results for the initial model without bootstrap, and at the end, confidence interval for estimates covariates with bootstrap, according to `conf.int` argument. Whenever `bootstrap > 0`, `patient_id` must also be provided: it identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (`drugdata` has several rows per patient, identified by the `Id` column).
@@ -109,35 +111,15 @@ coxphGPU_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
   batchsize = batchsize,
   all.results = FALSE
 )
+#> Error:
+#> ! survivalGPU requires a working Python installation with the necessary packages installed ('torch' for coxphGPU(); additionally 'pykeops', not available on Windows, for wceGPU()), which could not be loaded.
+#> See vignette("python_connect", package = "survivalGPU") for setup instructions, and run use_cuda() for diagnostics.
+#> Original error: ValueError: list.remove(x): x not in list
+#> Run `reticulate::py_last_error()` for details.
 
 summary(coxphGPU_bootstrap)
-#> Call:
-#> coxphGPU.default(formula = Surv(Start, Stop, Event) ~ sex + age,
-#>     data = drugdata, patient_id = "Id", bootstrap = n_bootstrap,
-#>     batchsize = batchsize, all.results = FALSE)
-#>
-#>   n= 77038, number of events= 383
-#>
-#>         coef exp(coef) se(coef)     z Pr(>|z|)
-#> sex 0.620634  1.860106 0.117783 5.269 1.37e-07 ***
-#> age 0.010696  1.010754 0.003964 2.698  0.00697 **
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#>
-#>     exp(coef) exp(-coef) lower .95 upper .95
-#> sex     1.860     0.5376     1.477     2.343
-#> age     1.011     0.9894     1.003     1.019
-#>
-#> Concordance= 0.59  (se = 0.018 )
-#> Likelihood ratio test= 33.88  on 2 df,   p=4e-08
-#> Wald test            = 36.27  on 2 df,   p=1e-08
-#> Score (logrank) test = 37.27  on 2 df,   p=8e-09
-#>
-#>  ----------------
-#> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
-#>        2.5%   97.5%
-#> sex 1.50221 2.33782
-#> age 1.00093 1.01579
+#> Error:
+#> ! object 'coxphGPU_bootstrap' not found
 ```
 
 

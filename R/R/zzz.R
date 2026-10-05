@@ -31,6 +31,7 @@ survivalgpu_unavailable_error <- function(e) {
     "survivalGPU requires a working Python installation with the necessary ",
     "packages installed ('torch' for coxphGPU(); additionally 'pykeops', ",
     "not available on Windows, for wceGPU()), which could not be loaded.\n",
+    "On Windows, use wceGPU() through WSL2 (the Windows Subsystem for Linux).\n",
     "See vignette(\"python_connect\", package = \"survivalGPU\") for setup ",
     "instructions, and run use_cuda() for diagnostics.\n",
     "Original error: ", conditionMessage(e),
