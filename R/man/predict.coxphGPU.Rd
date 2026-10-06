@@ -65,6 +65,12 @@ entry per observation.
 
 \item{...}{For future methods}
 }
+\value{
+The predictions computed by \code{\link[survival:predict.coxph]{survival::predict.coxph()}}: a numeric
+vector with one element per observation, or a matrix with one column per
+model term if \code{type = "terms"}. If \code{se.fit = TRUE}, a list with
+components \code{fit} (the predictions) and \code{se.fit} (their standard errors).
+}
 \description{
 Compute fitted values and regression terms for a model fitted by coxphGPU
 }

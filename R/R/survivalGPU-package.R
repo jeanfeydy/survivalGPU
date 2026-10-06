@@ -39,6 +39,10 @@ use_survivalGPU <- function() {
 #' Specifies whether you are using GPUs or not. If TRUE, CUDA drivers are
 #' detected, and you are using GPU.
 #'
+#' @return A single logical value: `TRUE` if PyTorch detects a CUDA-capable
+#'   GPU, in which case computations run on it by default; `FALSE` if they run
+#'   on the CPU. An error is raised if the Python backend cannot be loaded.
+#'
 #' @export
 #'
 #' @examples

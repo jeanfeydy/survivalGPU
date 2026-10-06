@@ -70,7 +70,40 @@
 #'   effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov
 #'   30;28(27):3437-53.
 #'
-#' @return WCE results
+#' @return `wceGPU()` returns an object of class `wceGPU`: a list that describes
+#'   the selected model, i.e. the candidate in `nknots` that minimizes the
+#'   information criterion. Its main components are:
+#'   * `WCEmat`: matrix with one row and `cutoff` columns, the estimated weight
+#'   function.
+#'   * `beta.hat.covariates`, `se.covariates`: one-row matrices with the
+#'   estimated coefficients of the covariates and their standard errors.
+#'   * `est`, `SED`: one-row matrices with the estimated spline coefficients
+#'   and their standard errors.
+#'   * `vcovmat`: list holding the variance-covariance matrix of all the
+#'   coefficients (covariates, then spline coefficients).
+#'   * `knotsmat`: one-row matrix with the knots of the spline basis.
+#'   * `loglik`, `info.criterion`, `nevents`: partial log-likelihood,
+#'   information criterion (the BIC, or the AIC if `aic = TRUE`) and number of
+#'   events.
+#'   * `best.nknots`: the selected number of interior knots. `nknots.grid`,
+#'   `info.criterion.grid` and `loglik.grid` give the candidates and the
+#'   information criterion and partial log-likelihood obtained for each.
+#'
+#'   If `nbootstraps > 0`, the object also contains:
+#'   * `WCEmat_bootstrap`, `bootstrap_beta.hat.covariates`: matrices with one
+#'   row per bootstrap replicate, for the weight function and for the
+#'   coefficients of the covariates.
+#'   * `WCEmat_CI`, `coef_CI`: two-row matrices with their lower and upper
+#'   percentile confidence limits, at level `confint`.
+#'   * `bootstrap.best.nknots`: the number of knots selected in each replicate.
+#'   * `bootstrap_est`, `est_CI`: the same for the spline coefficients, only
+#'   when a single `nknots` value is given.
+#'
+#'   `summary()` and `plot()` are called for their side effects (printing the
+#'   model, plotting the weight function) and return `NULL` invisibly.
+#'   `confint()` returns a matrix with one row per covariate and two columns:
+#'   the lower and upper confidence limits of its coefficient, based on the
+#'   normal approximation.
 #' @export
 #'
 #' @examples
@@ -392,6 +425,8 @@ print.wceGPU <- function(x, ...) {
       print(signif(object$coef_CI[, object$covariates]))
     }
   }
+
+  invisible(x)
 }
 
 

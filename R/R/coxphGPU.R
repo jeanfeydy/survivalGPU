@@ -1466,13 +1466,20 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
 #' Print method for coxphGPU object
 #'
+#' Prints a model fitted by [coxphGPU()] in the same way as a
+#' [survival::coxph()] fit. If the model was fitted with bootstrap resampling,
+#' a note points to `summary()` for the bootstrap confidence intervals.
+#'
 #' @param x a coxphGPU object
 #' @param digits significant digits to print
 #' @param signif.stars show stars to highlight small p-values
 #' @param ... additional argument(s) for methods.
 #'
+#' @return `x`, invisibly. Called for its side effect: printing the model.
+#'
+#' @seealso [coxphGPU()], [survival::coxph()]
+#'
 #' @exportS3Method print coxphGPU
-#' @inherit survival::print.coxph
 print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
                            signif.stars = FALSE) {
 
@@ -1481,6 +1488,8 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
   if (x$nbootstraps > 0) {
         cat("\n--- Other results with bootstrap with summary() ---")
       }
+
+  invisible(x)
 }
 
 
@@ -1569,6 +1578,17 @@ coef.coxphGPU <- function(object, ...) {
 #' @inherit survival::residuals.coxph description references
 #' @inheritParams survival::residuals.coxph
 #'
+#' @return A vector or matrix of residuals, computed by
+#'   [survival::residuals.coxph()]:
+#'   * martingale and deviance residuals: a numeric vector with one element
+#'   per observation, or one per group if `collapse` is used;
+#'   * score, dfbeta and dfbetas residuals: a matrix with one row per
+#'   observation and one column per coefficient;
+#'   * Schoenfeld and scaled Schoenfeld residuals: a matrix with one row per
+#'   event and one column per coefficient;
+#'   * partial residuals: a matrix with one row per observation and one column
+#'   per model term.
+#'
 #' @seealso [survival::residuals.coxph()]
 #'
 #' @exportS3Method residuals coxphGPU
@@ -1600,6 +1620,11 @@ residuals.coxphGPU <- function(object, ...,
 #' @inherit survival::predict.coxph references
 #' @inheritParams survival::predict.coxph
 #' @param object the results of a coxphGPU fit.
+#'
+#' @return The predictions computed by [survival::predict.coxph()]: a numeric
+#'   vector with one element per observation, or a matrix with one column per
+#'   model term if `type = "terms"`. If `se.fit = TRUE`, a list with
+#'   components `fit` (the predictions) and `se.fit` (their standard errors).
 #'
 #' @seealso [survival::predict.coxph()]
 #'
