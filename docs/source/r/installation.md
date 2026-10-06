@@ -58,7 +58,7 @@ use_cuda()   # TRUE if a GPU is detected; FALSE means survivalGPU runs on CPU
 Then use `coxphGPU()` and `wceGPU()`: see the {doc}`user guide <user_guide/index>`
 for examples.
 
-## Good to know
+## Platform-specific considerations
 
 - **Windows:** the Cox model (`coxphGPU()`) works, but the WCE model
   (`wceGPU()`) doesn't: it needs `pykeops`, which doesn't support Windows.
@@ -78,6 +78,9 @@ for examples.
 
 - **GPU and the WCE model:** to run `wceGPU()` on an NVIDIA GPU, KeOps also
   needs the **CUDA toolkit** (`nvcc`), not only the GPU driver.
+
+## Troubleshooting
+
 - **`virtualenv_create()` fails** with "Suitable Python installation for
   creating a venv not found"? The Python it picked can't create virtual
   environments (e.g. on Ubuntu, without the `python3.X-venv` package). Give

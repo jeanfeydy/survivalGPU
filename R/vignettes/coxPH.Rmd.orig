@@ -1,8 +1,8 @@
 ---
-title: "Cox Proportional Hazards regression"
+title: "Cox Proportional Hazards"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Cox Proportional Hazards regression}
+  %\VignetteIndexEntry{Cox Proportional Hazards}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -21,7 +21,7 @@ The Cox proportional hazards model[^cox1] [^cox2] is a semi-parametric regressio
 
 
 
-Let's make an example with `lung` cancer dataset from survival package. Check `?survival::lung` if you want more explanations about this dataset. Before load `survivalGPU`, use your virtual python environment (see `vignette("python_connect")`).
+Let's make an example with `lung` cancer dataset from survival package. Check `?survival::lung` if you want more explanations about this dataset. Before load `survivalGPU`, use your virtual python environment (see `vignette("installation")`).
 
 ```{r}
 library(reticulate)

@@ -14,7 +14,7 @@
 # on every build and gitignored instead.
 #
 # Requires the `survivalGPU` reticulate virtualenv from
-# vignette("python_connect") to already exist and be usable.
+# vignette("installation") to already exist and be usable.
 #
 # Usage (from the repository root):
 #   Rscript docs/scripts/knit_r_pages.R
@@ -25,9 +25,10 @@ render_markdown()
 src_dir <- "R/vignettes"
 out_dir <- "docs/source/r/user_guide"
 
-# survivalGPU.Rmd.orig is deliberately excluded: it overlaps heavily with
-# coxPH + WCE combined, and docs/source/r/index.md already serves as the
-# section's lightweight overview instead.
+# Only the vignettes with live code are knitted here. The other vignettes
+# (survivalGPU.Rmd, the overview, and installation.Rmd) have docs
+# counterparts of their own: docs/source/r/index.md and
+# docs/source/r/installation.md.
 pages <- c("coxPH", "WCE")
 
 # knit() leaves the source's Pandoc YAML front matter (title/output/vignette

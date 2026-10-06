@@ -9,7 +9,7 @@
 # Requires the survivalGPU R package itself to be installed (pkgdown runs
 # roxygen2 @examples when rendering Reference pages), and -- like
 # docs/scripts/knit_r_pages.R -- the `survivalGPU` reticulate virtualenv from
-# vignette("python_connect") to already exist and be usable.
+# vignette("installation") to already exist and be usable.
 #
 # Usage (from the repository root, after building the Sphinx site):
 #   Rscript docs/scripts/build_pkgdown.R

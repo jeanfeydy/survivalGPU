@@ -68,7 +68,7 @@ use_virtualenv("survivalGPU")
 library(survivalGPU)
 ```
 
-See `vignette("python_connect")` for troubleshooting, or to use your own
+See `vignette("installation")` for troubleshooting, or to use your own
 Python environment.
 
 ## Quick start
@@ -76,7 +76,7 @@ Python environment.
 Let’s make a small example for a Cox PH model with the `lung` cancer
 dataset from the `survival` package. Before loading `survivalGPU`, use
 your virtual Python environment (see above or
-`vignette("python_connect")`).
+`vignette("installation")`).
 
 ``` r
 library(reticulate)
@@ -192,7 +192,7 @@ plot a forestplot of your model. All is explain in the
 
 -   `vignette("coxPH")`
 -   `vignette("WCE")`
--   `vignette("python_connect")`
+-   `vignette("installation")`
 
 ## Development
 
@@ -216,7 +216,7 @@ devtools::test()
 environment with `torch` installed. `wceGPU()` tests
 ([test-wceGPU.R](https://github.com/jeanfeydy/survivalGPU/blob/main/R/tests/testthat/test-wceGPU.R))
 additionally need `pykeops` (not available on Windows) in that same
-environment — see `vignette("python_connect")` to add it to your
+environment — see `vignette("installation")` to add it to your
 virtualenv. If it’s missing, those tests are skipped with an informative
 message instead of failing.
 

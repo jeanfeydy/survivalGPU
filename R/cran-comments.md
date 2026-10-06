@@ -42,7 +42,7 @@ are **optional at check time**:
   chunks. `R CMD check` never needs to run Python to rebuild them.
 
 A user who wants the actual GPU functionality needs Python with `torch`
-and `pykeops` installed — see `vignette("python_connect")` for setup
+and `pykeops` installed — see `vignette("installation")` for setup
 instructions (`reticulate::virtualenv_create()` etc.).
 
 ## NOTEs

@@ -28,7 +28,7 @@ Python.
 
 Requires a working R + [reticulate](https://rstudio.github.io/reticulate/) →
 Python(+torch, +optionally pykeops) environment — the same one
-`vignette("python_connect")` in the R package sets up, and that
+`vignette("installation")` in the R package sets up, and that
 `R/vignettes/precompile.R` already relies on. From the repository root:
 
 ```bash
