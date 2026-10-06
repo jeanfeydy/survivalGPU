@@ -42,17 +42,13 @@ possible to use the library without a GPU (CPU fallback).
 
 ## Installation
 
-survivalGPU is not on CRAN yet: install it from GitHub, together with the
-Python libraries it uses behind the scenes (via the `reticulate` R
-package). You need **R >= 4.1**, **Python >= 3.10**, and a C/C++ compiler
-to build the package:
-[Rtools](https://cran.r-project.org/bin/windows/Rtools/) on Windows, the
-Xcode command line tools on macOS (`xcode-select --install`).
+Install survivalGPU from CRAN, together with the Python libraries it uses
+behind the scenes (via the `reticulate` R package). You need **R >= 4.1**
+and **Python >= 3.10**.
 
 ```{r, eval=FALSE}
 # 1. The R package:
-install.packages("remotes")
-remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")
+install.packages("survivalGPU")
 
 # 2. The Python libraries, once (torch is a large download):
 library(reticulate)
@@ -63,9 +59,16 @@ virtualenv_install("survivalGPU", c("numpy", "torch", "pandas", "scipy",
 virtualenv_install("survivalGPU", "pykeops")
 ```
 
-On macOS, `pykeops` also needs OpenMP (`brew install libomp`). On Windows,
-`coxphGPU()` works but `wceGPU()` doesn't (use
+On macOS, `pykeops` also needs Apple's compiler (`xcode-select --install`)
+and OpenMP (`brew install libomp`). On Windows, `coxphGPU()` works but
+`wceGPU()` doesn't (use
 [WSL2](https://learn.microsoft.com/windows/wsl/install) if you need it).
+
+To install the development version from GitHub instead, use
+`remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")`. This
+builds the package from source, so it needs a C compiler
+([Rtools](https://cran.r-project.org/bin/windows/Rtools/) on Windows, the
+Xcode command line tools on macOS).
 
 At the start of each R session, select the Python environment **before**
 loading survivalGPU:

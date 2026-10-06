@@ -1,19 +1,22 @@
 # Installation
 
-survivalGPU is not on CRAN yet: you install it from GitHub, together with
+survivalGPU has two parts to install: the R package itself, from CRAN, and
 the Python libraries it uses behind the scenes (via the
 [reticulate](https://rstudio.github.io/reticulate/) R package).
 
 ## 1. Before you start
 
-You need **R >= 4.1**, **Python >= 3.10**, and a C/C++ compiler to build
-the package:
+You need **R >= 4.1** and **Python >= 3.10**. Depending on your system, you
+may also need a C/C++ compiler:
 
 | System | Install first |
 |---|---|
 | **Linux** | A C/C++ compiler, usually already there. If not, on Debian/Ubuntu: `sudo apt install build-essential` |
-| **macOS** | Apple's compiler: run `xcode-select --install` in a terminal.<br>For the WCE model, also run `brew install libomp` (needs [Homebrew](https://brew.sh)). |
-| **Windows** | [Rtools](https://cran.r-project.org/bin/windows/Rtools/), matching your R version. |
+| **macOS** | Nothing for the Cox model.<br>For the WCE model, Apple's compiler: run `xcode-select --install` in a terminal, and also `brew install libomp` (needs [Homebrew](https://brew.sh)). |
+| **Windows** | Nothing. |
+
+The compiler is used to build the R package on Linux, and by the WCE model,
+which compiles its routines the first time it runs.
 
 If you don't have Python >= 3.10, reticulate can install it for you:
 `reticulate::install_python("3.11")`.
@@ -21,9 +24,19 @@ If you don't have Python >= 3.10, reticulate can install it for you:
 ## 2. Install the R package
 
 ```r
+install.packages("survivalGPU")
+```
+
+To install the development version from GitHub instead:
+
+```r
 install.packages("remotes")
 remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")
 ```
+
+This builds the package from source, so it needs a compiler on every system:
+[Rtools](https://cran.r-project.org/bin/windows/Rtools/) (matching your R
+version) on Windows, `xcode-select --install` on macOS.
 
 ## 3. Install the Python libraries
 
