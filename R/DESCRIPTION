@@ -5,7 +5,7 @@ Authors@R: c(
     person("Jean", "FEYDY", email = "jean.feydy@inria.fr",role = "aut"),
     person("Alexis", "van STRAATEN", email = "alexis.vanstraaten@outlook.fr", role = "aut"),
     person("Antoine", "Poirot-Bourdain", email = "antoine.poirot.bourdain@gmail.com", role = c("aut","cre")),
-    person("Terry", "THERNEAU", role = "cph", comment = "Author of survival library"),
+    person("Terry", "THERNEAU", role = c("ctb", "cph"), comment = "Author of the 'survival' package, from which the C code and parts of the R code are adapted"),
     person("Pierre", "SABATIER", role = "ctb"),
     person("Anne-Sophie", "JANNOT", role = "ctb"))
 Description: Performs survival analysis on GPU-accelerated hardware using
