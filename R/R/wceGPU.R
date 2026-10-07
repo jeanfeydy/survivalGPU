@@ -164,7 +164,10 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                            confint = 0.95, controls = NULL, device = NULL, double_precision = TRUE, ...) {
   # survivalgpu <- use_survivalGPU()
 
-  wce_R <- tryCatch(survivalgpu$wce_R, error = survivalgpu_unavailable_error)
+  wce_R <- tryCatch(
+    survivalgpu$wce_R,
+    error = function(e) survivalgpu_unavailable_error(e, need_keops = TRUE)
+  )
 
 
   # Minor changes for python inputs
@@ -195,7 +198,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
       bootstrap = nbootstraps, batchsize = batchsize,
       device = device, double_precision = double_precision,
     ),
-    error = survivalgpu_unavailable_error
+    error = function(e) survivalgpu_unavailable_error(e, need_keops = TRUE)
   )
 
 
