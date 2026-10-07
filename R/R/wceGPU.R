@@ -116,7 +116,7 @@
 #'                   event = "Event", start = "Start", stop = "Stop",
 #'                   expos = "dose", covariates = c("age", "sex"),
 #'                   constrained = FALSE, aic = FALSE, confint = 0.95,
-#'                   nbootstraps = 1, batchsize = 0)
+#'                   nbootstraps = 0, batchsize = 0)
 #'
 #' # Results
 #' wce_gpu
@@ -300,7 +300,11 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     # knot-selection uncertainty when nknots has several candidates:
     results$bootstrap.best.nknots <- as.vector(wce$bootstrap_best_nknots)
 
-    bootstrap_beta.hat.covariates <- drop(wce$bootstrap_coef)
+    # bootstrap_coef has shape (nbootstraps, 1, number of covariates): remove
+    # the middle axis only. drop() would also collapse the other two when
+    # there is a single replicate or a single covariate.
+    bootstrap_beta.hat.covariates <- wce$bootstrap_coef
+    dim(bootstrap_beta.hat.covariates) <- dim(wce$bootstrap_coef)[c(1, 3)]
     rownames(bootstrap_beta.hat.covariates) <- paste0("bootstrap", 1:nbootstraps)
     colnames(bootstrap_beta.hat.covariates) <- covariates
     results$bootstrap_beta.hat.covariates <- bootstrap_beta.hat.covariates
@@ -312,7 +316,8 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     # replicates may have selected different-width spline coefficients, so
     # Python does not report a single dense array for it.
     if (!is.null(wce$bootstrap_WCE_coef)) {
-      bootstrap_est <- drop(wce$bootstrap_WCE_coef)
+      bootstrap_est <- wce$bootstrap_WCE_coef
+      dim(bootstrap_est) <- dim(wce$bootstrap_WCE_coef)[c(1, 3)]
       rownames(bootstrap_est) <- paste0("bootstrap", 1:nbootstraps)
       colnames(bootstrap_est) <- paste0("D", 1:(ncol(bootstrap_est)))
       results$bootstrap_est <- bootstrap_est
@@ -482,7 +487,7 @@ sumWCEall <- function(object, objname, ...) {
     cat('\n')
   }
 
-  if (object$is_bootstraps) {
+  if (object$is_bootstraps && !is.null(object$covariates)) {
     # cat("\n ---------------- \n")
     cat(paste0(
       "With bootstrap (", object$nbootstraps,

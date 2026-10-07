@@ -135,7 +135,7 @@ use_cuda()
 ## Cox Proportional Hazards without bootstrap
 coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
          data = drugdata,
-         bootstrap = 1)
+         bootstrap = 0)
 
 ## Cox Proportional Hazards with bootstrap
 

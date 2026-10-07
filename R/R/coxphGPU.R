@@ -50,7 +50,7 @@
 #' ## Cox Proportional Hazards without bootstrap
 #' coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
 #'          data = drugdata,
-#'          bootstrap = 1)
+#'          bootstrap = 0)
 #'
 #' ## Cox Proportional Hazards with bootstrap
 #'
@@ -1032,7 +1032,13 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
 
   if (!is.null(patient_id)){
-    data_Y <- cbind(data[patient_id],data_Y)
+    patient_ids <- data[patient_id]
+    if (nrow(mf) != nrow(data)) {
+      # Rows were dropped by `subset` or for missing values: keep the patient
+      # ids of the rows that are in the model frame, like data_Y.
+      patient_ids <- patient_ids[match(rownames(mf), rownames(data)), , drop = FALSE]
+    }
+    data_Y <- cbind(patient_ids,data_Y)
     names(data_Y[1]) = patient_id
   }
 
@@ -1164,7 +1170,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
   fit$method <- method
   fit$nbootstraps <- bootstrap
-  if (bootstrap > 1){
+  if (bootstrap > 0){
     coef_bootstrap <- matrix(coxfit$`bootstrap_coef`,
                              ncol = length(coef))
     colnames(coef_bootstrap) <- dimnames(X)[[2]]
@@ -1632,12 +1638,13 @@ residuals.coxphGPU <- function(object, ...,
 #' @examples
 #' \dontrun{
 #' library(survival)
-#' options(na.action = na.exclude) # retain NA in predictions
+#' old_options <- options(na.action = na.exclude) # retain NA in predictions
 #' fit <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung)
 #' predict(fit, type = "lp")
 #' predict(fit, type = "expected")
 #' predict(fit, type = "risk", se.fit = TRUE)
 #' predict(fit, type = "terms", se.fit = TRUE)
+#' options(old_options) # restore the previous setting
 #' }
 predict.coxphGPU <- function(object, newdata,
                              type = c("lp", "risk", "expected", "terms", "survival"),

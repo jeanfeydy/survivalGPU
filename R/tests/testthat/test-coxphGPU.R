@@ -418,3 +418,65 @@ test_that("test1 - H", {
     tolerance = 1e-5
   )
 })
+
+
+# Bootstrap edge cases ------
+
+# Rows dropped from the model frame (missing values, `subset`) must also be
+# dropped from the patient ids used for the bootstrap resampling.
+lung_id <- survival::lung
+lung_id$id <- seq_len(nrow(lung_id)) # one row per patient
+
+test_that("coxphGPU bootstrap - rows with missing values", {
+  fit <- coxphGPU(
+    Surv(time, status) ~ age + ph.ecog,
+    lung_id,
+    patient_id = "id",
+    bootstrap = 5
+  )
+  ref <- survival::coxph(Surv(time, status) ~ age + ph.ecog, lung_id)
+
+  expect_equal(fit$n, ref$n)
+  expect_equal(
+    as.numeric(fit$coefficients),
+    as.numeric(ref$coefficients),
+    tolerance = 1e-5
+  )
+  expect_equal(dim(fit$coef_bootstrap), c(5, 2))
+})
+
+test_that("coxphGPU bootstrap - subset", {
+  fit <- coxphGPU(
+    Surv(time, status) ~ age + ph.ecog,
+    lung_id,
+    subset = sex == 2,
+    patient_id = "id",
+    bootstrap = 5
+  )
+  ref <- survival::coxph(
+    Surv(time, status) ~ age + ph.ecog,
+    lung_id,
+    subset = sex == 2
+  )
+
+  expect_equal(fit$n, ref$n)
+  expect_equal(
+    as.numeric(fit$coefficients),
+    as.numeric(ref$coefficients),
+    tolerance = 1e-5
+  )
+})
+
+# coef_bootstrap must be stored as soon as there is one replicate, since
+# summary() reads it whenever nbootstraps > 0.
+test_that("coxphGPU bootstrap - a single replicate", {
+  fit <- coxphGPU(
+    Surv(Start, Stop, Event) ~ sex + age,
+    drugdata,
+    patient_id = "Id",
+    bootstrap = 1
+  )
+
+  expect_equal(dim(fit$coef_bootstrap), c(1, 2))
+  expect_equal(dim(summary(fit)$conf.int_bootstrap), c(2, 2))
+})

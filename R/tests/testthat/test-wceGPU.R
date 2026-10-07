@@ -348,3 +348,47 @@ test_that("WCE - bootstrap selects the best knot per replicate", {
   hr <- HR(wce_boot, exposed, unexposed)
   expect_true(all(c("HR", "CI 2.5%", "CI 97.5%") %in% colnames(hr)))
 })
+
+# The bootstrap arrays have one row per replicate and one column per
+# coefficient: they must keep both dimensions when one of them has length 1.
+test_that("WCE - bootstrap with a single replicate", {
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 1, batchsize = 0
+  )
+
+  expect_equal(dim(wce_test$bootstrap_beta.hat.covariates), c(1, 2))
+  expect_equal(dim(wce_test$bootstrap_est), c(1, ncol(wce_test$est)))
+  expect_equal(dim(wce_test$WCEmat_bootstrap), c(1, 90))
+})
+
+test_that("WCE - bootstrap with a single covariate", {
+  nbootstraps <- 5
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = "age",
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = nbootstraps, batchsize = 0
+  )
+
+  expect_equal(dim(wce_test$bootstrap_beta.hat.covariates), c(nbootstraps, 1))
+  expect_equal(colnames(wce_test$bootstrap_beta.hat.covariates), "age")
+  expect_equal(dim(wce_test$coef_CI), c(2, 1))
+})
+
+test_that("WCE - summary() of a bootstrap fit without covariates", {
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose",
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 5, batchsize = 0
+  )
+
+  out <- capture.output(summary(wce_test))
+  expect_true(any(grepl("Partial log-likelihood", out)))
+})
