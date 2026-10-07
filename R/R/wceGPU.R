@@ -377,7 +377,7 @@ print.wceGPU <- function(x, ...) {
     ifelse(object$best.nknots > 1, "knots", "knot"), " -------\n"
   ))
 
-  print("Estimated WCE function\n:")
+  cat("Estimated WCE function :\n")
   print(object$WCEmat)
 
   if (object$is_bootstraps) {
@@ -494,7 +494,7 @@ sumWCEall <- function(object, objname, ...) {
       " bootstraps), conf.level = ", object$confint, " :\n"
     ))
     cat("\nCI of estimates :\n")
-    print(t(signif(object$coef_CI[, object$covariates])))
+    print(t(signif(object$coef_CI[, object$covariates, drop = FALSE])))
     cat('\n')
     # cat("\n ---------------- \n")
     # cat("\n")
@@ -580,7 +580,7 @@ coef.wceGPU <- function(object, ...) {
 #' @exportS3Method plot wceGPU
 plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
   object <- x
-  if (object$nbootstraps == 1) {
+  if (!object$is_bootstraps) {
     if (object$aic == TRUE) {
       info <- "AIC"
     } else {
@@ -598,12 +598,12 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
 
     if (isTRUE(hist.covariates) & !is.null(object$covariates)) {
       for (i in object$covariates) {
-        graphics::hist(object$beta.hat.covariate[, i],
+        graphics::hist(object$bootstrap_beta.hat.covariates[, i],
                        main = paste0(
                          "Histogram of ", i, " coefficient with ",
                          object$nbootstraps,
                          " bootstraps\n (without bootstraps coef = ",
-                         round(object$beta.hat.covariate[1, i], 2), ")"
+                         round(object$beta.hat.covariates[1, i], 2), ")"
                        ),
                        xlab = "Coefficient"
         )
@@ -612,7 +612,8 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
 
     graphics::matplot((object$WCEmat[1,]),
                       lty = 1, type = "l", ylab = "weights",
-                      xlab = "Time elapsed"
+                      xlab = "Time elapsed",
+                      ylim = range(object$WCEmat[1,], object$WCEmat_CI)
     )
     graphics::title(paste0(
       "Estimated weight functions\n with confidence interval (",
