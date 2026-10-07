@@ -8,7 +8,8 @@ skip_if_no_pykeops <- function() {
     reticulate::py_module_available("pykeops"),
     message = paste(
       "pykeops is not installed (only needed for wceGPU()).",
-      "Install it with `pip install survivalgpu[wce]`",
+      "Install it with",
+      "`reticulate::virtualenv_install(\"survivalGPU\", \"pykeops\")`",
       "(not available on Windows) to run WCE tests."
     )
   )

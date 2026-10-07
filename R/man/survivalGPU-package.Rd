@@ -31,8 +31,20 @@ Useful links:
 
 }
 \author{
+\strong{Maintainer}: Antoine Poirot-Bourdain \email{antoine.poirot.bourdain@gmail.com}
+
+Authors:
 \itemize{
-\item \href{https://www.jeanfeydy.com}{Jean FEYDY}
-\item Alexis van STRAATEN
+  \item Antoine Poirot-Bourdain \email{antoine.poirot.bourdain@gmail.com}
+  \item Jean FEYDY \email{jean.feydy@inria.fr}
+  \item Alexis van STRAATEN \email{alexis.vanstraaten@outlook.fr}
 }
+
+Other contributors:
+\itemize{
+  \item Terry THERNEAU (Author of the 'survival' package, from which the C code and parts of the R code are adapted) [contributor, copyright holder]
+  \item Pierre SABATIER [contributor]
+  \item Anne-Sophie JANNOT [contributor]
+}
+
 }

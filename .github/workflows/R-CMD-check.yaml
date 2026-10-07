@@ -159,6 +159,10 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      # setup-r sets NOT_CRAN=true unless it is already set. Keep it false
+      # here so that testthat::skip_on_cran() applies, as on CRAN: the tests
+      # must be skipped before reticulate starts (and downloads) a Python.
+      NOT_CRAN: "false"
 
     steps:
       - uses: actions/checkout@v3

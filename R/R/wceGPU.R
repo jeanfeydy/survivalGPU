@@ -1,7 +1,7 @@
 #' Fast WCE
 #'
 #' @description New implementation of the Weighted Cumulative Exposure model
-#'   (see @details), compatible with GPU to accelerate calculation speed and
+#'   (see Details), compatible with GPU to accelerate calculation speed and
 #'   work with large datasets.
 #'
 #'   Use `summary()` and `plot()` methods to see results and risk function.
@@ -50,7 +50,8 @@
 #'   of the variable(s) in data corresponding to the covariate(s) to be included
 #'   in the model. Default to NULL, which corresponds to fitting model(s)
 #'   without covariates.
-#' @param nbootstraps Number of repeats for the bootstrap cross-validation.
+#' @param nbootstraps Number of bootstrap replicates. Defaults to 0, which
+#'   means no bootstrap.
 #' @param batchsize Number of bootstrap copies that should be handled at a time.
 #'   Defaults to 0, which means that we handle all copies at once. If you run
 #'   into out of memory errors, please consider using batchsize=100, 10 or 1.
@@ -441,8 +442,9 @@ print.wceGPU <- function(x, ...) {
 #' Summary method for wceGPU object
 #'
 #' @param object wceGPU object
-#' @param allres Post-processing calculations. If TRUE, returns
-#'   linear predictors, wald.test, concordance for all bootstraps.
+#' @param allres If TRUE, `summary()` prints every candidate number of knots
+#'   that was tried, with its partial log-likelihood and information criterion,
+#'   instead of the summary of the selected model.
 #' @param ... additional argument(s) for methods.
 #' @exportS3Method summary wceGPU
 #' @rdname wceGPU

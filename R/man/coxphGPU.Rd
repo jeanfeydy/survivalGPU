@@ -38,7 +38,8 @@ object as returned by the Surv function.}
 performed at the patient level rather than at the row level (a patient
 can have several rows, e.g. with time-varying covariates).}
 
-\item{bootstrap}{Number of repeats for the bootstrap cross-validation.}
+\item{bootstrap}{Number of bootstrap replicates. Defaults to 0, which means
+no bootstrap.}
 
 \item{batchsize}{Number of bootstrap copies that should be handled at a time.
 Defaults to 0, which means that we handle all copies at once. If you run
