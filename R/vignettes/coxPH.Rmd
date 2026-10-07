@@ -1,8 +1,8 @@
 ---
-title: "Cox Proportional Hazards regression"
+title: "Cox Proportional Hazards"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Cox Proportional Hazards regression}
+  %\VignetteIndexEntry{Cox Proportional Hazards}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -60,13 +60,7 @@ coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
                                patient_id = "id",
                                bootstrap = 50,
                                ties = "breslow")
-```
 
-```
-[KeOps] Warning : CUDA libraries not found or could not be loaded; Switching to CPU only.
-```
-
-``` r
 # bootstrap at 50 for this example, but normally it's more.
 ```
 
@@ -104,9 +98,9 @@ Score (logrank) test = 30.41  on 3 df,   p=1e-06
  ----------------
 Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
             2.5%   97.5%
-age     0.994745 1.02797
-sexMale 1.224650 2.33012
-ph.ecog 1.282850 1.97849
+age     0.997825 1.03161
+sexMale 1.306090 2.41680
+ph.ecog 1.232030 1.90171
 ```
 
 ## Survival Curves
@@ -120,7 +114,7 @@ survminer::ggadjustedcurves(coxphGPU_bootstrap,
                             data = data)
 ```
 
-![plot of chunk unnamed-chunk-5](coxPH_files/unnamed-chunk-5-1.png)
+![plot of chunk unnamed-chunk-5](figures/coxPH-unnamed-chunk-5-1.png)
 
 This plot shows you survival curves for each sex group, adjusted on the effects of age and ECOG performance score. The result of is plot is that the female survival rate is higher than the male survival rate in time.
 
@@ -151,7 +145,7 @@ And plot scaled Schoenfeld residuals against the time for each covariates with `
 survminer::ggcoxzph(cox.zph(coxphGPU_bootstrap))
 ```
 
-![plot of chunk unnamed-chunk-7](coxPH_files/unnamed-chunk-7-1.png)
+![plot of chunk unnamed-chunk-7](figures/coxPH-unnamed-chunk-7-1.png)
 
 If you see a violation of the PH assumption, you can test :
 * interaction $covariate*time$ term (not currently implemented in `survivalGPU`)
@@ -167,7 +161,7 @@ survminer::ggforest(model = coxphGPU_bootstrap,
                     data = data)
 ```
 
-![plot of chunk unnamed-chunk-8](coxPH_files/unnamed-chunk-8-1.png)
+![plot of chunk unnamed-chunk-8](figures/coxPH-unnamed-chunk-8-1.png)
 
 
 ## References

@@ -95,7 +95,6 @@ Check if CUDA is detected :
 
 ``` r
 use_cuda()
-#> [KeOps] Warning : CUDA libraries not found or could not be loaded; Switching to CPU only.
 #> [1] FALSE
 ```
 

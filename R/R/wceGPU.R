@@ -509,8 +509,6 @@ sumWCEall <- function(object, objname, ...) {
 
 
 
-  objname <- deparse(substitute(object))
-
   cat("Partial log-likelihood: ", object$loglik[which.min(object$info.criterion)], "  ", criterion, min(object$info.criterion), "\n\n", sep='')
   cat("Number of events: ", object$nevents, "\n\n", sep='')
   cat("Use plot(", objname , ') to see the estimated weight function corresponding to this model.\n', sep="")
