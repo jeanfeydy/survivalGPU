@@ -1,59 +1,61 @@
 # CRAN comments
 
+This is a new submission.
+
 ## Test environments
 
-* Local: Ubuntu 22.04, R 4.6.1, `R CMD check --as-cran` run against a
-  clean checkout with `RETICULATE_PYTHON` pointed at a bare Python
-  installation with none of `torch`/`pykeops` present — simulating a CRAN
-  check machine, since none of them have these either. Result: 0 errors,
-  0 warnings, 2 NOTEs (both explained below).
-* win-builder (R-devel, Windows): 1 NOTE (explained below); install,
-  dependencies, tests, and vignette rebuilding all clean.
-* GitHub Actions CI (r-lib/actions), on every push: Ubuntu R-devel,
-  R-release, R-oldrel-1 (with a full `torch`/`pykeops` install), a
-  dedicated job with no Python/torch/pykeops installed at all, and macOS
-  R-release.
+* Local, Ubuntu 22.04, R 4.6.1: `R CMD check --as-cran` on the built
+  tarball, on an account with no Python configured (empty home directory,
+  `RETICULATE_PYTHON` unset), as on a CRAN check machine. This machine
+  reports one more NOTE, only because HTML Tidy is not installed on it.
+* TODO before submitting: add the win-builder (R-devel, R-release) and macOS
+  builder results here, and the GitHub Actions result for the submitted
+  commit. Remove this line.
 
-## This is a new release
+## R CMD check results
 
-This is the first submission of survivalGPU to CRAN.
+0 errors | 0 warnings | 1 note
 
-## `SystemRequirements: python, pytorch, pykeops`
+* checking CRAN incoming feasibility ... NOTE
 
-The package wraps a bundled Python backend (via `reticulate`) for its two
-GPU-capable models, `coxphGPU()` and `wceGPU()`. These system requirements
-are **optional at check time**:
+  New submission.
 
-* The Python module is imported with `delay_load = TRUE`, so package
-  loading never touches Python.
-* Every exported function that does need the Python backend
-  (`coxphGPU()`, `wceGPU()`, `use_cuda()`) fails with an informative
-  `stop()` message if it isn't available, rather than erroring
-  cryptically or hanging.
-* All `\examples{}` that call these functions are wrapped in
-  `\dontrun{}`.
-* All tests that call these functions are guarded with
-  `testthat::skip_if_not(reticulate::py_module_available("survivalgpu"))`,
-  so they skip cleanly rather than error when Python/torch/pykeops aren't
-  present.
-* The vignettes are pre-rendered: `vignettes/*.Rmd.orig` (with live code)
-  are knitted offline into the shipped `vignettes/*.Rmd`, which contain
-  the already-executed output as static markdown, not live executable
-  chunks. `R CMD check` never needs to run Python to rebuild them.
+  Possibly misspelled words in DESCRIPTION: Abrahamowicz, Sylvestre, GPUs,
+  WCE, Scalable, natively.
 
-A user who wants the actual GPU functionality needs Python with `torch`
-and `pykeops` installed — see `vignette("installation")` for setup
-instructions (`reticulate::virtualenv_create()` etc.).
+  These are spelled correctly. "Abrahamowicz" and "Sylvestre" are the authors
+  of the cited reference. "GPUs" and "WCE" are acronyms, both spelled out in
+  the Description. "Scalable" and "natively" are English words.
 
-## NOTEs
+## Python dependency
 
-* **"Found the following (possibly) invalid URLs: ... /issues ... Status:
-  404 / 503"** — `https://github.com/jeanfeydy/survivalGPU/issues` is
-  intermittently unreachable to automated HTTP checks (a 404 in local
-  testing, a 503 via win-builder) despite the repository and its Issues
-  page being directly reachable in a browser. We believe this is a
-  transient issue on GitHub's side with automated requests rather than a
-  problem with the URL itself.
-* **"possibly misspelled word WCE"** — WCE (Weighted Cumulative Exposure)
-  is a modeling method implemented by the package and is spelled out on
-  first use in the `Description` field.
+The computations run in a Python backend that is bundled with the package
+and called through 'reticulate'. It needs Python with 'PyTorch' (see
+`SystemRequirements`), which CRAN check machines do not provide. The package
+is written so that checking it never starts Python:
+
+* The Python module is imported with `delay_load = TRUE`: loading or
+  attaching the package does not start Python.
+* Examples: `coxphGPU()`, `wceGPU()`, `use_cuda()`, `HR()` and the `predict`
+  and `residuals` methods all need a fitted model, hence the Python backend.
+  Their examples are therefore in `\dontrun{}`. They all run in our
+  environment, with Python and 'PyTorch' installed.
+* Tests: every test file that needs the backend starts by calling a helper
+  whose first statement is `testthat::skip_on_cran()`, before any call to
+  'reticulate'. No Python is started, and nothing is downloaded or written
+  outside the check directory. Elsewhere the tests run whenever 'PyTorch' is
+  available.
+* Vignettes: the two vignettes with results are precomputed. Their sources
+  (`vignettes/*.Rmd.orig`, not shipped) are knitted on our machine, and the
+  shipped `.Rmd` files contain the output and figures as static content.
+  Rebuilding them needs no Python.
+* Without Python, or without the required Python packages, the exported
+  functions stop with a message that names what is missing and points to
+  `vignette("installation")`.
+
+## Code adapted from other packages
+
+The C code in `src/` and parts of the R code (`R/coxph_internals.R`, and the
+pre- and post-processing in `coxphGPU()`) are adapted from the 'survival'
+package (LGPL (>= 2)). Its author, Terry Therneau, is listed in `Authors@R`
+with the roles `ctb` and `cph`.

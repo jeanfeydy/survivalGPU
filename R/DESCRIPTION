@@ -26,6 +26,7 @@ Roxygen: list(markdown = TRUE)
 Depends:
     R (>= 4.1.0)
 Imports:
+    graphics,
     reticulate,
     stats,
     survival,
@@ -33,16 +34,18 @@ Imports:
 Suggests:
     dplyr,
     knitr,
-    pkgdown,
     rmarkdown,
     survminer,
     testthat (>= 3.0.0),
     WCE
 Config/testthat/edition: 3
+Config/Needs/website: pkgdown
 VignetteBuilder: knitr
-SystemRequirements: python, pytorch, pykeops (optional, required only for
-    wceGPU(); not available natively on Windows but can be used there through the Windows
-    Subsystem for Linux ('WSL'))
+SystemRequirements: Python (>= 3.10) with the 'torch', 'numpy', 'pandas',
+    'scipy', 'matplotlib', 'beartype' and 'jaxtyping' packages; 'pykeops'
+    (optional, required only for wceGPU(); not available natively on
+    Windows but can be used there through the Windows Subsystem for Linux
+    ('WSL'))
 URL: https://github.com/jeanfeydy/survivalGPU
 BugReports: https://github.com/jeanfeydy/survivalGPU/issues
 Config/roxygen2/version: 8.1.0
