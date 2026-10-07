@@ -22,6 +22,13 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          # One representative macOS (Apple Silicon) run, rather than the
+          # full OS x Python-version cross product -- matches the same
+          # "single representative version" pattern already used for
+          # macOS in R-CMD-check.yaml.
+          - os: macos-latest
+            python-version: "3.12"
 
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +37,16 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
+
+      - name: Install OpenMP (macOS/Apple Silicon)
+        if: runner.os == 'macOS'
+        run: |
+          # pykeops JIT-compiles its kernels and needs libomp on Apple
+          # Silicon; without it, keopscore disables OpenMP and falls back
+          # to a much less-tested code path that can crash. keopscore
+          # detects it via `brew --prefix`/opt/libomp itself at runtime,
+          # so installing the formula is the whole fix.
+          brew install libomp
 
       # R is needed to install rpy2 and run the tests against
       # the reference R package survival
@@ -49,7 +66,10 @@ jobs:
       - name: Install package (with dependencies for tests)
         run: |
           pip install --upgrade pip
-          pip install . --group test
+          # Install the 'wce' extra (pykeops) too, so CI keeps covering the
+          # WCE model -- it's optional at install time since it's not
+          # available on Windows, but this runner is Linux/macOS.
+          pip install ".[wce]" --group test
           export LD_LIBRARY_PATH=$(python -m rpy2.situation LD_LIBRARY_PATH):${LD_LIBRARY_PATH}
 
       - name: Test
@@ -66,3 +86,55 @@ jobs:
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
+
+  # Verifies that the CoxPH model works without the optional 'pykeops'
+  # dependency (the 'wce' extra is deliberately NOT installed here), on
+  # all three OSes -- most importantly Windows, where pykeops can't
+  # install at all, which is the whole point of making it optional.
+  # WCE-only tests (@pytest.mark.needs_keops) are auto-skipped with a
+  # warning by python/tests/conftest.py in this mode.
+  install_and_run_tests_no_wce:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12 on ${{ matrix.os }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+
+      # R is needed to install rpy2 and run the tests against
+      # the reference R package survival -- unrelated to pykeops.
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 4.5.1
+          use-public-rspm: true
+
+      - name: Install R dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+          working-directory: "R/"
+
+      - name: Install package (without the 'wce' extra)
+        shell: bash
+        run: |
+          pip install --upgrade pip
+          # Deliberately omit the 'wce' extra: verifies the whole suite
+          # passes cleanly (WCE tests auto-skipped + warning banner) when
+          # pykeops is genuinely not installed.
+          pip install . --group test
+          export LD_LIBRARY_PATH=$(python -m rpy2.situation LD_LIBRARY_PATH):${LD_LIBRARY_PATH}
+
+      - name: Test
+        shell: bash
+        run: |
+          pytest

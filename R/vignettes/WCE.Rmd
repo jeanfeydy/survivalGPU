@@ -1,8 +1,8 @@
 ---
-title: "Weighted Cumulative Exposure : Signal detection"
+title: "Weighted Cumulative Exposure (WCE)"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Weighted Cumulative Exposure : Signal detection}
+  %\VignetteIndexEntry{Weighted Cumulative Exposure (WCE)}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -12,10 +12,10 @@ vignette: >
 
 
 
-présenter Weighted Cumulative Exposure[^wce] model ...
+The Weighted Cumulative Exposure (WCE) model[^wce] extends the Cox proportional hazards model to time-varying exposures whose effect on the hazard depends not only on the current exposure level but also on how it has evolved over time. It estimates a weight function that captures how the influence of past exposure on the hazard changes with the time elapsed since it occurred, so that the cumulative effect at any given time is a weighted sum of the exposure history up to that point.
 
 
-Let's make an example with `drugdata` dataset from WCE package. Before load `survivalGPU`, use your virtual python environment (see `vignette("python_connect")`).
+Let's make an example with `drugdata` dataset from WCE package. Before load `survivalGPU`, use your virtual python environment (see `vignette("installation")`).
 
 
 ``` r
@@ -26,13 +26,13 @@ use_virtualenv(virtualenv = "survivalGPU")
 
 
 ```
-#>   Id Event Start Stop sex age dose
-#> 1  1     0     0    1   1  40    0
-#> 2  1     0     1    2   1  40    0
-#> 3  1     0     2    3   1  40    0
-#> 4  1     0     3    4   1  40    0
-#> 5  1     0     4    5   1  40    0
-#> 6  1     0     5    6   1  40    0
+  Id Event Start Stop sex age dose
+1  1     0     0    1   1  40    0
+2  1     0     1    2   1  40    0
+3  1     0     2    3   1  40    0
+4  1     0     3    4   1  40    0
+5  1     0     4    5   1  40    0
+6  1     0     5    6   1  40    0
 ```
 
 Check if CUDA is detected :
@@ -40,7 +40,10 @@ Check if CUDA is detected :
 
 ``` r
 use_cuda()
-#> [1] FALSE
+```
+
+```
+[1] FALSE
 ```
 
 By default, functions run with GPU if detected. Then we specify the number of bootstrap, and consequently the batchsize argument, according to CUDA drivers detection.
@@ -59,21 +62,87 @@ if (use_cuda()) {
 
 WCE allows modeling the cumulative effects of time-varying exposures, weighted according to their relative proximity in time and represented by time-dependent covariates. Currently, the weight function is estimated by the Cox proportional hazards model. To build a model, you can use the `wceGPU` function in the same way as the `WCE::WCE` function from WCE package.
 
+The number of interior knots of the splines is usually not known in advance. As in the `WCE` package, `nknots` accepts several candidates (e.g. `1:3`): one model is fitted per candidate, and the one that minimizes the information criterion is selected (the BIC by default, or the AIC with `aic = TRUE`).
+
 
 ``` r
-wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
                             event = "Event", start = "Start", stop = "Stop",
                             expos = "dose", covariates = c("age", "sex"),
                             constrained = FALSE, aic = FALSE, confint = 0.95,
                             nbootstraps = n_bootstrap, batchsize = batchsize)
 ```
 
-In the summary, there are estimated coefficients for the covariates with his confidence interval, calculated with var-covariance matrix, and information to see the significance of the covariates. It's also possible to have confidence interval with bootstrap.
+In the summary, there are estimated coefficients for the covariates of the selected model with his confidence interval, calculated with var-covariance matrix, and information to see the significance of the covariates. It's also possible to have confidence interval with bootstrap.
 
 
 ``` r
 summary(wce_gpu_bootstrap)
 ```
+
+```
+
+Unconstrained estimated WCE function (Proportional hazards model).***
+
+Estimated coefficients for the covariates:
+      coef exp(coef) se(coef)      z      p
+age 0.0116    1.0116   0.0040 2.9097 0.0036
+sex 0.6876    1.9889   0.1189 5.7849 0.0000
+
+With bootstrap (50 bootstraps), conf.level = 0.95 :
+
+CI of estimates :
+          2.5%     97.5%
+age 0.00520178 0.0184486
+sex 0.43544000 0.8932720
+
+Partial log-likelihood: -1891.644  BIC: 3824.924
+
+Number of events: 383
+
+Use plot(wce_gpu_bootstrap) to see the estimated weight function corresponding to this model.
+```
+
+With `allres = TRUE`, the summary shows every candidate that was tried, with its partial log-likelihood and information criterion, and the one that was selected (also available in `wce_gpu_bootstrap$best.nknots`).
+
+
+``` r
+summary(wce_gpu_bootstrap, allres = TRUE)
+```
+
+```
+
+Candidate models tried:
+  nknots    loglik      BIC
+1      1 -1891.644 3824.924
+2      2 -1891.752 3831.089
+3      3 -1891.260 3836.053
+
+Best model: 1 knot(s), by BIC.
+```
+
+## Bootstrap and selection of the number of knots
+
+With several `nknots` candidates, the number of knots is selected again in every bootstrap replicate:
+
+1. the bootstrap resamples (at the patient level) are drawn once and shared by all the candidates, so that they are compared on exactly the same data;
+2. every candidate is fitted on every resample;
+3. each replicate keeps the candidate that minimizes the information criterion computed on its own resampled data (for the BIC, with that replicate's own number of events).
+
+The bootstrap confidence intervals of the weight function, of the covariates and of the hazard ratios therefore account for the uncertainty on the choice of the number of knots, and not only for the uncertainty on the estimates for a fixed number of knots. The number of knots selected by each replicate is stored in `bootstrap.best.nknots`:
+
+
+``` r
+table(wce_gpu_bootstrap$bootstrap.best.nknots)
+```
+
+```
+
+ 1
+50
+```
+
+Since different replicates may select splines with different numbers of coefficients, the bootstrap spline coefficients (`bootstrap_est`, `est_CI`) are only returned when a single `nknots` value is given. With a single value, there is nothing to select and every replicate uses that number of knots, as in a standard bootstrap.
 
 The risk function can be plot, and if you added bootstrap, confidence band intervals will be visible.
 
@@ -82,10 +151,12 @@ The risk function can be plot, and if you added bootstrap, confidence band inter
 plot(wce_gpu_bootstrap)
 ```
 
+![plot of chunk wceGPU_plot](figures/WCE-wceGPU_plot-1.png)
+
 
 ## Hazards Ratios
 
-Expliquer HR et IC bootstrap
+`HR()` computes the hazard ratio between two exposure profiles — for example a constantly exposed patient versus an unexposed one — using the estimated WCE weight function. If the model was fit with bootstrap resampling (`nbootstraps > 0`), it also reports a bootstrap confidence interval for that hazard ratio.
 
 
 ``` r
@@ -94,6 +165,11 @@ exposed   <- rep(1, 90)
 unexposed <- rep(0, 90)
 
 HR(wce_gpu_bootstrap, exposed, unexposed)
+```
+
+```
+           HR  CI 2.5% CI 97.5%
+[1,] 3.032552 2.251186 4.030679
 ```
 
 

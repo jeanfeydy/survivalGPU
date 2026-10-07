@@ -15,19 +15,14 @@
 
 \item{signif.stars}{show stars to highlight small p-values}
 }
+\value{
+\code{x}, invisibly. Called for its side effect: printing the model.
+}
 \description{
-This class of objects is returned by the \code{coxph} class of functions
-to represent a fitted proportional hazards model.
-Objects of this class have methods for the functions \code{print},
-\code{summary}, \code{residuals}, \code{predict} and \code{survfit}.
+Prints a model fitted by \code{\link[=coxphGPU]{coxphGPU()}} in the same way as a
+\code{\link[survival:coxph]{survival::coxph()}} fit. If the model was fitted with bootstrap resampling,
+a note points to \code{summary()} for the bootstrap confidence intervals.
 }
-\section{Components}{
-
-The following components must be included in a legitimate \code{coxph}
-object.
-
-}
-
 \seealso{
-\code{\link[survival]{coxph}},  \code{\link[survival]{coxph.detail}},  \code{\link[survival]{cox.zph}},  \code{\link[survival]{residuals.coxph}},  \code{\link[survival]{survfit}},  \code{\link[survival]{survreg}}.
+\code{\link[=coxphGPU]{coxphGPU()}}, \code{\link[survival:coxph]{survival::coxph()}}
 }

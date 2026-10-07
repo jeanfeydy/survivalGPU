@@ -1,8 +1,10 @@
 numpy
 matplotlib
 torch
-pykeops
 beartype
 jaxtyping
 pandas
 scipy
+
+# Optional: only required for the WCE model (not available on Windows).
+# pykeops

@@ -26,7 +26,7 @@ class WCESurvivalAnalysis:
         self,
         *,
         cutoff: Int,
-        nknots: Int = 1,
+        nknots: Int | list[Int] | tuple[Int, ...] = 1,
         order: Int = 3,
         constrained: Literal["right", "left"] | None = None,
         criterion: Literal["aic", "bic"] = "bic",
@@ -41,58 +41,52 @@ class WCESurvivalAnalysis:
 
         The total number of degrees of freedom for the risk function (i.e. WCE covariates)
         is equal to:
+
             nknots + order + 1 if constrained is None,
             nknots + 2         if constrained is "left" or "right".
 
-        Parameters
-    ----------
-        cutoff
-            Size of the time window for the risk function.
-        nknots
-            Number of knots for the B-splines.
-        order
-            Order of the B-splines used to model the risk function.
-            `order == 0` corresponds to a piecewise constant risk function,
-            `order == 1` corresponds to a piecewise linear risk function,
-            `order == 3` corresponds to a piecewise cubic risk function.
-        criterion
-            Which information criterion to report in `self.info_criterion_`: "aic"
-            (penalty = 2 per degree of freedom) or "bic" (penalty =
-            log(n_events) per degree of freedom). Defaults to "bic".
-            Matches the `my_bic_c()` formula from the reference `WCE` R
-            package.
-        constrained
-            Whether the B-splines should be constrained.
-            Defaults to None (i.e. no constraint).
+        Args:
+            cutoff (int): Size of the time window for the risk function.
+            nknots (int or list of int): Number of knots for the B-splines.
+                If several candidates are given, one model is fitted per
+                candidate and the one that minimizes the information
+                criterion is selected; with `nbootstraps`, this selection is
+                repeated in every bootstrap replicate (see `fit()`).
+            order (int): Order of the B-splines used to model the risk function.
+                `order == 0` corresponds to a piecewise constant risk function,
+                `order == 1` corresponds to a piecewise linear risk function,
+                `order == 3` corresponds to a piecewise cubic risk function.
+            criterion (str): Which information criterion to report in `self.info_criterion_`: "aic"
+                (penalty = 2 per degree of freedom) or "bic" (penalty =
+                log(n_events) per degree of freedom). Defaults to "bic".
+                Matches the `my_bic_c()` formula from the reference `WCE` R
+                package.
+            constrained (str or None): Whether the B-splines should be constrained.
+                Defaults to None (i.e. no constraint).
 
-            Other options are:
+                Other options are:
 
-            - "Left" or "L": the drug has no immediate effect on the risk.
-                We remove features that correspond to basis functions that have
-                a non-zero value or derivative on the "left" of the domain,
-                i.e. around the exposure time.
-                This is useful to model a risk function that has no "immediate" impact.
+                - "Left" or "L": the drug has no immediate effect on the risk.
+                    We remove features that correspond to basis functions that have
+                    a non-zero value or derivative on the "left" of the domain,
+                    i.e. around the exposure time.
+                    This is useful to model a risk function that has no "immediate" impact.
 
-            - "Right" or "R": the drug has no effect on the risk around the cutoff time.
-                We remove features that correspond to basis functions that have
-                a non-zero value or derivative on the "right" of the domain,
-                i.e. around the "exposure+cutoff" time.
-                This is useful to model a risk function that vanishes "at infinity".
-        survival_model
-            Estimator that will be used to
-            perform a risk analysis from the WCE covariates.
-            For now, we only support the CoxPHSurvivalAnalysis model.
-        dtype
-            Either np.float32 or np.float64. Defaults to np.float64.
-        device
-            Device (e.g. "cpu" or "cuda") on which to run the computations.
-            Defaults to the best available device.
-        nbootstraps
-            Number of bootstrap resamples to fit, in addition to the main model.
-            Defaults to None (i.e. no bootstrapping).
-        batchsize
-            Number of bootstrap resamples to process at once on the GPU.
-            Defaults to None, i.e. all the bootstraps are processed at once.
+                - "Right" or "R": the drug has no effect on the risk around the cutoff time.
+                    We remove features that correspond to basis functions that have
+                    a non-zero value or derivative on the "right" of the domain,
+                    i.e. around the "exposure+cutoff" time.
+                    This is useful to model a risk function that vanishes "at infinity".
+            survival_model: Estimator that will be used to
+                perform a risk analysis from the WCE covariates.
+                For now, we only support the CoxPHSurvivalAnalysis model.
+            dtype: Either np.float32 or np.float64. Defaults to np.float64.
+            device: Device (e.g. "cpu" or "cuda") on which to run the computations.
+                Defaults to the best available device.
+            nbootstraps (int, optional): Number of bootstrap resamples to fit, in addition to the main model.
+                Defaults to None (i.e. no bootstrapping).
+            batchsize (int, optional): Number of bootstrap resamples to process at once on the GPU.
+                Defaults to None, i.e. all the bootstraps are processed at once.
         """
         # Let the model remember the parameters of the analysis.
         # Note that all type and value checks are performed in the attribute setters:
@@ -136,7 +130,8 @@ class WCESurvivalAnalysis:
 
 
 
-    def set_non_negative_int(self, value, name):
+    @staticmethod
+    def _validate_non_negative_int(value, name):
         if int(value) != value:
             msg = (
                 f"{name} should be an integer. "
@@ -148,7 +143,10 @@ class WCESurvivalAnalysis:
             msg = f"{name} should be >= 0. " f"Received {value}."
             raise ValueError(msg)
 
-        setattr(self, "_" + name, int(value))
+        return int(value)
+
+    def set_non_negative_int(self, value, name):
+        setattr(self, "_" + name, self._validate_non_negative_int(value, name))
 
     # The order should be an integer >= 0 --------------------------------
     @property
@@ -159,14 +157,29 @@ class WCESurvivalAnalysis:
     def order(self, new_o):
         self.set_non_negative_int(new_o, "order")
 
-    # The number of extra knots should be an integer >= 0 --------------------------------
+    # nknots is either a single non-negative integer, or a list of candidate
+    # values to try (stored as a sorted, deduplicated tuple) -----------------------------
     @property
     def nknots(self):
         return self._nknots
 
     @nknots.setter
     def nknots(self, new_n):
-        self.set_non_negative_int(new_n, "nknots")
+        if isinstance(new_n, list | tuple):
+            if len(new_n) == 0:
+                msg = "nknots must contain at least one candidate value."
+                raise ValueError(msg)
+            candidates = sorted(
+                {self._validate_non_negative_int(n, "nknots") for n in new_n}
+            )
+            self._nknots = tuple(candidates)
+        else:
+            self.set_non_negative_int(new_n, "nknots")
+
+    @property
+    def nknots_candidates(self):
+        """The candidate `nknots` values to fit and select from, always as a tuple."""
+        return self.nknots if isinstance(self.nknots, tuple) else (self.nknots,)
 
     # The cutoff value should be an integer >= 0 -----------------------------------------
     @property
@@ -194,28 +207,40 @@ class WCESurvivalAnalysis:
         self._constrained = new_c
 
     # The number of WCE features depends on nknots, the order and constrained -----------
-    @property
-    def n_atoms(self):
+    def _n_atoms_for(self, nknots):
         if self.constrained is None:
-            return self.nknots + self.order + 1
+            return nknots + self.order + 1
         else:
             # TODO: fix when self.order != 3
-            return self.nknots + 2
+            return nknots + 2
+
+    @property
+    def n_atoms(self):
+        if isinstance(self.nknots, tuple):
+            msg = (
+                "n_atoms is not defined when nknots is a list of candidates "
+                f"(nknots={self.nknots}): it depends on which candidate you "
+                "mean. Use _n_atoms_for(candidate), or fit the model and "
+                "look at WCE_coef_grid_."
+            )
+            raise TypeError(msg)
+        return self._n_atoms_for(self.nknots)
 
     # Functions related to the B-Spline atoms --------------------------------------------
-    def _constrain(self, features):
+    def _constrain(self, features, *, nknots):
         """Enforces a boundary condition on the B-Spline by discarding some basis functions.
 
         Args:
             features ((N,D) tensor): Time-dependent WCE features.
                 Each line corresponds to a sampling time.
                 Each column corresponds to a WCE basis function (= "atom").
+            nknots: Number of interior knots used to build `features`.
 
         Returns:
             truncated features ((N,D) or (N,D-(order-1)) tensor: Relevant WCE features.
         """
         assert len(features.shape) == 2
-        assert features.shape[1] == self.nknots + self.order + 1
+        assert features.shape[1] == nknots + self.order + 1
 
         # TODO: fix when self.order != 3
 
@@ -234,16 +259,27 @@ class WCESurvivalAnalysis:
             )
             raise ValueError(msg)
 
+    def _atoms_for(self, nknots):
+        """Samples the B-spline basis functions on the interval [0, cutoff-1]."""
+        atoms, _ = bspline_atoms(
+            cutoff=self.cutoff, order=self.order, nknots=nknots, dtype=self.dtype,
+            device=self.device,
+        )
+        atoms = self._constrain(atoms, nknots=nknots)
+        assert atoms.shape == (self.cutoff, self._n_atoms_for(nknots))
+        return atoms
+
     @property
     def atoms(self):
         """Samples the B-spline basis functions on the interval [0, cutoff-1]."""
-        atoms, _ = bspline_atoms(
-            cutoff=self.cutoff, order=self.order, nknots=self.nknots, dtype=self.dtype,
-            device=self.device,
-        )
-        atoms = self._constrain(atoms)
-        assert atoms.shape == (self.cutoff, self.n_atoms)
-        return atoms
+        if isinstance(self.nknots, tuple):
+            msg = (
+                "atoms is not defined when nknots is a list of candidates "
+                f"(nknots={self.nknots}): it depends on which candidate you "
+                "mean. Use _atoms_for(candidate)."
+            )
+            raise TypeError(msg)
+        return self._atoms_for(self.nknots)
 
     @property
     def atom_areas(self):
@@ -261,6 +297,7 @@ class WCESurvivalAnalysis:
         patient: Int64Array["intervals"],
         dose: Float64Array["intervals"],
         time: Int64Array["intervals"],
+        nknots: Int,
     ):
         """Computes the WCE B-Spline covariates on a batch of patients and drugs."""
 
@@ -272,7 +309,7 @@ class WCESurvivalAnalysis:
             ids=patient,
             times=time,
             doses=dose,
-            nknots=self.nknots,
+            nknots=nknots,
             cutoff=self.cutoff,
             order=self.order,
             dtype=self.dtype,
@@ -282,8 +319,8 @@ class WCESurvivalAnalysis:
         wce_features = wce_features.cpu().numpy()
         knots = knots.cpu().numpy()
 
-        wce_features = self._constrain(wce_features)
-        assert wce_features.shape == (len(time), self.n_atoms)
+        wce_features = self._constrain(wce_features, nknots=nknots)
+        assert wce_features.shape == (len(time), self._n_atoms_for(nknots))
         return wce_features, knots
 
     @typecheck
@@ -319,11 +356,32 @@ class WCESurvivalAnalysis:
             init ((C + n_atoms,) float64 array, optional): initial values for
                 the coefficients. Defaults to zeros.
 
-        Results are stored as attributes: knots_, coef_, WCE_coef_,
-        risk_function_, std_, SED_, means_, score_, loglik_, loglik_init_,
-        sctest_init_, hessian_, imat_, iter_, n_events_, info_criterion_, and
-        (if nbootstraps is set) bootstrap_coef_, bootstrap_WCE_coef_,
-        bootstrap_risk_functions_.
+        Results are stored as attributes: ``knots_``, ``coef_``, ``WCE_coef_``,
+        ``risk_function_``, ``std_``, ``SED_``, ``means_``, ``score_``,
+        ``loglik_``, ``loglik_init_``, ``sctest_init_``, ``hessian_``,
+        ``imat_``, ``iter_``, ``n_events_``, ``info_criterion_``, and (if
+        nbootstraps is set) ``bootstrap_coef_``, ``bootstrap_risk_functions_``
+        and, only when a single nknots value is given, ``bootstrap_WCE_coef_``.
+
+        When `nknots` is a list of candidates, one model is fitted per
+        candidate and the flat attributes above reflect whichever one
+        minimizes ``info_criterion_`` (see also ``best_index_``,
+        ``best_nknots_``). Every candidate's own results are kept in parallel
+        ``*_grid_`` attributes: ``knots_grid_``, ``coef_grid_``,
+        ``WCE_coef_grid_``, ``std_grid_``, ``SED_grid_``,
+        ``risk_function_grid_``, ``loglik_grid_``, ``info_criterion_grid_``.
+
+        If, in addition, `nbootstraps` is set, every bootstrap replicate
+        independently selects its own best candidate by information
+        criterion on its own resampled data (all candidates share the same
+        resamples, drawn once): ``bootstrap_coef_`` and
+        ``bootstrap_risk_functions_`` reflect that per-replicate winner, and
+        ``bootstrap_best_index_``, ``bootstrap_best_nknots_`` record which
+        candidate won each replicate. The full per-candidate bootstrap grid
+        is kept in ``bootstrap_coef_grid_``, ``bootstrap_WCE_coef_grid_``,
+        ``bootstrap_risk_functions_grid_``, ``bootstrap_loglik_grid_``,
+        ``bootstrap_info_criterion_grid_``, plus the (candidate-invariant)
+        ``bootstrap_n_events_``.
         """
 
         if not np.all(stop == start + 1):
@@ -331,113 +389,281 @@ class WCESurvivalAnalysis:
 
             raise NotImplementedError(msg)
 
-        # Step 1: compute the time-dependent features (= exposures)
-        exposures, knots = self._wce_features(patient=patient, dose=dose, time=stop)
-        assert exposures.shape == (len(stop), self.n_atoms)
-        exposures = np.array(exposures, dtype=np.float64)
-
-        # Step 2: perform a CoxPH regression with the new covariates
         if covariates is None:
             # No external covariates, just drug doses:
             self.n_covariates = 0
-            covariates = exposures
         else:
             # We observe other covariates such as the sex, etc.
             self.n_covariates = covariates.shape[-1]
-            covariates = np.concatenate((covariates, exposures), axis=-1)
 
-        # print("\n\nNote: the WCE features are computed on the stop times of the intervals.")
+        self.n_events_ = int(np.sum(event))
+        # Penalty per degree of freedom for the information criterion, matching
+        # the `my_bic_c()` formula from the reference `WCE` R package: AIC uses
+        # a penalty of 2, BIC uses log(n_events). Candidate-invariant, since it
+        # only depends on the (fixed) data, not on nknots.
+        penalty_per_df = 2.0 if self.criterion == "aic" else np.log(self.n_events_)
 
-        self.survival_model.fit(
-            covariates=covariates,
-            start=start,
-            stop=stop,
-            event=event,
-            # patient=patient,
-            strata=strata,
-            batch=batch,
-            init=init,
-        )
+        knots_grid = []
+        coef_grid = []
+        WCE_coef_grid = []
+        std_grid = []
+        SED_grid = []
+        risk_function_grid = []
+        loglik_grid = []
+        info_criterion_grid = []
 
-        # Step 3: Save the results in the expected format
-        # Save the knots values:
-        self.knots_ = knots
+        # "Usual" CoxPH diagnostics, ragged across candidates (their width
+        # depends on nknots) -- kept per candidate and resolved to the
+        # selected winner's own values after the loop, alongside coef_ etc.
+        means_grid = []
+        score_grid = []
+        sctest_init_grid = []
+        loglik_init_grid = []
+        hessian_grid = []
+        imat_grid = []
+        iter_grid = []
 
-        # Optimal coefficients: ------------------------------------------------
-        n_batch = len(self.survival_model.coef_)
-        assert self.survival_model.coef_.shape == (
-            n_batch,
-            self.n_covariates + self.n_atoms,
-        )
+        bootstrap_coef_grid = []
+        bootstrap_WCE_coef_grid = []
+        bootstrap_risk_functions_grid = []
+        bootstrap_loglik_grid = []
+        bootstrap_info_criterion_grid = []
+        # Shared across every candidate, so that a given bootstrap replicate
+        # resamples the exact same patients regardless of nknots: drawn once
+        # by the first candidate (below), then replayed by every other one.
+        shared_bootstrap_indices = None
 
-        # Coefficients for the covariates:
-        self.coef_ = self.survival_model.coef_[:, : self.n_covariates]
-        assert self.coef_.shape == (n_batch, self.n_covariates)
+        # Fit one WCE model per candidate nknots value. -----------------------------------
+        for i, nknots in enumerate(self.nknots_candidates):
+            n_atoms = self._n_atoms_for(nknots)
+            atoms = self._atoms_for(nknots)
 
-        # Coefficients for the WCE B-Spline features:
-        self.WCE_coef_ = self.survival_model.coef_[:, self.n_covariates :]
-        assert self.WCE_coef_.shape == (n_batch, self.n_atoms)
-        # Estimated risk function:
-        # (n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_batch, cutoff)
+            # Step 1: compute the time-dependent features (= exposures)
+            exposures, knots = self._wce_features(
+                patient=patient, dose=dose, time=stop, nknots=nknots
+            )
+            assert exposures.shape == (len(stop), n_atoms)
+            exposures = np.array(exposures, dtype=np.float64)
 
-        self.risk_function_ = torch.from_numpy(self.WCE_coef_).to(self.device) @ self.atoms.to(self.dtype).T
-        assert self.risk_function_.shape == (n_batch, self.cutoff)
+            # Step 2: perform a CoxPH regression with the new covariates
+            if covariates is None:
+                candidate_covariates = exposures
+            else:
+                candidate_covariates = np.concatenate((covariates, exposures), axis=-1)
 
-        # Standard deviations for the coefficients:
-        self.std_ = self.survival_model.std_[:, : self.n_covariates]
-        assert self.std_.shape == (n_batch, self.n_covariates)
-
-        # Standard deviations for the WCE B-Spline weights:
-        self.SED_ = self.survival_model.std_[:, self.n_covariates :]
-        assert self.SED_.shape == (n_batch, self.n_atoms)
-
-        # Batch coefficients: --------------------------------------------------
-        if self.nbootstraps is not None:
-            assert self.survival_model.bootstrap_coef_.shape == (
-                self.nbootstraps,
-                n_batch,
-                self.n_covariates + self.n_atoms,
+            self.survival_model.fit(
+                covariates=candidate_covariates,
+                start=start,
+                stop=stop,
+                event=event,
+                patient=patient,
+                strata=strata,
+                batch=batch,
+                init=init,
+                bootstrap_indices=shared_bootstrap_indices,
+                keep_bootstrap_indices=(i == 0),
             )
 
-            # Bootstrap coefficients for the covariates:
-            self.bootstrap_coef_ = self.survival_model.bootstrap_coef_[
-                :, :, : self.n_covariates
-            ]
-            assert self.bootstrap_coef_.shape == (
-                self.nbootstraps,
+            # Step 3: extract this candidate's results ------------------------------------
+            n_batch = len(self.survival_model.coef_)
+            assert self.survival_model.coef_.shape == (
                 n_batch,
-                self.n_covariates,
+                self.n_covariates + n_atoms,
             )
 
-            # Bootstrap weights for the WCE B-Spline features:
-            self.bootstrap_WCE_coef_ = self.survival_model.bootstrap_coef_[
-                :, :, self.n_covariates :
-            ]
-            assert self.bootstrap_WCE_coef_.shape == (
-                self.nbootstraps,
-                n_batch,
-                self.n_atoms,
-            )
+            # Coefficients for the covariates:
+            coef = self.survival_model.coef_[:, : self.n_covariates]
+            assert coef.shape == (n_batch, self.n_covariates)
 
+            # Coefficients for the WCE B-Spline features:
+            WCE_coef = self.survival_model.coef_[:, self.n_covariates :]
+            assert WCE_coef.shape == (n_batch, n_atoms)
 
             # Estimated risk function:
-            # (nbootstraps, n_batch, n_atoms) @ (n_atoms, cutoff) -> (nbootstraps, n_batch, cutoff)
-            self.bootstrap_risk_functions_ = torch.tensor(self.bootstrap_WCE_coef_, dtype=self.dtype).to(self.device) @ self.atoms.to(self.dtype).T
-        # Usual CoxPH results: -------------------------------------------------
-        self.means_ = self.survival_model.means_
-        self.score_ = self.survival_model.score_
-        self.sctest_init_ = self.survival_model.sctest_init_
-        self.loglik_init_ = self.survival_model.loglik_init_
-        self.loglik_ = self.survival_model.loglik_
-        self.hessian_ = self.survival_model.hessian_
-        self.imat_ = self.survival_model.imat_
-        self.iter_ = self.survival_model.iter_
-        self.n_events_ = int(np.sum(event))
-        # Compute the information criterion for the WCE model, matching the
-        # `my_bic_c()` formula from the reference `WCE` R package: AIC uses a
-        # penalty of 2 per degree of freedom, BIC uses log(n_events).
-        penalty_per_df = 2.0 if self.criterion == "aic" else np.log(self.n_events_)
-        self.info_criterion_ = -2 * np.asarray(self.loglik_) + (self.n_atoms + self.n_covariates) * penalty_per_df
+            # (n_batch, n_atoms) @ (n_atoms, cutoff) -> (n_batch, cutoff)
+            risk_function = torch.from_numpy(WCE_coef).to(self.device) @ atoms.to(self.dtype).T
+            assert risk_function.shape == (n_batch, self.cutoff)
+
+            # Standard deviations for the coefficients:
+            std = self.survival_model.std_[:, : self.n_covariates]
+            assert std.shape == (n_batch, self.n_covariates)
+
+            # Standard deviations for the WCE B-Spline weights:
+            SED = self.survival_model.std_[:, self.n_covariates :]
+            assert SED.shape == (n_batch, n_atoms)
+
+            loglik = np.asarray(self.survival_model.loglik_)
+            info_criterion = -2 * loglik + (n_atoms + self.n_covariates) * penalty_per_df
+
+            knots_grid.append(knots)
+            coef_grid.append(coef)
+            WCE_coef_grid.append(WCE_coef)
+            std_grid.append(std)
+            SED_grid.append(SED)
+            risk_function_grid.append(risk_function)
+            loglik_grid.append(loglik)
+            info_criterion_grid.append(info_criterion)
+
+            # Bootstrap results for this candidate: --------------------------------------
+            # every candidate reuses the same resample plan, drawn once by
+            # the first candidate above (bootstrap_indices=shared_bootstrap_indices).
+            if self.nbootstraps is not None:
+                if i == 0:
+                    shared_bootstrap_indices = self.survival_model.bootstrap_indices_
+                    # Candidate-invariant (depends on the resamples and the
+                    # fixed event data, not on nknots): capture it once.
+                    self.bootstrap_n_events_ = self.survival_model.bootstrap_n_events_
+                else:
+                    # Self-verifying invariant: if this ever fails, resamples
+                    # were redrawn instead of shared across candidates.
+                    assert np.allclose(
+                        self.survival_model.bootstrap_n_events_,
+                        self.bootstrap_n_events_,
+                    )
+
+                assert self.survival_model.bootstrap_coef_.shape == (
+                    self.nbootstraps,
+                    n_batch,
+                    self.n_covariates + n_atoms,
+                )
+
+                # Bootstrap coefficients for the covariates:
+                bootstrap_coef = self.survival_model.bootstrap_coef_[
+                    :, :, : self.n_covariates
+                ]
+                assert bootstrap_coef.shape == (
+                    self.nbootstraps,
+                    n_batch,
+                    self.n_covariates,
+                )
+
+                # Bootstrap weights for the WCE B-Spline features:
+                bootstrap_WCE_coef = self.survival_model.bootstrap_coef_[
+                    :, :, self.n_covariates :
+                ]
+                assert bootstrap_WCE_coef.shape == (
+                    self.nbootstraps,
+                    n_batch,
+                    n_atoms,
+                )
+
+                # Estimated risk function:
+                # (nbootstraps, n_batch, n_atoms) @ (n_atoms, cutoff) -> (nbootstraps, n_batch, cutoff)
+                bootstrap_risk_functions = torch.tensor(bootstrap_WCE_coef, dtype=self.dtype).to(self.device) @ atoms.to(self.dtype).T
+
+                bootstrap_coef_grid.append(bootstrap_coef)
+                bootstrap_WCE_coef_grid.append(bootstrap_WCE_coef)
+                bootstrap_risk_functions_grid.append(bootstrap_risk_functions)
+                bootstrap_loglik_grid.append(np.asarray(self.survival_model.bootstrap_loglik_))
+
+                # Per-replicate information criterion for this candidate,
+                # using this replicate's own (resample-weighted) event count
+                # rather than the fixed self.n_events_ used for the main fit:
+                if self.criterion == "aic":
+                    bootstrap_penalty_per_df = 2.0
+                else:
+                    bootstrap_penalty_per_df = np.log(self.bootstrap_n_events_)[:, None]
+                bootstrap_info_criterion = (
+                    -2 * np.asarray(self.survival_model.bootstrap_loglik_)
+                    + (n_atoms + self.n_covariates) * bootstrap_penalty_per_df
+                )
+                bootstrap_info_criterion_grid.append(bootstrap_info_criterion)
+
+            # Usual CoxPH results: kept per candidate (ragged, like WCE_coef_
+            # above) and resolved to the selected winner's own values below,
+            # alongside coef_/risk_function_/etc.
+            means_grid.append(self.survival_model.means_)
+            score_grid.append(self.survival_model.score_)
+            sctest_init_grid.append(self.survival_model.sctest_init_)
+            loglik_init_grid.append(self.survival_model.loglik_init_)
+            hessian_grid.append(self.survival_model.hessian_)
+            imat_grid.append(self.survival_model.imat_)
+            iter_grid.append(self.survival_model.iter_)
+
+        # Stack the fixed-width results into dense (n_candidates, ...) grids. ------------
+        self.knots_grid_ = knots_grid
+        self.coef_grid_ = np.stack(coef_grid)
+        self.WCE_coef_grid_ = WCE_coef_grid
+        self.std_grid_ = np.stack(std_grid)
+        self.SED_grid_ = SED_grid
+        self.risk_function_grid_ = torch.stack(risk_function_grid)
+        self.loglik_grid_ = np.stack(loglik_grid)
+        self.info_criterion_grid_ = np.stack(info_criterion_grid)
+
+        if self.nbootstraps is not None:
+            # (n_candidates, nbootstraps, n_batch, n_covariates):
+            self.bootstrap_coef_grid_ = np.stack(bootstrap_coef_grid)
+            # Ragged (width depends on nknots): list of (nbootstraps, n_batch, n_atoms_c).
+            self.bootstrap_WCE_coef_grid_ = bootstrap_WCE_coef_grid
+            # (n_candidates, nbootstraps, n_batch, cutoff):
+            self.bootstrap_risk_functions_grid_ = torch.stack(bootstrap_risk_functions_grid)
+            # (n_candidates, nbootstraps, n_batch):
+            self.bootstrap_loglik_grid_ = np.stack(bootstrap_loglik_grid)
+            self.bootstrap_info_criterion_grid_ = np.stack(bootstrap_info_criterion_grid)
+
+            # Select, independently for every replicate (and batch column),
+            # the candidate that minimizes the information criterion on that
+            # replicate's own resampled data -- this is what lets the
+            # bootstrap distribution reflect knot-selection uncertainty,
+            # instead of conditioning on a single fixed nknots.
+            self.bootstrap_best_index_ = self.bootstrap_info_criterion_grid_.argmin(axis=0)
+            self.bootstrap_best_nknots_ = np.asarray(self.nknots_candidates)[
+                self.bootstrap_best_index_
+            ]
+
+            boot_idx = np.arange(self.nbootstraps).reshape(-1, 1)
+            batch_idx2 = np.arange(n_batch).reshape(1, -1)
+            self.bootstrap_coef_ = self.bootstrap_coef_grid_[
+                self.bootstrap_best_index_, boot_idx, batch_idx2
+            ]
+            self.bootstrap_risk_functions_ = self.bootstrap_risk_functions_grid_[
+                self.bootstrap_best_index_, boot_idx, batch_idx2
+            ]
+
+            # Ragged (width depends on nknots): only dense when there is a
+            # single candidate, matching today's scalar-nknots contract.
+            if len(self.nknots_candidates) == 1:
+                self.bootstrap_WCE_coef_ = self.bootstrap_WCE_coef_grid_[0]
+
+        # Select the candidate that minimizes the information criterion, per batch column.
+        self.best_index_ = self.info_criterion_grid_.argmin(axis=0)
+        self.best_nknots_ = np.asarray(self.nknots_candidates)[self.best_index_]
+
+        # "Usual" CoxPH diagnostics for the selected winner. Like means_/
+        # score_/hessian_/imat_ themselves (see the "TODO batch this" note on
+        # means_' shape), this picks a single winner rather than one per
+        # batch column: not batch-aware, but no worse than before.
+        winner = int(self.best_index_[0])
+        self.means_ = means_grid[winner]
+        self.score_ = score_grid[winner]
+        self.sctest_init_ = sctest_init_grid[winner]
+        self.loglik_init_ = loglik_init_grid[winner]
+        self.hessian_ = hessian_grid[winner]
+        self.imat_ = imat_grid[winner]
+        self.iter_ = iter_grid[winner]
+
+        batch_idx = np.arange(n_batch)
+        self.coef_ = self.coef_grid_[self.best_index_, batch_idx]
+        self.std_ = self.std_grid_[self.best_index_, batch_idx]
+        self.risk_function_ = self.risk_function_grid_[self.best_index_, batch_idx]
+        self.loglik_ = self.loglik_grid_[self.best_index_, batch_idx]
+        self.info_criterion_ = self.info_criterion_grid_[self.best_index_, batch_idx]
+
+        # Ragged across candidates (their width depends on nknots): stay dense
+        # whenever every batch column agrees on the same winning candidate
+        # (true whenever there is a single candidate, and in practice always
+        # true today, since `batch` -- and thus more than one column -- is
+        # never used); only fall back to one entry per batch column when
+        # different columns genuinely pick different candidates.
+        if len(set(self.best_index_.tolist())) == 1:
+            winner = int(self.best_index_[0])
+            self.knots_ = self.knots_grid_[winner]
+            self.WCE_coef_ = self.WCE_coef_grid_[winner]
+            self.SED_ = self.SED_grid_[winner]
+        else:
+            self.knots_ = [self.knots_grid_[i] for i in self.best_index_]
+            self.WCE_coef_ = [self.WCE_coef_grid_[i][b] for b, i in enumerate(self.best_index_)]
+            self.SED_ = [self.SED_grid_[i][b] for b, i in enumerate(self.best_index_)]
 
 
     def HR(self,
@@ -482,7 +708,7 @@ def wce_numpy(
     start,
     stop,
     cutoff: Int,
-    nknots: Int = 1,
+    nknots=1,
     order: Int = 3,
     constrained: Literal["right", "left"] | None = None,
     criterion: Literal["aic", "bic"] = "bic",
@@ -495,10 +721,9 @@ def wce_numpy(
     dtype = np.float64,
     **kwargs,
 ):
-    """Functional interface to WCESurvivalAnalysis: fits a WCE model and returns the results as a dict.
-
-    Builds a CoxPHSurvivalAnalysis from `kwargs`, wraps it in a WCESurvivalAnalysis
-    with the given WCE parameters, fits it on the data, and collects the results.
+    """Internal function: this is not meant to be called directly by end users.
+    It is the computational backend used by `wce_R`, which is the function
+    actually invoked from R (via reticulate) as part of the R WCE interface.
 
     Args:
         ids ((I,) array): patient id for each interval.
@@ -508,8 +733,10 @@ def wce_numpy(
             0 if it is censored.
         start ((I,) array): start time of each interval.
         stop ((I,) array): end time of each interval.
-        cutoff (int): size of the time window for the risk function.
-        nknots (int, optional): number of knots for the B-splines. Defaults to 1.
+      cutoff (int): size of the time window for Zthe risk function.
+        nknots (int or list[int], optional): number of knots for the
+            B-splines, or a list of candidate values to try -- the candidate
+            that minimizes `criterion` is selected. Defaults to 1.
         order (int, optional): order of the B-splines. Defaults to 3.
         constrained ("left", "right" or None, optional): boundary constraint
             on the B-splines. Defaults to None.
@@ -530,9 +757,11 @@ def wce_numpy(
     Returns:
         dict: with keys "knotsmat", "coef", "std", "WCE_coef", "SED",
             "risk_function", "info_criterion", "means", "score", "sctest_init",
-            "loglik_init", "loglik", "hessian", "imat", "iter", and (if
-            nbootstraps is set) "bootstrap_coef", "bootstrap_WCE_coef",
-            "bootstrap_risk_functions".
+            "loglik_init", "loglik", "hessian", "imat", "iter", "best_nknots",
+            "nknots_grid", "info_criterion_grid", "loglik_grid", and (if
+            nbootstraps is set) "bootstrap_coef", "bootstrap_risk_functions",
+            "bootstrap_best_nknots", and (only when a single nknots candidate
+            was given) "bootstrap_WCE_coef".
     """
     if nbootstraps == 0:
         nbootstraps = None
@@ -587,15 +816,29 @@ def wce_numpy(
         hessian=model.hessian_,
         imat=model.imat_,
         iter=model.iter_,
+        # Diagnostics for the candidate-selection grid -- always present,
+        # even for a single nknots value (a grid of size one):
+        best_nknots=model.best_nknots_,
+        nknots_grid=np.asarray(model.nknots_candidates),
+        info_criterion_grid=model.info_criterion_grid_,
+        loglik_grid=model.loglik_grid_,
     )
 
 
     if nbootstraps is not None:
         output.update(
             bootstrap_coef=model.bootstrap_coef_,
-            bootstrap_WCE_coef=model.bootstrap_WCE_coef_,
             bootstrap_risk_functions=model.bootstrap_risk_functions_.squeeze(axis=1).cpu().numpy(),
+            # Which candidate won each replicate -- the actual measure of
+            # knot-selection uncertainty this feature is about:
+            bootstrap_best_nknots=model.bootstrap_best_nknots_,
         )
+        if hasattr(model, "bootstrap_WCE_coef_"):
+            # Only meaningful when there was a single candidate: with several
+            # candidates, different replicates may have selected different
+            # (differently-sized) spline coefficients, so there is no single
+            # dense array to report here.
+            output["bootstrap_WCE_coef"] = model.bootstrap_WCE_coef_
 
 
     return output
@@ -629,7 +872,8 @@ def wce_R(
     device = None,
     double_precision = True,
 ):
-    """R-facing wrapper around wce_numpy: fits a WCE model from a long-format data.frame.
+    """Internal function: this is not meant to be called directly by end users.
+    R-facing wrapper around wce_numpy: fits a WCE model from a long-format data.frame.
 
     Args:
         data (pandas.DataFrame): the long-format dataset.
@@ -640,7 +884,10 @@ def wce_R(
         doses (str): name of the column with drug doses.
         events (str): name of the column with the event indicator.
         cutoff (int): size of the time window for the risk function.
-        nknots (int, optional): number of knots for the B-splines. Defaults to 1.
+        nknots (int or array-like of int, optional): number of knots for the
+            B-splines, or several candidate values to try (as sent by R for a
+            numeric vector) -- the candidate that minimizes the information
+            criterion is selected. Defaults to 1.
         order (int, optional): order of the B-splines. Defaults to 3.
         constrained (str or None, optional): one of "None"/None, "left"/"Left"/"l"/"L"
             or "right"/"Right"/"r"/"R". Defaults to None.
@@ -667,9 +914,11 @@ def wce_R(
     Returns:
         dict: with keys "knotsmat", "coef", "std", "WCE_coef", "SED",
             "risk_function", "info_criterion", "means", "score", "sctest_init",
-            "loglik_init", "loglik", "hessian", "imat", "iter", and (if
-            bootstrap > 0) "bootstrap_coef", "bootstrap_WCE_coef",
-            "bootstrap_risk_functions".
+            "loglik_init", "loglik", "hessian", "imat", "iter", "best_nknots",
+            "nknots_grid", "info_criterion_grid", "loglik_grid", and (if
+            bootstrap > 0) "bootstrap_coef", "bootstrap_risk_functions",
+            "bootstrap_best_nknots", and (only when a single nknots candidate
+            was given) "bootstrap_WCE_coef".
     """
 
     if constrained == "None":
@@ -742,7 +991,12 @@ def wce_R(
     if strata is not None:
         strata = np.array(strata, dtype=np.int64)
 
-
+    # nknots may be a single value or (for an R numeric vector, converted by
+    # reticulate into e.g. a NumPy array) several candidates to try -- either
+    # way, coerce it into a plain Python int or list[int]:
+    nknots_arg = np.atleast_1d(nknots).astype(int).tolist()
+    if len(nknots_arg) == 1:
+        nknots_arg = nknots_arg[0]
 
     with myprof as prof:
         res = wce_numpy(
@@ -753,7 +1007,7 @@ def wce_R(
             start=start,
             stop=stop,
             cutoff=int(cutoff),
-            nknots=int(nknots),
+            nknots=nknots_arg,
             order=int(order),
             constrained=constrained,
             criterion="aic" if aic else "bic",

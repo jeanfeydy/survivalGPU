@@ -1,19 +1,32 @@
 Package: survivalGPU
-Title: Fast and scalable implementations for survival models
+Title: Fast and Scalable Implementations for Survival Models
 Version: 0.1.0
 Authors@R: c(
     person("Jean", "FEYDY", email = "jean.feydy@inria.fr",role = "aut"),
-    person("Alexis", "van STRAATEN", email = "alexis.vanstraaten@outlook.fr", role = c("aut","cre")),
-    person("Terry", "THERNEAU", role = "cph", comment = "Author of survival library"),
+    person("Alexis", "van STRAATEN", email = "alexis.vanstraaten@outlook.fr", role = "aut"),
+    person("Antoine", "Poirot-Bourdain", email = "antoine.poirot.bourdain@gmail.com", role = c("aut","cre")),
+    person("Terry", "THERNEAU", role = c("ctb", "cph"), comment = "Author of the 'survival' package, from which the C code and parts of the R code are adapted"),
     person("Pierre", "SABATIER", role = "ctb"),
     person("Anne-Sophie", "JANNOT", role = "ctb"))
-Description: Allows to perform survivals analysis on GPU with coxph and WCE models, and several features to use bootstrap and manage memory.
+Description: Performs survival analysis on graphics processing units
+    (GPUs) using Cox proportional hazards and weighted cumulative
+    exposure (WCE) models, with support for bootstrap resampling and
+    memory management.
+    The Cox model is described in Cox (1972)
+    <doi:10.1111/j.2517-6161.1972.tb00899.x> and the WCE model in
+    Sylvestre and Abrahamowicz (2009) <doi:10.1002/sim.3701>.
+    Computations are delegated to 'PyTorch' via 'reticulate'; the WCE
+    model additionally requires 'PyKeOps', which is not available
+    natively on Windows, but can be used there through the Windows
+    Subsystem for Linux ('WSL').
 License: LGPL (>= 2.1)
+Language: en-US
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
+Depends:
+    R (>= 4.1.0)
 Imports:
-    data.table,
+    graphics,
     reticulate,
     stats,
     survival,
@@ -22,10 +35,17 @@ Suggests:
     dplyr,
     knitr,
     rmarkdown,
+    survminer,
     testthat (>= 3.0.0),
     WCE
 Config/testthat/edition: 3
+Config/Needs/website: pkgdown
 VignetteBuilder: knitr
-SystemRequirements: python, pytorch, pykeops
+SystemRequirements: Python (>= 3.10) with the 'torch', 'numpy', 'pandas',
+    'scipy', 'matplotlib', 'beartype' and 'jaxtyping' packages; 'pykeops'
+    (optional, required only for wceGPU(); not available natively on
+    Windows but can be used there through the Windows Subsystem for Linux
+    ('WSL'))
 URL: https://github.com/jeanfeydy/survivalGPU
 BugReports: https://github.com/jeanfeydy/survivalGPU/issues
+Config/roxygen2/version: 8.1.0

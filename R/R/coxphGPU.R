@@ -16,12 +16,13 @@
 #'   (subject). Required if `bootstrap > 0`, so that bootstrap resampling is
 #'   performed at the patient level rather than at the row level (a patient
 #'   can have several rows, e.g. with time-varying covariates).
-#' @param bootstrap Number of repeats for the bootstrap cross-validation.
+#' @param bootstrap Number of bootstrap replicates. Defaults to 0, which means
+#'   no bootstrap.
 #' @param batchsize Number of bootstrap copies that should be handled at a time.
 #'   Defaults to 0, which means that we handle all copies at once. If you run
 #'   into out of memory errors, please consider using batchsize=100, 10 or 1.
 #' @param all.results Post-processing calculations. If TRUE, coxphGPU returns
-#'   linears.predictors, wald.test, concordance for all bootstraps. Default to
+#'   linear.predictors, wald.test, concordance for all bootstraps. Default to
 #'   FALSE if bootstraps.
 #' @param ... Other arguments for methods.
 #'
@@ -29,7 +30,6 @@
 #' @import survival
 #' @importFrom utils methods
 #' @importFrom utils head
-#' @importFrom data.table data.table
 #'
 #' @return A coxphGPU object representing the fit.
 #' @export
@@ -51,7 +51,7 @@
 #' ## Cox Proportional Hazards without bootstrap
 #' coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
 #'          data = drugdata,
-#'          bootstrap = 1)
+#'          bootstrap = 0)
 #'
 #' ## Cox Proportional Hazards with bootstrap
 #'
@@ -297,7 +297,9 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # several types : right, left, counting, etc...
   multi <- FALSE
   if (type == "mright" || type == "mcounting") {
-    multi <- TRUE
+    stop("coxphGPU() does not yet support multi-state survival data ",
+         "(response type \"", type, "\"); only single-endpoint \"right\" ",
+         "and \"counting\" responses are currently supported.")
   } else if (type != "right" && type != "counting") {
     stop(paste("Cox model doesn't support \"", type,
                "\" survival data",
@@ -325,10 +327,10 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
   # Formula check
   if (length(attr(Terms, "variables")) > 2) { # a ~1 formula has length 2
-    ytemp <- terms.inner(formula[1:2])
+    ytemp <- terms_inner(formula[1:2])
     suppressWarnings(z <- as.numeric(ytemp)) # are any of the elements numeric?
     ytemp <- ytemp[is.na(z)] # toss numerics, e.g. Surv(t, 1-s)
-    xtemp <- terms.inner(formula[-2])
+    xtemp <- terms_inner(formula[-2])
     if (any(!is.na(match(xtemp, ytemp)))) {
       warning("a variable appears on both the left and right sides of the formula")
     }
@@ -981,7 +983,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     event <- ytemp[3]
 
 
-    data_Y <- data.table(start = y1,
+    data_Y <- data.frame(start = y1,
                        stop = y2,
                        status = Y[,3])
 
@@ -1000,7 +1002,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     event <- ytemp[2]
 
 
-    data_Y <- data.table(stop = time,
+    data_Y <- data.frame(stop = time,
                        status = status)
 
     names(data_Y)[1] <- stop
@@ -1031,7 +1033,13 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
 
   if (!is.null(patient_id)){
-    data_Y <- cbind(data[patient_id],data_Y)
+    patient_ids <- data[patient_id]
+    if (nrow(mf) != nrow(data)) {
+      # Rows were dropped by `subset` or for missing values: keep the patient
+      # ids of the rows that are in the model frame, like data_Y.
+      patient_ids <- patient_ids[match(rownames(mf), rownames(data)), , drop = FALSE]
+    }
+    data_Y <- cbind(patient_ids,data_Y)
     names(data_Y[1]) = patient_id
   }
 
@@ -1072,16 +1080,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
   # Python coxph
   # survivalgpu <- use_survivalGPU() # change due to .onload
-  coxph_R <- survivalgpu$coxph_R
-
-  # time_start = Sys.time()
-  # data_X <- as.data.table(X)
-  # time_stop = Sys.time()
-  # time_data_X = difftime(time_stop, time_start)
-  # print("####### Time data_X")
-  # print(time_data_X)
-
-  # names(data_X) <- colnames(X)
+  coxph_R <- tryCatch(survivalgpu$coxph_R, error = survivalgpu_unavailable_error)
 
    coxfit <- coxph_R(
                     data_Y = data_Y,
@@ -1172,7 +1171,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
   fit$method <- method
   fit$nbootstraps <- bootstrap
-  if (bootstrap > 1){
+  if (bootstrap > 0){
     coef_bootstrap <- matrix(coxfit$`bootstrap_coef`,
                              ncol = length(coef))
     colnames(coef_bootstrap) <- dimnames(X)[[2]]
@@ -1322,7 +1321,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
       fit$rscore <- coxph.wtest(t(temp0) %*% temp0, u, control$toler.chol)$test
     }
 
-    # plusieurs tests de Wald nécessaire ? il faut la matrice de variance covar pour tous les bootstraps
+    # multiple Wald tests needed? requires the variance-covariance matrix for all bootstraps
 
     # # Wald test
     # if (length(fit$coefficients) && is.null(fit$wald.test)) {
@@ -1474,13 +1473,20 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
 #' Print method for coxphGPU object
 #'
+#' Prints a model fitted by [coxphGPU()] in the same way as a
+#' [survival::coxph()] fit. If the model was fitted with bootstrap resampling,
+#' a note points to `summary()` for the bootstrap confidence intervals.
+#'
 #' @param x a coxphGPU object
 #' @param digits significant digits to print
 #' @param signif.stars show stars to highlight small p-values
 #' @param ... additional argument(s) for methods.
 #'
+#' @return `x`, invisibly. Called for its side effect: printing the model.
+#'
+#' @seealso [coxphGPU()], [survival::coxph()]
+#'
 #' @exportS3Method print coxphGPU
-#' @inherit survival::print.coxph
 print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
                            signif.stars = FALSE) {
 
@@ -1489,6 +1495,8 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
   if (x$nbootstraps > 0) {
         cat("\n--- Other results with bootstrap with summary() ---")
       }
+
+  invisible(x)
 }
 
 
@@ -1577,6 +1585,17 @@ coef.coxphGPU <- function(object, ...) {
 #' @inherit survival::residuals.coxph description references
 #' @inheritParams survival::residuals.coxph
 #'
+#' @return A vector or matrix of residuals, computed by
+#'   [survival::residuals.coxph()]:
+#'   * martingale and deviance residuals: a numeric vector with one element
+#'   per observation, or one per group if `collapse` is used;
+#'   * score, dfbeta and dfbetas residuals: a matrix with one row per
+#'   observation and one column per coefficient;
+#'   * Schoenfeld and scaled Schoenfeld residuals: a matrix with one row per
+#'   event and one column per coefficient;
+#'   * partial residuals: a matrix with one row per observation and one column
+#'   per model term.
+#'
 #' @seealso [survival::residuals.coxph()]
 #'
 #' @exportS3Method residuals coxphGPU
@@ -1609,18 +1628,24 @@ residuals.coxphGPU <- function(object, ...,
 #' @inheritParams survival::predict.coxph
 #' @param object the results of a coxphGPU fit.
 #'
+#' @return The predictions computed by [survival::predict.coxph()]: a numeric
+#'   vector with one element per observation, or a matrix with one column per
+#'   model term if `type = "terms"`. If `se.fit = TRUE`, a list with
+#'   components `fit` (the predictions) and `se.fit` (their standard errors).
+#'
 #' @seealso [survival::predict.coxph()]
 #'
 #' @exportS3Method predict coxphGPU
 #' @examples
 #' \dontrun{
 #' library(survival)
-#' options(na.action = na.exclude) # retain NA in predictions
+#' old_options <- options(na.action = na.exclude) # retain NA in predictions
 #' fit <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung)
 #' predict(fit, type = "lp")
 #' predict(fit, type = "expected")
 #' predict(fit, type = "risk", se.fit = TRUE)
 #' predict(fit, type = "terms", se.fit = TRUE)
+#' options(old_options) # restore the previous setting
 #' }
 predict.coxphGPU <- function(object, newdata,
                              type = c("lp", "risk", "expected", "terms", "survival"),

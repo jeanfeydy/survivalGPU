@@ -1,3 +1,6 @@
+skip_if_no_backend()
+skip_if_no_pykeops()
+
 # Dataset
 drugdata <- WCE::drugdata
 
@@ -94,6 +97,27 @@ test_that("HR", {
     WCE::HR.WCE(wce, exposed, unexposed)[1],
     tolerance = 1e-4
   )
+})
+
+# Regression: confint.wceGPU() used to crash with
+# "'list' object cannot be coerced to type 'integer'", since object$vcovmat
+# is a named list (holding the selected model's covariance matrix), and
+# confint() called diag() on it directly instead of unwrapping it first.
+test_that("confint.wceGPU returns Wald CIs matching beta.hat +/- z*se", {
+  ci <- confint(wce_gpu)
+
+  expected_age <- wce_gpu$beta.hat.covariates[1, "age"] +
+    qnorm(c(0.025, 0.975)) * wce_gpu$se.covariates[1, "age"]
+  expected_sex <- wce_gpu$beta.hat.covariates[1, "sex"] +
+    qnorm(c(0.025, 0.975)) * wce_gpu$se.covariates[1, "sex"]
+
+  expect_equal(unname(ci["age", ]), expected_age, tolerance = 1e-8)
+  expect_equal(unname(ci["sex", ]), expected_sex, tolerance = 1e-8)
+  expect_equal(rownames(ci), c("age", "sex"))
+
+  # parm subsetting, by name and by index:
+  expect_equal(confint(wce_gpu, parm = "age"), ci["age", , drop = FALSE])
+  expect_equal(confint(wce_gpu, parm = 1), ci["age", , drop = FALSE])
 })
 
 
@@ -228,4 +252,143 @@ test_that("WCE - 3 knots", {
   )
   expect_equal(as.vector(wce_ref$WCEmat), as.vector(wce_test$WCEmat), tolerance = 1e-4)
   expect_equal(as.vector(wce_ref$beta.hat.covariates), as.vector(wce_test$beta.hat.covariates), tolerance = 1e-4)
+})
+
+# Multi-knot selection: nknots accepts a vector of candidates, and the
+# candidate that minimizes the information criterion is selected -- this
+# should match what WCE::WCE()'s own multi-candidate selection picks.
+test_that("WCE - multi-knot selection matches WCE::WCE()'s own best candidate", {
+  wce_ref <- WCE::WCE(
+    data = drugdata, analysis = "Cox", nknots = 1:3, cutoff = 90,
+    id = "Id", event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, double_precision = TRUE
+  )
+  best_ref <- which.min(wce_ref$info.criterion)
+
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+
+  expect_equal(wce_test$best.nknots, (1:3)[best_ref])
+  expect_equal(
+    as.vector(wce_ref$WCEmat[best_ref, ]), as.vector(wce_test$WCEmat),
+    tolerance = 1e-4
+  )
+  expect_equal(
+    as.vector(wce_ref$beta.hat.covariates[best_ref, ]), as.vector(wce_test$beta.hat.covariates),
+    tolerance = 1e-4
+  )
+  expect_equal(as.vector(wce_ref$info.criterion), wce_test$info.criterion.grid, tolerance = 1e-4)
+})
+
+test_that("WCE - best.nknots is one of the tried candidates", {
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+  expect_true(wce_test$best.nknots %in% c(1, 2, 3))
+  expect_equal(wce_test$nknots.grid, c(1, 2, 3))
+})
+
+test_that("WCE - summary(allres = TRUE) shows every candidate tried", {
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+  out <- capture.output(summary(wce_test, allres = TRUE))
+  expect_true(any(grepl("Candidate models tried", out)))
+  expect_true(any(grepl("Best model", out)))
+})
+
+test_that("WCE - best.nknots matches nknots for a single (scalar) candidate", {
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 0, batchsize = 0
+  )
+  expect_equal(wce_test$best.nknots, 1)
+})
+
+# Bootstrap + multi-knot: each replicate should independently select its own
+# best nknots -- no production code changes were needed for this beyond the
+# multi-knot support above, since Python already resolves per-replicate
+# selection before the bootstrap arrays ever reach R.
+test_that("WCE - bootstrap selects the best knot per replicate", {
+  nbootstraps <- 20
+  wce_boot <- wceGPU(
+    data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = nbootstraps, batchsize = 10
+  )
+
+  expect_true(wce_boot$is_bootstraps)
+  expect_length(wce_boot$bootstrap.best.nknots, nbootstraps)
+  expect_true(all(wce_boot$bootstrap.best.nknots %in% c(1, 2, 3)))
+  expect_equal(sum(table(wce_boot$bootstrap.best.nknots)), nbootstraps)
+  expect_equal(dim(wce_boot$WCEmat_bootstrap), c(nbootstraps, 90))
+  expect_equal(dim(wce_boot$WCEmat_CI), c(2, 90))
+
+  exposed   <- rep(1, 90)
+  unexposed <- rep(0, 90)
+  hr <- HR(wce_boot, exposed, unexposed)
+  expect_true(all(c("HR", "CI 2.5%", "CI 97.5%") %in% colnames(hr)))
+})
+
+# The bootstrap arrays have one row per replicate and one column per
+# coefficient: they must keep both dimensions when one of them has length 1.
+test_that("WCE - bootstrap with a single replicate", {
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = c("age", "sex"),
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 1, batchsize = 0
+  )
+
+  expect_equal(dim(wce_test$bootstrap_beta.hat.covariates), c(1, 2))
+  expect_equal(dim(wce_test$bootstrap_est), c(1, ncol(wce_test$est)))
+  expect_equal(dim(wce_test$WCEmat_bootstrap), c(1, 90))
+})
+
+test_that("WCE - bootstrap with a single covariate", {
+  nbootstraps <- 5
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose", covariates = "age",
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = nbootstraps, batchsize = 0
+  )
+
+  expect_equal(dim(wce_test$bootstrap_beta.hat.covariates), c(nbootstraps, 1))
+  expect_equal(colnames(wce_test$bootstrap_beta.hat.covariates), "age")
+  expect_equal(dim(wce_test$coef_CI), c(2, 1))
+})
+
+test_that("WCE - summary() of a bootstrap fit without covariates", {
+  wce_test <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop",
+    expos = "dose",
+    constrained = FALSE, aic = FALSE, confint = 0.95,
+    nbootstraps = 5, batchsize = 0
+  )
+
+  out <- capture.output(summary(wce_test))
+  expect_true(any(grepl("Partial log-likelihood", out)))
 })

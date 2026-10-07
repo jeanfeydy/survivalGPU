@@ -38,7 +38,8 @@ object as returned by the Surv function.}
 performed at the patient level rather than at the row level (a patient
 can have several rows, e.g. with time-varying covariates).}
 
-\item{bootstrap}{Number of repeats for the bootstrap cross-validation.}
+\item{bootstrap}{Number of bootstrap replicates. Defaults to 0, which means
+no bootstrap.}
 
 \item{batchsize}{Number of bootstrap copies that should be handled at a time.
 Defaults to 0, which means that we handle all copies at once. If you run
@@ -50,7 +51,7 @@ into out of memory errors, please consider using batchsize=100, 10 or 1.}
   }
 
 \item{all.results}{Post-processing calculations. If TRUE, coxphGPU returns
-linears.predictors, wald.test, concordance for all bootstraps. Default to
+linear.predictors, wald.test, concordance for all bootstraps. Default to
 FALSE if bootstraps.}
 
 \item{control}{
@@ -135,7 +136,7 @@ use_cuda()
 ## Cox Proportional Hazards without bootstrap
 coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
          data = drugdata,
-         bootstrap = 1)
+         bootstrap = 0)
 
 ## Cox Proportional Hazards with bootstrap
 
