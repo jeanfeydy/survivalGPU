@@ -99,6 +99,85 @@ test_that("HR", {
   )
 })
 
+# HR() takes exposure vectors in reverse chronological order (first value =
+# current time). Shorter vectors are padded with zeros, longer ones truncated
+# to the cutoff. Where WCE::HR.WCE() can be used (full-length vectors, no
+# bootstrap), HR() is compared to it; otherwise to the HR computed by hand
+# from the estimated weight function(s).
+hr_by_hand <- function(weights, vecnum, vecdenom) {
+  exp(sum(weights * (vecnum - vecdenom)))
+}
+pad <- function(x, n = 90) c(x, rep(0, n - length(x)))
+
+test_that("HR - matches WCE::HR.WCE() for full-length scenarios", {
+  set.seed(42)
+  scenarios <- list(
+    list(rep(1, 90), rep(0, 90)),
+    list(pad(rep(2, 10)), rep(0, 90)),
+    list(c(rep(0, 60), rep(1, 30)), c(rep(1, 30), rep(0, 60))),
+    list(runif(90, 0, 3), runif(90, 0, 3))
+  )
+  for (s in scenarios) {
+    hr <- HR(wce_gpu, s[[1]], s[[2]])
+    expect_equal(colnames(hr), "HR")
+    expect_equal(hr[[1, "HR"]], WCE::HR.WCE(wce, s[[1]], s[[2]])[1],
+                 tolerance = 1e-4)
+    expect_equal(hr[[1, "HR"]], hr_by_hand(wce_gpu$WCEmat[1, ], s[[1]], s[[2]]))
+  }
+})
+
+test_that("HR - shorter vectors are padded with zeros", {
+  recent <- rep(1, 30)
+  expected <- WCE::HR.WCE(wce, pad(recent), rep(0, 90))[1]
+
+  expect_equal(HR(wce_gpu, recent, rep(0, 90))[[1, "HR"]], expected,
+               tolerance = 1e-4)
+  # a single value is a vector of length 1: padded too
+  expect_equal(HR(wce_gpu, recent, 0)[[1, "HR"]], expected, tolerance = 1e-4)
+  expect_equal(HR(wce_gpu, recent, 0)[[1, "HR"]],
+               hr_by_hand(wce_gpu$WCEmat[1, ], pad(recent), rep(0, 90)))
+})
+
+test_that("HR - longer vectors are truncated to the cutoff", {
+  expected <- hr_by_hand(wce_gpu$WCEmat[1, ], rep(1, 90), rep(0, 90))
+
+  expect_equal(HR(wce_gpu, c(rep(1, 90), rep(5, 30)), rep(0, 150))[[1, "HR"]],
+               expected)
+  # exposures older than the cutoff have no effect
+  expect_equal(HR(wce_gpu, c(rep(1, 90), rep(100, 30)), 0)[[1, "HR"]],
+               expected)
+})
+
+test_that("HR - mixed lengths and fractional doses", {
+  vecnum <- rep(1, 30)       # shorter than the cutoff
+  vecdenom <- rep(0.5, 120)  # fractional doses, longer than the cutoff
+  full_num <- pad(vecnum)
+  full_den <- rep(0.5, 90)
+
+  hr <- HR(wce_gpu, vecnum, vecdenom)[[1, "HR"]]
+  expect_equal(hr, WCE::HR.WCE(wce, full_num, full_den)[1], tolerance = 1e-4)
+  expect_equal(hr, hr_by_hand(wce_gpu$WCEmat[1, ], full_num, full_den))
+})
+
+test_that("HR - bootstrap confidence interval computed by hand", {
+  delta <- pad(rep(1, 30))
+  boot_hr <- exp(as.vector(wce_gpu_bootstrap$WCEmat_bootstrap %*% delta))
+
+  hr <- HR(wce_gpu_bootstrap, rep(1, 30), 0)
+  expect_equal(colnames(hr), c("HR", "CI 2.5%", "CI 97.5%"))
+  expect_equal(hr[[1, "HR"]],
+               hr_by_hand(wce_gpu_bootstrap$WCEmat[1, ], delta, rep(0, 90)))
+  expect_equal(unname(hr[1, 2:3]), unname(quantile(boot_hr, c(0.025, 0.975))))
+
+  hr90 <- HR(wce_gpu_bootstrap, rep(1, 30), 0, level = 0.9)
+  expect_equal(colnames(hr90), c("HR", "CI 5%", "CI 95%"))
+  expect_equal(unname(hr90[1, 2:3]), unname(quantile(boot_hr, c(0.05, 0.95))))
+})
+
+test_that("HR - rejects objects that are not wceGPU fits", {
+  expect_error(HR(list(), 1, 0), "not a wceGPU object")
+})
+
 # Regression: confint.wceGPU() used to crash with
 # "'list' object cannot be coerced to type 'integer'", since object$vcovmat
 # is a named list (holding the selected model's covariance matrix), and

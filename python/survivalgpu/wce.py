@@ -666,35 +666,46 @@ class WCESurvivalAnalysis:
             self.SED_ = [self.SED_grid_[i][b] for b, i in enumerate(self.best_index_)]
 
 
-    def HR(self,
-           vecnum:Int64Array["intervals"],
-           vecdenom:Int64Array["intervals"],
-           level = 0.95):
+    def HR(self, vecnum, vecdenom, level=0.95):
+        """Computes the Hazard Ratio between two exposure scenarios.
 
-        """Computes the Hazard Ratio between two vectors of doses.
+        Each scenario is a vector of doses in reverse chronological order: the
+        first value is the dose at the current time, the second the dose one
+        time unit earlier, and so on. A vector longer than ``cutoff`` is
+        truncated, and a shorter one is padded with zeros (no exposure further
+        back in time).
+
         Args:
-            vecnum ((Intervals,) int64 array): a vector of doses for the numerator.
-            vecdenom ((Intervals,) int64 array): a vector of doses for the denominator.
+            vecnum (array-like of float): doses of the scenario of interest
+                (numerator of the HR).
+            vecdenom (array-like of float): doses of the reference scenario
+                (denominator of the HR).
+            level (float, optional): confidence level of the bootstrap interval,
+                used only if the model was fitted with bootstrap. Defaults to 0.95.
+
         Returns:
-            (Intervals,) float64 array: the Hazard Ratio between the two vectors of doses.
-            """
+            dict: ``{"HR": hr}`` with the Hazard Ratio as a float. If the model
+            was fitted with bootstrap, also ``"CI_lower"`` and ``"CI_upper"``:
+            the bounds of the bootstrap percentile interval at ``level``.
+        """
 
         cutoff = self.cutoff
 
+        def fit_length(x):
+            x = np.atleast_1d(np.asarray(x, dtype=np.float64))[:cutoff]
+            return np.pad(x, (0, cutoff - len(x)))
 
-        if (len(vecnum) != cutoff) or (len(vecdenom) != cutoff):
-            msg = f"vecnum and vecdenom should have length {cutoff}."
-            raise ValueError(msg)
+        diff = fit_length(vecnum) - fit_length(vecdenom)
 
         if hasattr(self, "bootstrap_risk_functions_"):
-            hr_boot = np.exp(self.bootstrap_risk_functions_.squeeze(1).cpu().numpy() @ (vecnum - vecdenom)).tolist()
+            hr_boot = np.exp(self.bootstrap_risk_functions_.squeeze(1).cpu().numpy() @ diff).tolist()
             lower = np.quantile(hr_boot, (1-level)/2).tolist()
             upper = np.quantile(hr_boot, 1-(1-level)/2).tolist()
-            hr = np.exp(self.risk_function_.reshape(-1).cpu().numpy() @ (vecnum - vecdenom)).tolist()
+            hr = np.exp(self.risk_function_.reshape(-1).cpu().numpy() @ diff).tolist()
             return {"HR" : hr, "CI_lower": lower, "CI_upper": upper}
 
         else:
-            hr = np.exp(self.risk_function_.reshape(-1).cpu().numpy() @ (vecnum - vecdenom)).tolist()
+            hr = np.exp(self.risk_function_.reshape(-1).cpu().numpy() @ diff).tolist()
             return {"HR" : hr}
 
 

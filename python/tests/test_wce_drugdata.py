@@ -440,3 +440,163 @@ def test_wce_r_accepts_nknots_vector():
     res_scalar = wce_R(nknots=2, **common_kwargs)
     assert res_scalar["nknots_grid"].tolist() == [2]
     assert res_scalar["best_nknots"][0] == 2
+
+
+# HR() ----------------------------------------------------------------------
+#
+# Exposure vectors are in reverse chronological order (first value = current
+# time). Shorter vectors are padded with zeros, longer ones truncated to
+# `cutoff`. Where the reference WCE R package can be used (full-length
+# vectors, no bootstrap), HR() is compared to WCE::HR.WCE(); otherwise to the
+# HR computed by hand from the estimated weight function(s).
+
+HR_CUTOFF = 90
+
+
+@pytest.fixture(scope="module")
+def hr_model():
+    model = WCESurvivalAnalysis(cutoff=HR_CUTOFF, nknots=1)
+    model.fit(
+        dose=_dose, stop=_stop, start=_start, patient=_patient, event=_event
+    )
+    return model
+
+
+@pytest.fixture(scope="module")
+def hr_model_bootstrap():
+    model = WCESurvivalAnalysis(
+        cutoff=HR_CUTOFF, nknots=1, nbootstraps=20, batchsize=10
+    )
+    model.fit(
+        dose=_dose, stop=_stop, start=_start, patient=_patient, event=_event
+    )
+    return model
+
+
+@pytest.fixture(scope="module")
+def hr_reference():
+    """WCE::HR.WCE() on the same model fitted by the reference R package."""
+    wce_ref = WCE.WCE(
+        data=drugdata_r,
+        analysis="Cox",
+        nknots=1,
+        cutoff=HR_CUTOFF,
+        constrained=False,
+        id="Id",
+        event="Event",
+        start="Start",
+        stop="Stop",
+        expos="dose",
+    )
+    hr_wce = ro.r("WCE::HR.WCE")
+
+    def reference(vecnum, vecdenom):
+        res = hr_wce(wce_ref, ro.FloatVector(vecnum), ro.FloatVector(vecdenom))
+        return float(np.asarray(res).ravel()[0])
+
+    return reference
+
+
+def _weights(model):
+    return model.risk_function_.reshape(-1).cpu().numpy()
+
+
+def _hr_by_hand(weights, vecnum, vecdenom):
+    return float(
+        np.exp(np.dot(weights, np.asarray(vecnum) - np.asarray(vecdenom)))
+    )
+
+
+def _pad(x, n=HR_CUTOFF):
+    return np.concatenate(
+        [np.asarray(x, dtype=np.float64), np.zeros(n - len(x))]
+    )
+
+
+@pytest.mark.needs_keops()
+def test_wce_hr_matches_r_wce_full_length(hr_model, hr_reference):
+    rng = np.random.default_rng(42)
+    scenarios = [
+        (np.ones(HR_CUTOFF), np.zeros(HR_CUTOFF)),
+        (_pad(np.full(10, 2.0)), np.zeros(HR_CUTOFF)),
+        (np.r_[np.zeros(60), np.ones(30)], np.r_[np.ones(30), np.zeros(60)]),
+        (rng.uniform(0, 3, HR_CUTOFF), rng.uniform(0, 3, HR_CUTOFF)),
+    ]
+    for vecnum, vecdenom in scenarios:
+        hr = hr_model.HR(vecnum, vecdenom)
+        assert set(hr) == {"HR"}
+        assert hr["HR"] == pytest.approx(
+            hr_reference(vecnum, vecdenom), rel=1e-4
+        )
+        assert hr["HR"] == pytest.approx(
+            _hr_by_hand(_weights(hr_model), vecnum, vecdenom), rel=1e-12
+        )
+
+
+@pytest.mark.needs_keops()
+def test_wce_hr_pads_shorter_vectors_with_zeros(hr_model, hr_reference):
+    recent = np.ones(30)
+    expected = hr_reference(_pad(recent), np.zeros(HR_CUTOFF))
+
+    assert hr_model.HR(recent, np.zeros(HR_CUTOFF))["HR"] == pytest.approx(
+        expected, rel=1e-4
+    )
+    # a scalar is a vector of length 1: padded too
+    assert hr_model.HR(recent, 0)["HR"] == pytest.approx(expected, rel=1e-4)
+    assert hr_model.HR(recent, 0)["HR"] == pytest.approx(
+        _hr_by_hand(_weights(hr_model), _pad(recent), np.zeros(HR_CUTOFF)),
+        rel=1e-12,
+    )
+
+
+@pytest.mark.needs_keops()
+def test_wce_hr_truncates_longer_vectors(hr_model):
+    expected = _hr_by_hand(
+        _weights(hr_model), np.ones(HR_CUTOFF), np.zeros(HR_CUTOFF)
+    )
+
+    long_num = np.r_[np.ones(HR_CUTOFF), np.full(30, 5.0)]
+    assert hr_model.HR(long_num, np.zeros(150))["HR"] == pytest.approx(
+        expected, rel=1e-12
+    )
+    # exposures older than the cutoff have no effect
+    older = np.r_[np.ones(HR_CUTOFF), np.full(30, 100.0)]
+    assert hr_model.HR(older, 0)["HR"] == pytest.approx(expected, rel=1e-12)
+
+
+@pytest.mark.needs_keops()
+def test_wce_hr_mixed_lengths_lists_and_fractional_doses(
+    hr_model, hr_reference
+):
+    vecnum = [1] * 30  # a plain list, shorter than the cutoff
+    vecdenom = np.full(120, 0.5)  # fractional doses, longer than the cutoff
+    full_num, full_den = _pad(vecnum), np.full(HR_CUTOFF, 0.5)
+
+    hr = hr_model.HR(vecnum, vecdenom)["HR"]
+    assert hr == pytest.approx(hr_reference(full_num, full_den), rel=1e-4)
+    assert hr == pytest.approx(
+        _hr_by_hand(_weights(hr_model), full_num, full_den), rel=1e-12
+    )
+
+
+@pytest.mark.needs_keops()
+def test_wce_hr_bootstrap_interval_by_hand(hr_model_bootstrap):
+    model = hr_model_bootstrap
+    delta = _pad(np.ones(30))
+    boot_weights = model.bootstrap_risk_functions_.squeeze(1).cpu().numpy()
+    boot_hr = np.exp(boot_weights @ delta)
+
+    for level in (0.95, 0.9):
+        hr = model.HR(np.ones(30), 0, level=level)
+        assert set(hr) == {"HR", "CI_lower", "CI_upper"}
+        assert hr["HR"] == pytest.approx(
+            _hr_by_hand(_weights(model), delta, np.zeros(HR_CUTOFF)), rel=1e-12
+        )
+        alpha = (1 - level) / 2
+        assert hr["CI_lower"] == pytest.approx(
+            np.quantile(boot_hr, alpha), rel=1e-12
+        )
+        assert hr["CI_upper"] == pytest.approx(
+            np.quantile(boot_hr, 1 - alpha), rel=1e-12
+        )
+        assert hr["CI_lower"] < hr["CI_upper"]

@@ -438,7 +438,6 @@ print.wceGPU <- function(x, ...) {
   invisible(x)
 }
 
-
 #' Summary method for wceGPU object
 #'
 #' @param object wceGPU object
@@ -683,10 +682,15 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #' time-dependent exposures.
 #'
 #' @param object wceGPU object.
-#' @param vecnum 	A vector of time-dependent exposures corresponding to a
-#'   scenario of interest (numerator of the HR).
+#' @param vecnum A vector of time-dependent exposures corresponding to a
+#'   scenario of interest (numerator of the HR), in reverse chronological
+#'   order: the first value is the exposure at the current time, the second
+#'   the exposure one time unit earlier, and so on. A vector longer than the
+#'   `cutoff` of the model is truncated, and a shorter one is padded with zeros
+#'   (no exposure further back in time).
 #' @param vecdenom A vector of time-dependent exposures corresponding to a
-#'   scenario for the reference category (denominator of the HR).
+#'   scenario for the reference category (denominator of the HR), in the same
+#'   order and with the same length rules as `vecnum`.
 #' @param level the confidence level required for HR CI. Default to 0.95.
 #'
 #' @export
@@ -715,17 +719,12 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 HR <- function(object, vecnum, vecdenom, level = 0.95) {
   if (!inherits(object, "wceGPU")) stop("It's not a wceGPU object.")
   cutoff <- ncol(object$WCEmat)
-  if (length(vecnum) > cutoff){
-    vecnum = vecnum[1:cutoff]
-  }else if (length(vecnum) v cutoff){
-    vecnum = c(vecnum, rep(0, cutoff - length(vecnum)))
+    fit_length <- function(x, n) {
+    c(head(x, n), rep(0, max(0, n - length(x))))
   }
-  if (length(vedenom) > cutoff){
-    vedenom = vedenom[1:cutoff]
-  }
-  if (length(vedenom) > cutoff){
-    vedenom = vedenom[1:cutoff]
-  }
+
+  vecnum  <- fit_length(vecnum, cutoff)
+  vecdenom <- fit_length(vecdenom, cutoff)
 
   hr <- exp(sum(object$WCEmat[1, ] * (vecnum - vecdenom)))
 
@@ -747,8 +746,5 @@ HR <- function(object, vecnum, vecdenom, level = 0.95) {
   }
 
   return(results)
-
-
-
 
 }
