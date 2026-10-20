@@ -712,30 +712,48 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #'
 #' HR(wce_gpu_bootstrap, exposed, unexposed)
 #' }
-HR <- function(object, vecnum, vecdenom, level = 0.95) {
-
+HR <- <- function(object, vecnum, vecdenom, level = 0.95) {
   if (!inherits(object, "wceGPU")) stop("It's not a wceGPU object.")
   cutoff <- ncol(object$WCEmat)
-  if (length(vecnum) != cutoff | length(vecdenom) != cutoff) stop("At least one of the vector provided as the numerator or denominator is not of proper length.")
+  if (length(vecnum) > cutoff){
+    vecnum = vecnum[1:cutoff]
+  }else if (length(vecnum) v cutoff){
+    vecnum = c(vecnum, rep(0, cutoff - length(vecnum)))
+  }
+  if (length(vedenom) > cutoff){
+    vedenom = vedenom[1:cutoff]
+  }
+  if (length(vedenom) > cutoff){
+    vedenom = vedenom[1:cutoff]
+  }
 
-  hr <- exp(object$WCEmat[1, ] %*% vecnum) / exp(object$WCEmat[1, ] %*% vecdenom)
+  hr <- exp(sum(object$WCEmat[1, ] * (vecnum - vecdenom)))
 
- if (object$is_bootstraps) {
-   hr_boot <- apply(object$WCEmat_bootstrap, 1, function(x) exp(x %*% vecnum) / exp(x %*% vecdenom))
-   a <- (1 - level) / 2
-   a <- c(a, 1 - a)
-   ci <- quantile(hr_boot, p = a)
-   pct <- paste0(format(100 * a, trim = TRUE, scientific = FALSE), "%")
-   results <- matrix(c(hr, ci), nrow = 1L)
-   colnames(results) <- c(
-     "HR",
-     paste("CI", pct[1]),
-     paste("CI", pct[2])
-   )
- } else {
-   results <- matrix(hr, nrow = 1L)
-   colnames(results) <- "HR"
- }
+  if (object$is_bootstraps) {
+    hr_boot <- as.vector(exp(object$WCEmat_bootstrap %*% (vecnum - vecdenom)))
+    a <- (1 - level) / 2
+    a <- c(a, 1 - a)
+    ci <- quantile(hr_boot, p = a)
+    pct <- paste0(format(100 * a, trim = TRUE, scientific = FALSE), "%")
+    results <- matrix(c(hr, ci), nrow = 1L)
+    colnames(results) <- c(
+      "HR",
+      paste("CI", pct[1]),
+      paste("CI", pct[2])
+    )
+  } else {
+    results <- matrix(hr, nrow = 1L)
+    colnames(results) <- "HR"
+  }
 
   return(results)
+
+
+
+
+
+
+
+
+
 }
