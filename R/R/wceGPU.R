@@ -712,7 +712,7 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #'
 #' HR(wce_gpu_bootstrap, exposed, unexposed)
 #' }
-HR <- <- function(object, vecnum, vecdenom, level = 0.95) {
+HR <- function(object, vecnum, vecdenom, level = 0.95) {
   if (!inherits(object, "wceGPU")) stop("It's not a wceGPU object.")
   cutoff <- ncol(object$WCEmat)
   if (length(vecnum) > cutoff){
@@ -747,11 +747,6 @@ HR <- <- function(object, vecnum, vecdenom, level = 0.95) {
   }
 
   return(results)
-
-
-
-
-
 
 
 
