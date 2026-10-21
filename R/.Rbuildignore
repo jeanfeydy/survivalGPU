@@ -15,8 +15,6 @@
 ^pkgdown$
 ^vignettes/.*\.orig$
 ^vignettes/precompile\.R$
-^src/.*\.o$
-^src/.*\.so$
 (^|/)__pycache__$
 \.py[cod]$
 (^|/)htmlcov$

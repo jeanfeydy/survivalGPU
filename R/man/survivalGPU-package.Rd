@@ -42,7 +42,7 @@ Authors:
 
 Other contributors:
 \itemize{
-  \item Terry THERNEAU (Author of the 'survival' package, from which the C code and parts of the R code are adapted) [contributor, copyright holder]
+  \item Terry THERNEAU (Author of the 'survival' package, from which parts of the R code are adapted) [contributor, copyright holder]
   \item Pierre SABATIER [contributor]
   \item Anne-Sophie JANNOT [contributor]
 }

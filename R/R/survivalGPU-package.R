@@ -14,7 +14,6 @@
 #' - `coxphGPU()`: fit a Cox proportional hazards regression model.
 #' - `wceGPU()`:   fit a Weighted Cumulative Exposure model.
 #'
-#' @useDynLib survivalGPU, .registration = TRUE
 "_PACKAGE"
 
 

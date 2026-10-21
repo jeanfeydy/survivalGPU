@@ -189,18 +189,12 @@ From the audit of 6 October 2026, branch `CRAN_release`.
   - Remove the `@author` block in `R/survivalGPU-package.R`: it omits the
     maintainer, and roxygen fills it from `Authors@R` otherwise.
 
-- [ ] **2.10 Unused and unregistered C code.**
-  - Used: `agmart3.c` and `coxmart.c` (martingale residuals, on every fit),
-    and `coxcount1.c` (only for formulas with a `tt()` term).
-  - [x] Deleted the four files that nothing called (`chinv2.c`,
-    `cholesky2.c`, `chsolve2.c`, `dmatrix.c`) and their prototypes in
-    `survproto.h`.
-  - [ ] `multicheck.c` and `tmerge.c` are kept for now, on purpose.
-    `multicheck` and `tmerge3` are called from `R/coxph_internals.R` but not
-    registered in `src/init.c`, so the calls fail if reached. Still to decide:
-    delete the multi-state code that can never run (`multi` is always
-    `FALSE`), and either register `tmerge3` or reject `Surv2` responses up
-    front.
+- [x] **2.10 Unused and unregistered C code.**
+  - Removed all the C code (`src/`, `useDynLib`). The formula and model-frame
+    pre-processing is delegated to `survival::coxph()` (`iter.max = 0`), and
+    the martingale residuals (formerly `agmart3.c` / `coxmart.c`) come from a
+    second `survival::coxph()` call at the GPU coefficients (`init = coef`,
+    `iter.max = 0`). The package no longer needs compilation.
 
 - [ ] **2.11 The pykeops install hint is wrong for R users.**
   `pip install survivalgpu[wce]` appears in `tests/testthat/helper-keops.R`

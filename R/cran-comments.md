@@ -57,7 +57,8 @@ is written so that checking it never starts Python:
 
 ## Code adapted from other packages
 
-The C code in `src/` and parts of the R code (`R/coxph_internals.R`, and the
-pre- and post-processing in `coxphGPU()`) are adapted from the 'survival'
-package (LGPL (>= 2)). Its author, Terry Therneau, is listed in `Authors@R`
-with the roles `ctb` and `cph`.
+Parts of the R code (the pre- and post-processing in `coxphGPU()`) are adapted
+from the 'survival' package (LGPL (>= 2)). The package has no compiled code:
+the model frame and the martingale residuals are computed by calling
+`survival::coxph()` itself. The author of 'survival', Terry Therneau, is
+listed in `Authors@R` with the roles `ctb` and `cph`.

@@ -31,4 +31,3 @@ importFrom(utils,
   head,
   methods
 )
-useDynLib(survivalGPU, .registration = TRUE)

@@ -526,23 +526,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
 
   # return to agreg.fit.R
   lp <- apply(matrix(fit$coefficients, ncol = length(covar)), 1, function(x) c(X %*% x) + offset - sum(x * agmeans))
-  if (any(lp > log(.Machine$double.xmax))) {
-    # prevent a failure message due to overflow
-    #  this occurs with near-infinite coefficients
-    temp <- lp + log(.Machine$double.xmax) - (1 + max(lp))
-    score <- exp(temp)
-  } else {
-    score <- exp(lp)
-  }
-
-
-  residuals <- .Call(
-    "agmart3", nused,
-    Y, score, weights,
-    strata,
-    sort.start, sort.end,
-    as.integer(method == "efron")
-  )
 
   }else if(type == "right"){
 
@@ -573,25 +556,19 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
     # }
     # if (maxiter > 0) coef[which.sing] <- NA  #leave it be if iter=0 is set
 
-    temp <- lp[sorted]
-    if (any(temp > log(.Machine$double.xmax))) {
-      # prevent a failure message due to overflow
-      #  this occurs with near-infinite coefficients
-      temp <- temp + log(.Machine$double.xmax) - (1 + max(temp))
-    }
-    score <- exp(temp)
-    coxres <- .C("coxmart", as.integer(n),
-                 as.integer(method=='efron'),
-                 stime,
-                 sstat,
-                 newstrat,
-                 as.double(score),
-                 as.double(weights),
-                 resid=double(n))
-    residuals <- double(n)
-    residuals[sorted] <- coxres$resid
-
   }
+
+  # Martingale residuals at the GPU coefficients, computed by survival::coxph()
+  # itself, as for the pre-processing above: with init = coef and
+  # iter.max = 0, it evaluates the model at those coefficients without any
+  # Newton iteration. Residuals don't depend on how the linear predictor is
+  # centred, so they are consistent with `lp` above.
+  resid_call <- prep_call
+  resid_call$init <- unname(ifelse(is.na(coef), 0, coef))
+  resid_call$model <- FALSE
+  resid_call$x <- FALSE
+  resid_call$y <- FALSE
+  residuals <- eval(resid_call, parent.frame())$residuals
 
   names(residuals) <- rname
 
