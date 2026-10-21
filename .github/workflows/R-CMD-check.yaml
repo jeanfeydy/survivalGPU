@@ -69,7 +69,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install ".[wce]" --group test
           # Point reticulate at this interpreter instead of letting it
           # auto-provision its own bare ephemeral Python.
@@ -127,7 +127,7 @@ jobs:
       - name: Install Python dependencies (without the 'wce' extra)
         shell: bash
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install . --group test
           echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
 
