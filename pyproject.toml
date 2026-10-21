@@ -62,7 +62,7 @@ all = [{include-group = "test"}] # https://stackoverflow.com/questions/75490231
 
 
 [project.urls]
-Documentation = "https://github.com/jeanfeydy/survivalGPU"
+Documentation = "https://jeanfeydy.github.io/survivalGPU/"
 Repository = "https://github.com/jeanfeydy/survivalGPU"
 
 

@@ -46,6 +46,12 @@ implementation (in Python), not two separate codebases to keep in sync.
 `WCE::WCE() <https://cran.r-project.org/package=WCE>`_ respectively, so R
 users familiar with those functions should feel at home.
 
+These two R packages are the reference implementations of the models, and
+survivalGPU is tested against them: ``survival`` by Terry Therneau, and
+``WCE`` by Marie-Pierre Sylvestre and colleagues, which implements the method
+of Sylvestre and Abrahamowicz (2009),
+`doi:10.1002/sim.3701 <https://doi.org/10.1002/sim.3701>`_.
+
 The reticulate bridge
 ----------------------
 

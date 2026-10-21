@@ -17,6 +17,9 @@ survivalGPU scales classical survival models to large datasets and to
 heavy bootstrap resampling by running the core computations on the GPU.
 It’s also possible to use the library without a GPU (CPU fallback).
 
+**Documentation**, with user guides and API reference:
+<https://jeanfeydy.github.io/survivalGPU/>
+
 ## Features
 
 -   **Cox Proportional Hazards** models (`coxphGPU()`), with Breslow and
@@ -30,13 +33,14 @@ It’s also possible to use the library without a GPU (CPU fallback).
 -   **GPU acceleration** of the likelihood and its gradients via PyTorch
     (+ KeOps for WCE), with a CPU fallback (`use_cuda()` to check what’s
     available).
--   **Bootstrap** resampling for confidence intervals on both models.
+-   **Bootstrap** resampling for confidence intervals on both models, as
+    a separate step after the fit (`bootstrap()`).
 
 ## Installation
 
-Install survivalGPU from CRAN, together with the Python libraries it uses
-behind the scenes (via the `reticulate` R package). You need **R >= 4.1**
-and **Python >= 3.10**.
+Install survivalGPU from CRAN, together with the Python libraries it
+uses behind the scenes (via the `reticulate` R package). You need **R
+\>= 4.1** and **Python \>= 3.10**.
 
 ``` r
 # 1. The R package:
@@ -51,16 +55,14 @@ virtualenv_install("survivalGPU", c("numpy", "torch", "pandas", "scipy",
 virtualenv_install("survivalGPU", "pykeops")
 ```
 
-On macOS, `pykeops` also needs Apple's compiler (`xcode-select --install`)
-and OpenMP (`brew install libomp`). On Windows, `coxphGPU()` works but
-`wceGPU()` doesn't (use
+On macOS, `pykeops` also needs Apple’s compiler
+(`xcode-select --install`) and OpenMP (`brew install libomp`). On
+Windows, `coxphGPU()` works but `wceGPU()` doesn’t (use
 [WSL2](https://learn.microsoft.com/windows/wsl/install) if you need it).
 
 To install the development version from GitHub instead, use
-`remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")`. This
-builds the package from source, so it needs a C compiler
-([Rtools](https://cran.r-project.org/bin/windows/Rtools/) on Windows, the
-Xcode command line tools on macOS).
+`remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")`. The R
+package has no compiled code, so this doesn’t need a compiler.
 
 At the start of each R session, select the Python environment **before**
 loading survivalGPU:
@@ -99,8 +101,8 @@ use_cuda()
 ```
 
 By default, functions run with GPU if detected. Then we specify the
-number of bootstrap, and consequently the batchsize argument, according
-to CUDA drivers detection.
+number of bootstrap replicates, and consequently the batchsize argument,
+according to CUDA drivers detection.
 
 ``` r
 if (use_cuda()) {
@@ -114,35 +116,38 @@ if (use_cuda()) {
 
 You can realize the Cox model with the `coxphGPU()` function, which is
 written in the same way as the `survival::coxph()` function from
-survival package, with a Surv object in the formula. If you use
-`bootstrap`, `patient_id` must be provided: it identifies each patient
-(subject) in `data`, so that bootstrap resampling is performed at the
-patient level rather than at the row level (relevant when a patient has
-several rows, e.g. with time-varying covariates).
+survival package, with a Surv object in the formula. Bootstrap
+confidence intervals are added afterwards with `bootstrap()`, which
+reuses the design matrix stored in the fitted model (hence `x = TRUE`).
+Its `patient_id` argument identifies each patient (subject) in `data`,
+so that bootstrap resampling is performed at the patient level rather
+than at the row level (relevant when a patient has several rows,
+e.g. with time-varying covariates).
 
 ``` r
 lung <- lung[stats::complete.cases(lung[c("time", "status", "age", "sex", "ph.ecog")]), ]
 lung$id <- seq_len(nrow(lung)) # one row per patient here, so a row index works as patient_id
 
-coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
-                               data = lung,
-                               patient_id = "id",
-                               bootstrap = n_bootstrap,
-                               batchsize = batchsize,
-                               ties = "breslow")
+coxphGPU_fit <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
+                         data = lung,
+                         ties = "breslow",
+                         x = TRUE)
+
+coxphGPU_bootstrap <- bootstrap(coxphGPU_fit, R = n_bootstrap,
+                                patient_id = "id", data = lung,
+                                batchsize = batchsize)
 ```
 
 With `summary` method, you obtain results for initial model, and a
 confidence interval by normal distribution process. A confidence
-interval is also estimated for coefficients by bootstrap (if bootstrap
-\> 1 in your coxphGPU object).
+interval is also estimated for coefficients by bootstrap (if
+`bootstrap()` was called on the model).
 
 ``` r
 summary(coxphGPU_bootstrap)
 #> Call:
 #> coxphGPU.default(formula = Surv(time, status) ~ age + sex + ph.ecog,
-#>     data = lung, ties = "breslow", patient_id = "id", bootstrap = n_bootstrap,
-#>     batchsize = batchsize)
+#>     data = lung, ties = "breslow", x = TRUE)
 #>
 #>   n= 227, number of events= 164
 #>
@@ -166,9 +171,9 @@ summary(coxphGPU_bootstrap)
 #>  ----------------
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>             2.5%    97.5%
-#> age     0.995994 1.032250
-#> sex     0.463003 0.868341
-#> ph.ecog 1.227140 1.896280
+#> age     0.987929 1.027300
+#> sex     0.442419 0.759111
+#> ph.ecog 1.267270 1.988060
 ```
 
 To visualize your model, you can plot adjusted survival curves with

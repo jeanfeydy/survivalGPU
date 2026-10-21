@@ -21,8 +21,13 @@
 #' @return A coxphGPU object representing the fit.
 #' @export
 #'
-#' @references Therneau T (2021). _A Package for Survival Analysis in R_. R
-#'   package version 3.2-13
+#' @references Therneau T (2026). _A Package for Survival Analysis in R_. R
+#'   package version 3.8-9, <https://CRAN.R-project.org/package=survival>.
+#'   `coxphGPU()` follows the interface of its `coxph()`, calls it for the
+#'   model frame and the martingale residuals, and is tested against it.
+#'
+#'   Therneau TM, Grambsch PM (2000). _Modeling Survival Data: Extending the
+#'   Cox Model_. Springer, New York.
 #'
 #' @seealso [survival::coxph()], [bootstrap()]
 #'

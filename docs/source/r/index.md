@@ -8,9 +8,10 @@ hardware. Currently, two models are implemented:
 - **`wceGPU()`** — Weighted Cumulative Exposure (WCE), built to take the same
   inputs as `WCE::WCE()`.
 
-Both support bootstrap resampling, and both run on CPU if no CUDA-capable GPU
-is available. Under the hood, the R package delegates its computations to the
-same Python backend as the `survivalgpu` Python package, via
+Both support bootstrap resampling, as a separate step after the fit
+(`bootstrap()`), and both run on CPU if no CUDA-capable GPU is available.
+Under the hood, the R package delegates its computations to the same Python
+backend as the `survivalgpu` Python package, via
 [reticulate](https://rstudio.github.io/reticulate/) — see
 {doc}`installation` to set that up.
 

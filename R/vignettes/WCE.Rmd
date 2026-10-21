@@ -15,17 +15,12 @@ vignette: >
 The Weighted Cumulative Exposure (WCE) model[^wce] extends the Cox proportional hazards model to time-varying exposures whose effect on the hazard depends not only on the current exposure level but also on how it has evolved over time. It estimates a weight function that captures how the influence of past exposure on the hazard changes with the time elapsed since it occurred, so that the cumulative effect at any given time is a weighted sum of the exposure history up to that point.
 
 
-Let's make an example with `drugdata` dataset from WCE package. Before load `survivalGPU`, use your virtual python environment (see `vignette("installation")`).
+Let's make an example with `drugdata` dataset from WCE package[^wcepkg]. Before load `survivalGPU`, use your virtual python environment (see `vignette("installation")`).
 
 
 ``` r
 library(reticulate)
 use_virtualenv(virtualenv = "survivalGPU")
-```
-
-```
-Error in `use_virtualenv()`:
-! Directory ~/.virtualenvs/survivalGPU is not a Python virtualenv
 ```
 
 
@@ -48,14 +43,10 @@ use_cuda()
 ```
 
 ```
-Error:
-! survivalGPU requires a working Python installation with the necessary packages installed ('torch' for coxphGPU(); additionally 'pykeops', not available on Windows, for wceGPU()), which could not be loaded.
-See vignette("python_connect", package = "survivalGPU") for setup instructions, and run use_cuda() for diagnostics.
-Original error: ValueError: list.remove(x): x not in list
-Run `reticulate::py_last_error()` for details.
+[1] FALSE
 ```
 
-By default, functions run with GPU if detected. Then we specify the number of bootstrap, and consequently the batchsize argument, according to CUDA drivers detection.
+By default, functions run with GPU if detected. Then we specify the number of bootstrap replicates, and consequently the batchsize argument, according to CUDA drivers detection.
 
 
 ``` r
@@ -68,18 +59,20 @@ if (use_cuda()) {
 }
 ```
 
-```
-Error:
-! survivalGPU requires a working Python installation with the necessary packages installed ('torch' for coxphGPU(); additionally 'pykeops', not available on Windows, for wceGPU()), which could not be loaded.
-See vignette("python_connect", package = "survivalGPU") for setup instructions, and run use_cuda() for diagnostics.
-Original error: ValueError: list.remove(x): x not in list
-Run `reticulate::py_last_error()` for details.
-```
-
 
 WCE allows modeling the cumulative effects of time-varying exposures, weighted according to their relative proximity in time and represented by time-dependent covariates. Currently, the weight function is estimated by the Cox proportional hazards model. To build a model, you can use the `wceGPU` function in the same way as the `WCE::WCE` function from WCE package.
 
 The number of interior knots of the splines is usually not known in advance. As in the `WCE` package, `nknots` accepts several candidates (e.g. `1:3`): one model is fitted per candidate, and the one that minimizes the information criterion is selected (the BIC by default, or the AIC with `aic = TRUE`).
+
+
+``` r
+wce_gpu <- wceGPU(data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
+                  event = "Event", start = "Start", stop = "Stop",
+                  expos = "dose", covariates = c("age", "sex"),
+                  constrained = FALSE, aic = FALSE, confint = 0.95)
+```
+
+`wceGPU()` fits the model only. Bootstrap confidence intervals are added afterwards with `bootstrap()`, which refits the model on `R` patient-level resamples of `data` (the patients are identified by the `id` column given to `wceGPU()`), processed `batchsize` copies at a time on the GPU.
 
 The bootstrap resamples are drawn by PyTorch, not by R, so `set.seed()` has no effect on them. To get reproducible results, set PyTorch's seed:
 
@@ -88,27 +81,10 @@ The bootstrap resamples are drawn by PyTorch, not by R, so `set.seed()` has no e
 invisible(reticulate::import("torch")$manual_seed(42L))
 ```
 
-```
-Error in `py_module_import()`:
-! ModuleNotFoundError: No module named 'torch'
-Run `reticulate::py_last_error()` for details.
-```
-
 
 ``` r
-wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
-                            event = "Event", start = "Start", stop = "Stop",
-                            expos = "dose", covariates = c("age", "sex"),
-                            constrained = FALSE, aic = FALSE, confint = 0.95,
-                            nbootstraps = n_bootstrap, batchsize = batchsize)
-```
-
-```
-Error:
-! survivalGPU requires a working Python installation with the necessary packages installed ('torch' for coxphGPU(); additionally 'pykeops', not available on Windows, for wceGPU()), which could not be loaded.
-See vignette("python_connect", package = "survivalGPU") for setup instructions, and run use_cuda() for diagnostics.
-Original error: ValueError: list.remove(x): x not in list
-Run `reticulate::py_last_error()` for details.
+wce_gpu_bootstrap <- bootstrap(wce_gpu, R = n_bootstrap, data = drugdata,
+                               batchsize = batchsize)
 ```
 
 In the summary, there are estimated coefficients for the covariates of the selected model with his confidence interval, calculated with var-covariance matrix, and information to see the significance of the covariates. It's also possible to have confidence interval with bootstrap.
@@ -119,8 +95,25 @@ summary(wce_gpu_bootstrap)
 ```
 
 ```
-Error:
-! object 'wce_gpu_bootstrap' not found
+Weighted cumulative exposure (WCE) in a Cox proportional hazards model
+Weight function: cubic spline with 1 interior knot(s), unconstrained
+
+Covariates:
+         coef exp(coef)  se(coef)      z  Pr(>|z|)
+age 0.0115718 1.0116390 0.0039769 2.9097  0.003617 **
+sex 0.6875935 1.9889234 0.1188602 5.7849 7.256e-09 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Bootstrap percentile intervals for the coefficients (50 replicates, level 0.95):
+        2.5%   97.5%
+age 0.003853 0.01827
+sex 0.432600 0.93930
+
+Partial log-likelihood: -1891.644, BIC: 3824.924
+Number of events: 383
+
+See plot(wce_gpu_bootstrap) for the estimated weight function.
 ```
 
 With `allres = TRUE`, the summary shows every candidate that was tried, with its partial log-likelihood and information criterion, and the one that was selected (also available in `wce_gpu_bootstrap$best.nknots`).
@@ -131,13 +124,19 @@ summary(wce_gpu_bootstrap, allres = TRUE)
 ```
 
 ```
-Error:
-! object 'wce_gpu_bootstrap' not found
+
+Candidate models tried:
+  nknots    loglik      BIC
+1      1 -1891.644 3824.924
+2      2 -1891.752 3831.089
+3      3 -1891.260 3836.053
+
+Best model: 1 knot(s), by BIC.
 ```
 
 ## Bootstrap and selection of the number of knots
 
-With several `nknots` candidates, the number of knots is selected again in every bootstrap replicate:
+With several `nknots` candidates, `bootstrap()` selects the number of knots again in every bootstrap replicate:
 
 1. the bootstrap resamples (at the patient level) are drawn once and shared by all the candidates, so that they are compared on exactly the same data;
 2. every candidate is fitted on every resample;
@@ -151,8 +150,9 @@ table(wce_gpu_bootstrap$bootstrap.best.nknots)
 ```
 
 ```
-Error:
-! object 'wce_gpu_bootstrap' not found
+
+ 1
+50
 ```
 
 Since different replicates may select splines with different numbers of coefficients, the bootstrap spline coefficients (`bootstrap_est`, `est_CI`) are only returned when a single `nknots` value is given. With a single value, there is nothing to select and every replicate uses that number of knots, as in a standard bootstrap.
@@ -164,15 +164,12 @@ The risk function can be plot, and if you added bootstrap, confidence band inter
 plot(wce_gpu_bootstrap)
 ```
 
-```
-Error:
-! object 'wce_gpu_bootstrap' not found
-```
+![plot of chunk wceGPU_plot](figures/WCE-wceGPU_plot-1.png)
 
 
 ## Hazards Ratios
 
-`HR()` computes the hazard ratio between two exposure profiles — for example a constantly exposed patient versus an unexposed one — using the estimated WCE weight function. If the model was fit with bootstrap resampling (`nbootstraps > 0`), it also reports a bootstrap confidence interval for that hazard ratio.
+`HR()` computes the hazard ratio between two exposure profiles — for example a constantly exposed patient versus an unexposed one — using the estimated WCE weight function. If `bootstrap()` was called on the model, it also reports a bootstrap confidence interval for that hazard ratio.
 
 
 ``` r
@@ -184,11 +181,12 @@ HR(wce_gpu_bootstrap, exposed, unexposed)
 ```
 
 ```
-Error:
-! object 'wce_gpu_bootstrap' not found
+           HR  CI 2.5% CI 97.5%
+[1,] 3.032552 2.255275 4.005504
 ```
 
 
 ## References
 
-[^wce]: Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov 30;28(27):3437-53.
+[^wce]: Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov 30;28(27):3437-53. doi:10.1002/sim.3701
+[^wcepkg]: Sylvestre M (2025). WCE: Weighted Cumulative Exposure Models. R package version 1.0.4, doi:10.32614/CRAN.package.WCE. The reference implementation of the method: `wceGPU()` follows its interface, and its results are tested against it.

@@ -43,7 +43,16 @@ data$id <- seq_len(nrow(data)) # one row per patient here, so a row index works 
 head(data)
 ```
 
-You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula. If you use `bootstrap`, `patient_id` must be provided: it identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates).
+You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package[^survival], with a Surv object in the formula. Use `x = TRUE` if you want to add bootstrap confidence intervals afterwards: `bootstrap()` reuses the design matrix stored in the fitted model.
+
+```{r coxphGPU}
+coxphGPU_fit <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
+                         data = data,
+                         ties = "breslow",
+                         x = TRUE)
+```
+
+`bootstrap()` refits the model on `R` resamples of `data`. `patient_id` identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates).
 
 The bootstrap resamples are drawn by PyTorch, not by R, so `set.seed()` has no effect on them. To get reproducible results, set PyTorch's seed:
 
@@ -51,17 +60,14 @@ The bootstrap resamples are drawn by PyTorch, not by R, so `set.seed()` has no e
 invisible(reticulate::import("torch")$manual_seed(42L))
 ```
 
-```{r coxphGPU}
-coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
-                               data = data,
-                               patient_id = "id",
-                               bootstrap = 50,
-                               ties = "breslow")
+```{r bootstrap}
+coxphGPU_bootstrap <- bootstrap(coxphGPU_fit, R = 50, patient_id = "id",
+                                data = data)
 
-# bootstrap at 50 for this example, but normally it's more.
+# 50 bootstrap replicates for this example, but normally it's more.
 ```
 
-You obtain with `summary` all results for initial model, and a confidence interval for estimated coefficients with bootstrap.
+You obtain with `summary` all results for the initial model, and a bootstrap confidence interval for the estimated coefficients.
 
 ```{r}
 summary(coxphGPU_bootstrap)
@@ -114,3 +120,4 @@ survminer::ggforest(model = coxphGPU_bootstrap,
 
 [^cox1]: Andersen, P. and Gill, R. (1982). Cox's regression model for counting processes, a large sample study. Annals of Statistics 10, 1100-1120.
 [^cox2]: Therneau, T., Grambsch, P., Modeling Survival Data: Extending the Cox Model. Springer-Verlag, 2000.
+[^survival]: Therneau T (2026). A Package for Survival Analysis in R. R package version 3.8-9, <https://CRAN.R-project.org/package=survival>. `coxphGPU()` follows the interface of its `coxph()`, calls it for the model frame and the martingale residuals, and is tested against it.

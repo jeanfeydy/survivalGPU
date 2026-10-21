@@ -170,6 +170,18 @@ print(f"95% bootstrap CI: [{hr['CI_lower']:.3f}, {hr['CI_upper']:.3f}]")
 With a single value such as `nknots=1`, there is nothing to select: every
 replicate uses that number of knots, as in a standard bootstrap.
 
+## References
+
+- Sylvestre MP, Abrahamowicz M (2009). Flexible modeling of the cumulative
+  effects of time-dependent exposures on the hazard. *Statistics in Medicine*,
+  28(27), 3437–3453.
+  [doi:10.1002/sim.3701](https://doi.org/10.1002/sim.3701)
+- Sylvestre M (2025). *WCE: Weighted Cumulative Exposure Models*, the `WCE` R
+  package.
+  [doi:10.32614/CRAN.package.WCE](https://doi.org/10.32614/CRAN.package.WCE).
+  The reference implementation of the method: survivalGPU's WCE model follows
+  its conventions, and its results are tested against it.
+
 ## Going further
 
 Full API reference: {class}`~survivalgpu.WCESurvivalAnalysis`.

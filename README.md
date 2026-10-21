@@ -13,6 +13,9 @@ survival models to large datasets and to heavy bootstrap resampling by running
 the core computations on the GPU (with a CPU fallback). It's available as both
 a **Python package** and an **R package**, sharing the same GPU backend.
 
+**Documentation** for both, with user guides and API reference:
+<https://jeanfeydy.github.io/survivalGPU/>
+
 This repository hosts both:
 
 - **[`python/`](python/)** — the core implementation. See
@@ -25,6 +28,15 @@ This repository hosts both:
   test suite. The R package is currently being prepared for CRAN submission;
   install the development version from GitHub in the meantime (see the R
   README for instructions).
+
+## Acknowledgements
+
+survivalGPU's models follow two reference R packages, and are tested against
+them: [`survival`](https://CRAN.R-project.org/package=survival) by Terry
+Therneau for the Cox model, and [`WCE`](https://CRAN.R-project.org/package=WCE)
+by Marie-Pierre Sylvestre and colleagues for the Weighted Cumulative Exposure
+model, which implements the method of Sylvestre and Abrahamowicz (2009),
+[doi:10.1002/sim.3701](https://doi.org/10.1002/sim.3701).
 
 ## Citation
 

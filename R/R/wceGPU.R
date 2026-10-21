@@ -65,7 +65,12 @@
 #'
 #' @references Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative
 #'   effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov
-#'   30;28(27):3437-53.
+#'   30;28(27):3437-53. \doi{10.1002/sim.3701}
+#'
+#'   Sylvestre M (2025). _WCE: Weighted Cumulative Exposure Models_. R package
+#'   version 1.0.4. \doi{10.32614/CRAN.package.WCE}. The reference
+#'   implementation of the method: `wceGPU()` follows its interface, and its
+#'   results are tested against it.
 #'
 #' @return `wceGPU()` returns an object of class `wceGPU`: a list that describes
 #'   the selected model, i.e. the candidate in `nknots` that minimizes the

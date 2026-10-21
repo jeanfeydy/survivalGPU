@@ -103,6 +103,16 @@ The percentile bootstrap CIs above are often preferable to the Wald CIs when
 the sample size is small or the likelihood isn't well approximated by a
 quadratic near the optimum.
 
+## References
+
+- Cox DR (1972). Regression models and life-tables. *Journal of the Royal
+  Statistical Society: Series B*, 34(2), 187–220.
+  [doi:10.1111/j.2517-6161.1972.tb00899.x](https://doi.org/10.1111/j.2517-6161.1972.tb00899.x)
+- Therneau T. *A Package for Survival Analysis in R*, the `survival` R package,
+  <https://CRAN.R-project.org/package=survival>. The reference implementation:
+  survivalGPU's Cox model follows its conventions, and its results are tested
+  against it.
+
 ## Going further
 
 Full API reference: {class}`~survivalgpu.CoxPHSurvivalAnalysis`.

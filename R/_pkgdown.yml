@@ -12,6 +12,10 @@ reference:
     - contains("wce")
     - HR
 
+  - title: Bootstrap
+    contents:
+    - bootstrap
+
   - title: Utils
     contents:
     - use_cuda

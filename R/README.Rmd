@@ -27,6 +27,9 @@ survivalGPU scales classical survival models to large datasets and to heavy
 bootstrap resampling by running the core computations on the GPU. It's also
 possible to use the library without a GPU (CPU fallback).
 
+**Documentation**, with user guides and API reference:
+<https://jeanfeydy.github.io/survivalGPU/>
+
 ## Features
 
 - **Cox Proportional Hazards** models (`coxphGPU()`), with Breslow and Efron
@@ -38,7 +41,8 @@ possible to use the library without a GPU (CPU fallback).
   below); `wceGPU()` raises an informative error if it's missing.
 - **GPU acceleration** of the likelihood and its gradients via PyTorch (+
   KeOps for WCE), with a CPU fallback (`use_cuda()` to check what's available).
-- **Bootstrap** resampling for confidence intervals on both models.
+- **Bootstrap** resampling for confidence intervals on both models, as a
+  separate step after the fit (`bootstrap()`).
 
 ## Installation
 
@@ -65,10 +69,8 @@ and OpenMP (`brew install libomp`). On Windows, `coxphGPU()` works but
 [WSL2](https://learn.microsoft.com/windows/wsl/install) if you need it).
 
 To install the development version from GitHub instead, use
-`remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")`. This
-builds the package from source, so it needs a C compiler
-([Rtools](https://cran.r-project.org/bin/windows/Rtools/) on Windows, the
-Xcode command line tools on macOS).
+`remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")`. The R
+package has no compiled code, so this doesn't need a compiler.
 
 At the start of each R session, select the Python environment **before**
 loading survivalGPU:
@@ -105,7 +107,7 @@ Check if CUDA is detected :
 use_cuda()
 ```
 
-By default, functions run with GPU if detected. Then we specify the number of bootstrap, and consequently the batchsize argument, according to CUDA drivers detection.
+By default, functions run with GPU if detected. Then we specify the number of bootstrap replicates, and consequently the batchsize argument, according to CUDA drivers detection.
 
 ```{r}
 if (use_cuda()) {
@@ -117,21 +119,23 @@ if (use_cuda()) {
 }
 ```
 
-You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula. If you use `bootstrap`, `patient_id` must be provided: it identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates).
+You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula. Bootstrap confidence intervals are added afterwards with `bootstrap()`, which reuses the design matrix stored in the fitted model (hence `x = TRUE`). Its `patient_id` argument identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates).
 
 ```{r coxphGPU}
 lung <- lung[stats::complete.cases(lung[c("time", "status", "age", "sex", "ph.ecog")]), ]
 lung$id <- seq_len(nrow(lung)) # one row per patient here, so a row index works as patient_id
 
-coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
-                               data = lung,
-                               patient_id = "id",
-                               bootstrap = n_bootstrap,
-                               batchsize = batchsize,
-                               ties = "breslow")
+coxphGPU_fit <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
+                         data = lung,
+                         ties = "breslow",
+                         x = TRUE)
+
+coxphGPU_bootstrap <- bootstrap(coxphGPU_fit, R = n_bootstrap,
+                                patient_id = "id", data = lung,
+                                batchsize = batchsize)
 ```
 
-With `summary` method, you obtain results for initial model, and a confidence interval by normal distribution process. A confidence interval is also estimated for coefficients by bootstrap (if bootstrap > 1 in your coxphGPU object).
+With `summary` method, you obtain results for initial model, and a confidence interval by normal distribution process. A confidence interval is also estimated for coefficients by bootstrap (if `bootstrap()` was called on the model).
 
 ```{r}
 summary(coxphGPU_bootstrap)

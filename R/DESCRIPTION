@@ -46,7 +46,8 @@ SystemRequirements: Python (>= 3.10) with the 'torch', 'numpy', 'pandas',
     (optional, required only for wceGPU(); not available natively on
     Windows but can be used there through the Windows Subsystem for Linux
     ('WSL'))
-URL: https://github.com/jeanfeydy/survivalGPU
+URL: https://jeanfeydy.github.io/survivalGPU/,
+    https://github.com/jeanfeydy/survivalGPU
 BugReports: https://github.com/jeanfeydy/survivalGPU/issues
 Config/roxygen2/version: 8.1.0
 RoxygenNote: 7.3.2
