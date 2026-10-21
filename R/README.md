@@ -118,11 +118,13 @@ You can realize the Cox model with the `coxphGPU()` function, which is
 written in the same way as the `survival::coxph()` function from
 survival package, with a Surv object in the formula. Bootstrap
 confidence intervals are added afterwards with `bootstrap()`, which
-reuses the design matrix stored in the fitted model (hence `x = TRUE`).
-Its `patient_id` argument identifies each patient (subject) in `data`,
-so that bootstrap resampling is performed at the patient level rather
-than at the row level (relevant when a patient has several rows,
-e.g. with time-varying covariates).
+reuses the design matrix and the patient ids stored in the fitted
+model: fit it with `x = TRUE` and `patient_id`. `patient_id` identifies
+each patient (subject) in `data`, so that bootstrap resampling is
+performed at the patient level rather than at the row level (relevant
+when a patient has several rows,
+e.g. with time-varying covariates);
+`bootstrap()` cannot run without it.
 
 ``` r
 lung <- lung[stats::complete.cases(lung[c("time", "status", "age", "sex", "ph.ecog")]), ]
@@ -131,10 +133,10 @@ lung$id <- seq_len(nrow(lung)) # one row per patient here, so a row index works 
 coxphGPU_fit <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
                          data = lung,
                          ties = "breslow",
-                         x = TRUE)
+                         x = TRUE,
+                         patient_id = "id")
 
 coxphGPU_bootstrap <- bootstrap(coxphGPU_fit, R = n_bootstrap,
-                                patient_id = "id", data = lung,
                                 batchsize = batchsize)
 ```
 

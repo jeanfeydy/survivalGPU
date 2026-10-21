@@ -11,8 +11,6 @@ bootstrap(object, ...)
 \method{bootstrap}{coxphGPU}(
   object,
   R,
-  patient_id,
-  data,
   batchsize = 0,
   init = TRUE,
   control,
@@ -24,7 +22,6 @@ bootstrap(object, ...)
 \method{bootstrap}{wceGPU}(
   object,
   R,
-  data,
   batchsize = 0,
   init = TRUE,
   device = NULL,
@@ -38,12 +35,6 @@ bootstrap(object, ...)
 \item{...}{additional argument(s) for methods.}
 
 \item{R}{number of bootstrap replicates.}
-
-\item{patient_id}{(coxphGPU only) name of the column in \code{data} that
-identifies each patient (subject), so that resampling is performed at the
-patient level rather than at the row level.}
-
-\item{data}{the data frame used in the original fit (see Details).}
 
 \item{batchsize}{number of bootstrap copies handled at a time. Defaults to
 0, which means that all copies are handled at once. If you run into out
@@ -87,17 +78,21 @@ a single batched GPU call to the Python backend. Resampling is performed at
 the patient level.
 }
 \details{
-For a coxphGPU model, \code{object} must have been fit with \code{x = TRUE}
-(\code{coxphGPU(..., x = TRUE)}), so its design matrix is available to reuse
-without re-parsing the formula. \code{data} must have the same row names as the
-data frame used in the original call -- the ordinary R default, unless
-explicitly reset -- so that \code{patient_id}'s values can be correctly realigned
-to the stored design matrix even if the original fit used \verb{subset =} or
-dropped rows to missing values.
+For a coxphGPU model, \code{object} must have been fit with \code{x = TRUE} and
+\code{patient_id} (\code{coxphGPU(..., x = TRUE, patient_id = "id")}). The bootstrap
+resamples patients, not rows, so that all the rows of a patient (e.g. with
+time-varying covariates) are kept together: \code{patient_id} tells which rows
+belong to the same patient. The design matrix, the response and the
+patient of each row are stored in the fit, so the bootstrap always uses
+exactly the data the model was fitted on, including after \verb{subset =} or
+rows dropped for missing values.
 
-For a wceGPU model, \code{wceGPU()} doesn't retain the expanded spline-basis
-feature matrix, so it is rebuilt from \code{data} with the same knot
-configuration; the patient identifier is the \code{id} column given at the fit.
+For a wceGPU model, \code{object} must have been fit with \code{x = TRUE}
+(\code{wceGPU(..., x = TRUE)}): the columns used by the model are stored in the
+fit, and the bootstrap resamples them, so it always uses exactly the data
+the model was fitted on. The spline-basis features are rebuilt from them
+with the same knot configuration; the patient identifier is the \code{id} column
+given at the fit.
 If the model was fitted with several \code{nknots} candidates, the number of
 knots is selected again in every bootstrap replicate (see
 \code{bootstrap.best.nknots}), so that the confidence intervals account for the
@@ -108,17 +103,16 @@ uncertainty on that choice.
 library(survival)
 drugdata <- WCE::drugdata
 fit <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-                data = drugdata, x = TRUE)
-fit_boot <- bootstrap(fit, R = 1000, patient_id = "Id", data = drugdata,
-                      batchsize = 200)
+                data = drugdata, x = TRUE, patient_id = "Id")
+fit_boot <- bootstrap(fit, R = 1000, batchsize = 200)
 summary(fit_boot)
 }
 \dontrun{
 drugdata <- WCE::drugdata
 fit <- wceGPU(data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
               event = "Event", start = "Start", stop = "Stop",
-              expos = "dose", covariates = c("age", "sex"))
-fit_boot <- bootstrap(fit, R = 500, data = drugdata, batchsize = 100)
+              expos = "dose", covariates = c("age", "sex"), x = TRUE)
+fit_boot <- bootstrap(fit, R = 500, batchsize = 100)
 summary(fit_boot)
 table(fit_boot$bootstrap.best.nknots)
 }

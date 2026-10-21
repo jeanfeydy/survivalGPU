@@ -10,7 +10,7 @@
 #' @usage
 #' wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
 #'        event, start, stop, expos, covariates = NULL,
-#'        confint = 0.95, controls = NULL, ...)
+#'        confint = 0.95, controls = NULL, x = FALSE, ...)
 #'
 #' @param data A data frame in an interval (long) format, in which each line
 #'   corresponds to one and only one time unit for a given individual.
@@ -54,6 +54,10 @@
 #' @param confint Level for confidence intervals. Default to 0.95.
 #' @param controls List corresponding to the control parameters to be passed to
 #'   the coxph function. See coxph.control for more details.
+#' @param x Logical. If TRUE, the columns of `data` used by the model (`id`,
+#'   `event`, `start`, `stop`, `expos` and `covariates`) are stored in the
+#'   returned object, as `data`. Required by [bootstrap()], which resamples
+#'   exactly the data the model was fitted on.
 #' @param ... Optional; other parameters to be passed through to WCE
 #'
 #' @details WCE implements a flexible method for modeling cumulative effects of
@@ -90,6 +94,7 @@
 #'   * `best.nknots`: the selected number of interior knots. `nknots.grid`,
 #'   `info.criterion.grid` and `loglik.grid` give the candidates and the
 #'   information criterion and partial log-likelihood obtained for each.
+#'   * `data`: with `x = TRUE`, the columns of `data` used by the model.
 #'
 #'   After [bootstrap()], the object also contains:
 #'   * `WCEmat_bootstrap`, `bootstrap_beta.hat.covariates`: matrices with one
@@ -119,7 +124,8 @@
 #' wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = 90, id = "Id",
 #'                   event = "Event", start = "Start", stop = "Stop",
 #'                   expos = "dose", covariates = c("age", "sex"),
-#'                   constrained = FALSE, aic = FALSE, confint = 0.95)
+#'                   constrained = FALSE, aic = FALSE, confint = 0.95,
+#'                   x = TRUE)
 #'
 #' # Results
 #' wce_gpu
@@ -130,7 +136,7 @@
 #'
 #' # Bootstrap-based inference, as a separate step (example with 20
 #' # replicates, but normally R > 500)
-#' wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20, data = drugdata)
+#' wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20)
 #'
 #' # See confidence bands for the estimated weight function due to bootstrap
 #' plot(wce_gpu_bootstrap)
@@ -146,7 +152,7 @@
 #' }
 wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
                    event, start, stop, expos, covariates = NULL,
-                   confint = 0.95, controls = NULL, ...) {
+                   confint = 0.95, controls = NULL, x = FALSE, ...) {
   UseMethod("wceGPU")
 }
 
@@ -158,7 +164,8 @@ wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
 wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                            aic = FALSE, id, event, start, stop, expos,
                            covariates = NULL,
-                           confint = 0.95, controls = NULL, device = NULL, double_precision = TRUE, ...) {
+                           confint = 0.95, controls = NULL, x = FALSE,
+                           device = NULL, double_precision = TRUE, ...) {
   # survivalgpu <- use_survivalGPU()
 
   # Bootstrap is no longer requested at fit time. Without this check, the old
@@ -167,7 +174,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   removed <- intersect(names(list(...)), c("nbootstraps", "batchsize"))
   if (length(removed)) {
     stop("wceGPU() no longer takes ", paste(removed, collapse = ", "),
-         ": fit the model first, then call bootstrap(fit, R = , data = ).",
+         ": fit the model with x = TRUE, then call bootstrap(fit, R = ).",
          call. = FALSE)
   }
 
@@ -178,6 +185,10 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     bootstrap = 0, batchsize = 0, init = NULL,
     device = device, double_precision = double_precision
   )
+
+  model_data <- if (isTRUE(x)) {
+    data[unique(c(id, event, start, stop, expos, covariates))]
+  }
 
 
   # call WCE outputs and rename them to follow R WCE convention
@@ -257,9 +268,8 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     confint = confint,
     nbootstraps = 0, # no bootstrap at fit time; see bootstrap()
     is_bootstraps = FALSE,
-    # Stored purely so bootstrap() can be called later without re-supplying
-    # every column name -- these are already required at every wceGPU() fit,
-    # unlike coxphGPU()'s patient_id which is only needed for bootstrap.
+    # Stored so bootstrap() can be called later without re-supplying every
+    # column name.
     id = id,
     event = event,
     start = start,
@@ -268,6 +278,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   )
 
   results$analysis <- "Cox"
+  results$data <- model_data
 
   # wceGPU object
   class(results) <- "wceGPU"
@@ -702,8 +713,9 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #'                   id = "Id", event = "Event", start = "Start",
 #'                   stop = "Stop", expos = "dose",
 #'                   covariates = c("age", "sex"),
-#'                   constrained = FALSE, aic = FALSE, confint = 0.95)
-#' wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20, data = drugdata)
+#'                   constrained = FALSE, aic = FALSE, confint = 0.95,
+#'                   x = TRUE)
+#' wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20)
 #'
 #' # Exposed at a dose vs. unexposed
 #' exposed   <- rep(1, cutoff)
@@ -752,21 +764,26 @@ HR <- function(object, vecnum, vecdenom, level = 0.95) {
 #' drugdata <- WCE::drugdata
 #' fit <- wceGPU(data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
 #'               event = "Event", start = "Start", stop = "Stop",
-#'               expos = "dose", covariates = c("age", "sex"))
-#' fit_boot <- bootstrap(fit, R = 500, data = drugdata, batchsize = 100)
+#'               expos = "dose", covariates = c("age", "sex"), x = TRUE)
+#' fit_boot <- bootstrap(fit, R = 500, batchsize = 100)
 #' summary(fit_boot)
 #' table(fit_boot$bootstrap.best.nknots)
 #' }
-bootstrap.wceGPU <- function(object, R, data, batchsize = 0, init = TRUE,
+bootstrap.wceGPU <- function(object, R, batchsize = 0, init = TRUE,
                              device = NULL, double_precision = TRUE, ...) {
 
   if (missing(R) || is.null(R) || R < 1) {
     stop("R (number of bootstrap replicates) must be a positive integer.")
   }
-  if (missing(data)) {
-    stop("data is required: wceGPU() doesn't retain the expanded feature ",
-         "matrix, so bootstrap() needs the original (or an equivalent) ",
-         "data frame to rebuild it.")
+  if ("data" %in% names(list(...))) {
+    stop("bootstrap() resamples the data stored by wceGPU(..., x = TRUE), so ",
+         "that it always matches the fit: it doesn't take a data argument.",
+         call. = FALSE)
+  }
+  if (is.null(object$data)) {
+    stop("bootstrap() requires the data stored on the fitted object. Refit ",
+         "with wceGPU(..., x = TRUE), then call bootstrap() again.",
+         call. = FALSE)
   }
 
   # Python passes the same `init` to every nknots candidate, but their
@@ -786,7 +803,8 @@ bootstrap.wceGPU <- function(object, R, data, batchsize = 0, init = TRUE,
   }
 
   wce <- .wceGPU_call_python(
-    data = data, id = object$id, event = object$event, start = object$start,
+    data = object$data, id = object$id, event = object$event,
+    start = object$start,
     stop = object$stop, expos = object$expos, covariates = object$covariates,
     nknots = object$nknots, constrained = object$constrained,
     cutoff = object$cutoff, aic = object$aic,

@@ -21,10 +21,9 @@ seed <- 2024L
 # --- Path 1: the R package's own coxphGPU() + bootstrap() -------------------
 
 torch$manual_seed(seed)
-fit <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age, data = drugdata, x = TRUE)
-fit_boot <- bootstrap(
-  fit, R = R_reps, patient_id = "Id", data = drugdata, batchsize = 0
-)
+fit <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age, data = drugdata,
+                x = TRUE, patient_id = "Id")
+fit_boot <- bootstrap(fit, R = R_reps, batchsize = 0)
 
 # --- Path 2: a hand-built, direct call into the Python backend --------------
 # Independently reconstructs what coxphGPU()/bootstrap() should be sending,

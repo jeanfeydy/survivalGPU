@@ -6,7 +6,8 @@
 \title{Fast Cox Proportional Hazards Regression Model}
 \usage{
 coxphGPU(formula, data, ties = c("efron", "breslow"), init, control,
-         singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
+         singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
+         patient_id = NULL, ...)
 
 \method{summary}{coxphGPU}(object, ..., conf.int = 0.95, scale = 1)
 }
@@ -67,6 +68,12 @@ object as returned by the Surv function.}
     component \code{y}.
   }
 
+\item{patient_id}{name of the column of \code{data} that identifies each patient
+(subject). Required by \code{\link[=bootstrap]{bootstrap()}}, which resamples patients rather than
+rows, so that all the rows of a patient (e.g. with time-varying
+covariates) are kept together. With one row per patient, a column of row
+indices (\code{data$id <- seq_len(nrow(data))}) can be used.}
+
 \item{...}{Other arguments for methods.}
 
 \item{object}{a coxphGPU object}
@@ -83,7 +90,9 @@ object as returned by the Surv function.}
   }
 }
 \value{
-A coxphGPU object representing the fit.
+A coxphGPU object representing the fit. With \code{patient_id}, it also
+contains \code{patient_id} (the column name) and \code{patient_ids} (the patient of
+each row used by the model).
 
 With \code{summary()} :
 \itemize{
@@ -108,6 +117,12 @@ Use \code{summary()} method to see confidence interval for covariates with two
 process : normal distribution and bootstrap (if \code{\link[=bootstrap]{bootstrap()}} was called
 on the object first).
 }
+\details{
+To compute bootstrap confidence intervals with \code{\link[=bootstrap]{bootstrap()}}, fit the model
+with both \code{x = TRUE}, which stores the design matrix, and \code{patient_id},
+which stores the patient of each row used by the model. The bootstrap then
+resamples exactly the data the model was fitted on.
+}
 \examples{
 \dontrun{
 library(survival)
@@ -117,21 +132,26 @@ data(drugdata)
 ## Check CUDA drivers (if FALSE you use CPU)
 use_cuda()
 
-## Cox Proportional Hazards point estimate; x = TRUE is required if you
-## plan to call bootstrap() on the result afterwards.
+## Cox Proportional Hazards point estimate; x = TRUE and patient_id are
+## required if you plan to call bootstrap() on the result afterwards.
 fit <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-                data = drugdata, x = TRUE)
+                data = drugdata, x = TRUE, patient_id = "Id")
 
 ## Bootstrap-based inference, as a separate step
-fit_boot <- bootstrap(fit, R = 1000, patient_id = "Id", data = drugdata,
+fit_boot <- bootstrap(fit, R = 1000,
                       batchsize = if (use_cuda()) 200 else 10)
 
 summary(fit_boot)
 }
 }
 \references{
-Therneau T (2021). \emph{A Package for Survival Analysis in R}. R
-package version 3.2-13
+Therneau T (2026). \emph{A Package for Survival Analysis in R}. R
+package version 3.8-9, \url{https://CRAN.R-project.org/package=survival}.
+\code{coxphGPU()} follows the interface of its \code{coxph()}, calls it for the
+model frame and the martingale residuals, and is tested against it.
+
+Therneau TM, Grambsch PM (2000). \emph{Modeling Survival Data: Extending the
+Cox Model}. Springer, New York.
 }
 \seealso{
 \code{\link[survival:coxph]{survival::coxph()}}, \code{\link[=bootstrap]{bootstrap()}}

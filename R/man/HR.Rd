@@ -41,8 +41,9 @@ wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff,
                   id = "Id", event = "Event", start = "Start",
                   stop = "Stop", expos = "dose",
                   covariates = c("age", "sex"),
-                  constrained = FALSE, aic = FALSE, confint = 0.95)
-wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20, data = drugdata)
+                  constrained = FALSE, aic = FALSE, confint = 0.95,
+                  x = TRUE)
+wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20)
 
 # Exposed at a dose vs. unexposed
 exposed   <- rep(1, cutoff)

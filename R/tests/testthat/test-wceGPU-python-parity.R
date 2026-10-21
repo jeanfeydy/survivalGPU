@@ -22,9 +22,10 @@ seed <- 4242L
 torch$manual_seed(seed)
 fit <- wceGPU(
   data = drugdata, nknots = 1, cutoff = 90, id = "Id", event = "Event",
-  start = "Start", stop = "Stop", expos = "dose", covariates = c("age", "sex")
+  start = "Start", stop = "Stop", expos = "dose", covariates = c("age", "sex"),
+  x = TRUE
 )
-fit_boot <- bootstrap(fit, R = R_reps, data = drugdata, batchsize = 10)
+fit_boot <- bootstrap(fit, R = R_reps, batchsize = 10)
 
 # --- Path 2: a hand-built, direct call into the Python backend --------------
 # Independently reconstructs what wceGPU()/bootstrap() should be sending,

@@ -41,8 +41,9 @@ data <- lung
 data$status <- data$status - 1 # event coded as 0/1
 data$id <- seq_len(nrow(data))  # one row per patient
 
-fit <- coxphGPU(Surv(time, status) ~ age + sex, data = data, x = TRUE)
-fit <- bootstrap(fit, R = 100, patient_id = "id", data = data)
+fit <- coxphGPU(Surv(time, status) ~ age + sex, data = data,
+                x = TRUE, patient_id = "id") # both needed by bootstrap()
+fit <- bootstrap(fit, R = 100)
 summary(fit) # with bootstrap confidence intervals
 ```
 

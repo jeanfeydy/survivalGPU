@@ -5,20 +5,34 @@
 #'   only; call [bootstrap()] on the result for bootstrap-based inference.
 #'
 #' @usage coxphGPU(formula, data, ties = c("efron", "breslow"), init, control,
-#'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
+#'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
+#'          patient_id = NULL, ...)
 #'
 #' @inheritParams survival::coxph
 #' @param formula a formula object, with the response on the left of a ~
 #'   operator, and the terms on the right. The response must be a survival
 #'   object as returned by the Surv function.
+#' @param patient_id name of the column of `data` that identifies each patient
+#'   (subject). Required by [bootstrap()], which resamples patients rather than
+#'   rows, so that all the rows of a patient (e.g. with time-varying
+#'   covariates) are kept together. With one row per patient, a column of row
+#'   indices (`data$id <- seq_len(nrow(data))`) can be used.
 #' @param ... Other arguments for methods.
+#'
+#' @details
+#' To compute bootstrap confidence intervals with [bootstrap()], fit the model
+#' with both `x = TRUE`, which stores the design matrix, and `patient_id`,
+#' which stores the patient of each row used by the model. The bootstrap then
+#' resamples exactly the data the model was fitted on.
 #'
 #' @import stats
 #' @import survival
 #' @importFrom utils methods
 #' @importFrom utils head
 #'
-#' @return A coxphGPU object representing the fit.
+#' @return A coxphGPU object representing the fit. With `patient_id`, it also
+#'   contains `patient_id` (the column name) and `patient_ids` (the patient of
+#'   each row used by the model).
 #' @export
 #'
 #' @references Therneau T (2026). _A Package for Survival Analysis in R_. R
@@ -40,20 +54,20 @@
 #' ## Check CUDA drivers (if FALSE you use CPU)
 #' use_cuda()
 #'
-#' ## Cox Proportional Hazards point estimate; x = TRUE is required if you
-#' ## plan to call bootstrap() on the result afterwards.
+#' ## Cox Proportional Hazards point estimate; x = TRUE and patient_id are
+#' ## required if you plan to call bootstrap() on the result afterwards.
 #' fit <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-#'                 data = drugdata, x = TRUE)
+#'                 data = drugdata, x = TRUE, patient_id = "Id")
 #'
 #' ## Bootstrap-based inference, as a separate step
-#' fit_boot <- bootstrap(fit, R = 1000, patient_id = "Id", data = drugdata,
+#' fit_boot <- bootstrap(fit, R = 1000,
 #'                       batchsize = if (use_cuda()) 200 else 10)
 #'
 #' summary(fit_boot)
 #' }
 coxphGPU <- function(formula, data, ties = c("efron", "breslow"), init, control,
                      singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
-                     ...) {
+                     patient_id = NULL, ...) {
   UseMethod("coxphGPU")
 }
 
@@ -63,7 +77,8 @@ coxphGPU <- function(formula, data, ties = c("efron", "breslow"), init, control,
 #' @exportS3Method coxphGPU default
 coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
                              control, singular.ok = TRUE,
-                             model = FALSE, x = FALSE, y = TRUE, ..., weights,
+                             model = FALSE, x = FALSE, y = TRUE,
+                             patient_id = NULL, ..., weights,
                              subset, na.action, robust, tt, method = ties, id,
                              cluster, istate, statedata,
                              nocenter = c(-1, 0, 1), device = NULL, double_precision = TRUE) {
@@ -92,11 +107,11 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
   # Bootstrap is no longer requested at fit time: point users of the old
   # arguments to bootstrap() instead of a bare "Argument not matched".
   removed <- intersect(names(extraArgs),
-                       c("bootstrap", "nbootstraps", "patient_id", "batchsize"))
+                       c("bootstrap", "nbootstraps", "batchsize"))
   if (length(removed)) {
     stop("coxphGPU() no longer takes ", paste(removed, collapse = ", "),
-         ": fit with coxphGPU(..., x = TRUE), then call ",
-         "bootstrap(fit, R = , patient_id = , data = ).", call. = FALSE)
+         ": fit with coxphGPU(..., x = TRUE, patient_id = ), then call ",
+         "bootstrap(fit, R = ).", call. = FALSE)
   }
   if (length(extraArgs)) { # Condition if more options
     controlargs <- names(formals(coxph.control)) # legal arg names
@@ -137,7 +152,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
   # Drop coxphGPU-only arguments that survival::coxph() doesn't accept.
   # (a call object errors on `[[<- NULL` for a name it doesn't already
   #  have, unlike a list, so only touch names actually present.)
-  for (nm in c("device", "double_precision", "singular.ok")) {
+  for (nm in c("device", "double_precision", "singular.ok", "patient_id")) {
     if (nm %in% names(prep_call)) prep_call[[nm]] <- NULL
   }
 
@@ -215,6 +230,20 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
   pterms <- rep(FALSE, length(attr(Terms, "term.labels")))
 
   rname <- rownames(X)
+
+  if (!is.null(patient_id)) {
+    if (!is.character(patient_id) || length(patient_id) != 1) {
+      stop("patient_id must be the name of one column of data.")
+    }
+    if (missing(data) || !patient_id %in% names(data)) {
+      stop("patient_id = \"", patient_id, "\" is not a column of data.")
+    }
+    patient_ids <- data[rname, patient_id]
+    if (anyNA(patient_ids)) {
+      stop("the patient_id column \"", patient_id, "\" has missing values ",
+           "in the rows used by the model.")
+    }
+  }
 
   if (ncol(X) == 0) {
     stop("coxphGPU() needs at least one covariate; use survival::coxph() ",
@@ -593,6 +622,11 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
   fit$call <- Call
   fit$pterms <- pterms
 
+  if (!is.null(patient_id)) {
+    fit$patient_id <- patient_id
+    fit$patient_ids <- patient_ids
+  }
+
   return(fit)
 }
 
@@ -871,7 +905,6 @@ predict.coxphGPU <- function(object, newdata,
 #'
 #' @param object a coxphGPU or wceGPU object.
 #' @param R number of bootstrap replicates.
-#' @param data the data frame used in the original fit (see Details).
 #' @param batchsize number of bootstrap copies handled at a time. Defaults to
 #'   0, which means that all copies are handled at once. If you run into out
 #'   of memory errors, please consider using batchsize=100, 10 or 1.
@@ -888,17 +921,21 @@ predict.coxphGPU <- function(object, newdata,
 #' @param ... additional argument(s) for methods.
 #'
 #' @details
-#' For a coxphGPU model, `object` must have been fit with `x = TRUE`
-#' (`coxphGPU(..., x = TRUE)`), so its design matrix is available to reuse
-#' without re-parsing the formula. `data` must have the same row names as the
-#' data frame used in the original call -- the ordinary R default, unless
-#' explicitly reset -- so that `patient_id`'s values can be correctly realigned
-#' to the stored design matrix even if the original fit used `subset =` or
-#' dropped rows to missing values.
+#' For a coxphGPU model, `object` must have been fit with `x = TRUE` and
+#' `patient_id` (`coxphGPU(..., x = TRUE, patient_id = "id")`). The bootstrap
+#' resamples patients, not rows, so that all the rows of a patient (e.g. with
+#' time-varying covariates) are kept together: `patient_id` tells which rows
+#' belong to the same patient. The design matrix, the response and the
+#' patient of each row are stored in the fit, so the bootstrap always uses
+#' exactly the data the model was fitted on, including after `subset =` or
+#' rows dropped for missing values.
 #'
-#' For a wceGPU model, `wceGPU()` doesn't retain the expanded spline-basis
-#' feature matrix, so it is rebuilt from `data` with the same knot
-#' configuration; the patient identifier is the `id` column given at the fit.
+#' For a wceGPU model, `object` must have been fit with `x = TRUE`
+#' (`wceGPU(..., x = TRUE)`): the columns used by the model are stored in the
+#' fit, and the bootstrap resamples them, so it always uses exactly the data
+#' the model was fitted on. The spline-basis features are rebuilt from them
+#' with the same knot configuration; the patient identifier is the `id` column
+#' given at the fit.
 #' If the model was fitted with several `nknots` candidates, the number of
 #' knots is selected again in every bootstrap replicate (see
 #' `bootstrap.best.nknots`), so that the confidence intervals account for the
@@ -920,9 +957,6 @@ bootstrap <- function(object, ...) {
   UseMethod("bootstrap")
 }
 
-#' @param patient_id (coxphGPU only) name of the column in `data` that
-#'   identifies each patient (subject), so that resampling is performed at the
-#'   patient level rather than at the row level.
 #' @param control (coxphGPU only) a [survival::coxph.control()] object;
 #'   defaults to the one used at the original fit (stored on `object`).
 #'
@@ -933,34 +967,37 @@ bootstrap <- function(object, ...) {
 #' library(survival)
 #' drugdata <- WCE::drugdata
 #' fit <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-#'                 data = drugdata, x = TRUE)
-#' fit_boot <- bootstrap(fit, R = 1000, patient_id = "Id", data = drugdata,
-#'                       batchsize = 200)
+#'                 data = drugdata, x = TRUE, patient_id = "Id")
+#' fit_boot <- bootstrap(fit, R = 1000, batchsize = 200)
 #' summary(fit_boot)
 #' }
-bootstrap.coxphGPU <- function(object, R, patient_id, data, batchsize = 0,
+bootstrap.coxphGPU <- function(object, R, batchsize = 0,
                                init = TRUE, control,
                                device = NULL, double_precision = TRUE, ...) {
 
-  if (is.null(object$x)) {
-    stop("bootstrap() requires the design matrix stored on the fitted ",
-         "object. Refit with coxphGPU(..., x = TRUE), then call ",
-         "bootstrap() again.")
-  }
   if (missing(R) || is.null(R) || R < 1) {
     stop("R (number of bootstrap replicates) must be a positive integer.")
   }
-  if (missing(patient_id) || missing(data)) {
-    stop("patient_id and data are required: patient_id is only needed for ",
-         "bootstrap resampling, so it isn't captured at the original ",
-         "coxphGPU() call.")
+  passed <- intersect(names(list(...)), c("patient_id", "data"))
+  if (length(passed)) {
+    stop("bootstrap() doesn't take ", paste(passed, collapse = " or "),
+         ": give patient_id to the fit instead, with ",
+         "coxphGPU(..., x = TRUE, patient_id = ), then call ",
+         "bootstrap(fit, R = ).", call. = FALSE)
   }
-
-  pid_values <- data[rownames(object$x), patient_id]
-  if (anyNA(pid_values)) {
-    stop("data does not have the same row names as the fitted object; ",
-         "pass the same data frame used in the original coxphGPU() call.")
+  if (is.null(object$x)) {
+    stop("bootstrap() requires the design matrix stored on the fitted ",
+         "object. Refit with coxphGPU(..., x = TRUE, patient_id = ), then ",
+         "call bootstrap() again.", call. = FALSE)
   }
+  if (is.null(object$patient_ids)) {
+    stop("bootstrap() resamples patients, not rows, so it needs to know ",
+         "which rows belong to the same patient. Refit with ",
+         "coxphGPU(..., x = TRUE, patient_id = \"<id column>\"), then call ",
+         "bootstrap() again. With one row per patient, a column of row ",
+         "indices can be used as patient_id.", call. = FALSE)
+  }
+  patient_id <- object$patient_id
 
   Y <- object$y
   type <- attr(Y, "type")
@@ -990,7 +1027,7 @@ bootstrap.coxphGPU <- function(object, R, patient_id, data, batchsize = 0,
                                  time = Y[, 1], status = Y[, 2])
   }
 
-  pid_df <- data.frame(pid_values)
+  pid_df <- data.frame(object$patient_ids)
   names(pid_df) <- patient_id
   data_Y <- cbind(pid_df, db$data_Y)
 

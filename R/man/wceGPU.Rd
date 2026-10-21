@@ -9,7 +9,7 @@
 \usage{
 wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
        event, start, stop, expos, covariates = NULL,
-       confint = 0.95, controls = NULL, ...)
+       confint = 0.95, controls = NULL, x = FALSE, ...)
 
 \method{summary}{wceGPU}(object, allres = FALSE, ...)
 
@@ -73,6 +73,8 @@ without covariates.}
 \item{controls}{List corresponding to the control parameters to be passed to
 the coxph function. See coxph.control for more details.}
 
+\item{x}{wceGPU object.}
+
 \item{...}{additional argument(s) for methods.}
 
 \item{object}{wceGPU object.}
@@ -80,8 +82,6 @@ the coxph function. See coxph.control for more details.}
 \item{allres}{If TRUE, \code{summary()} prints every candidate number of knots
 that was tried, with its partial log-likelihood and information criterion,
 instead of the summary of the selected model.}
-
-\item{x}{wceGPU object.}
 
 \item{hist.covariates}{show histogram for each covariates if you use
 bootstrap.}
@@ -114,6 +114,7 @@ events.
 \item \code{best.nknots}: the selected number of interior knots. \code{nknots.grid},
 \code{info.criterion.grid} and \code{loglik.grid} give the candidates and the
 information criterion and partial log-likelihood obtained for each.
+\item \code{data}: with \code{x = TRUE}, the columns of \code{data} used by the model.
 }
 
 After \code{\link[=bootstrap]{bootstrap()}}, the object also contains:
@@ -159,7 +160,8 @@ drugdata <- WCE::drugdata
 wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = 90, id = "Id",
                   event = "Event", start = "Start", stop = "Stop",
                   expos = "dose", covariates = c("age", "sex"),
-                  constrained = FALSE, aic = FALSE, confint = 0.95)
+                  constrained = FALSE, aic = FALSE, confint = 0.95,
+                  x = TRUE)
 
 # Results
 wce_gpu
@@ -170,7 +172,7 @@ plot(wce_gpu)
 
 # Bootstrap-based inference, as a separate step (example with 20
 # replicates, but normally R > 500)
-wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20, data = drugdata)
+wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20)
 
 # See confidence bands for the estimated weight function due to bootstrap
 plot(wce_gpu_bootstrap)
@@ -188,7 +190,12 @@ HR(wce_gpu_bootstrap, exposed, unexposed)
 \references{
 Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative
 effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov
-30;28(27):3437-53.
+30;28(27):3437-53. \doi{10.1002/sim.3701}
+
+Sylvestre M (2025). \emph{WCE: Weighted Cumulative Exposure Models}. R package
+version 1.0.4. \doi{10.32614/CRAN.package.WCE}. The reference
+implementation of the method: \code{wceGPU()} follows its interface, and its
+results are tested against it.
 }
 \seealso{
 \code{\link[=bootstrap]{bootstrap()}}

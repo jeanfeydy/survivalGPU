@@ -43,16 +43,17 @@ data$id <- seq_len(nrow(data)) # one row per patient here, so a row index works 
 head(data)
 ```
 
-You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package[^survival], with a Surv object in the formula. Use `x = TRUE` if you want to add bootstrap confidence intervals afterwards: `bootstrap()` reuses the design matrix stored in the fitted model.
+You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package[^survival], with a Surv object in the formula. To add bootstrap confidence intervals afterwards, fit the model with `x = TRUE` and `patient_id`: `bootstrap()` reuses the design matrix and the patient ids stored in the fitted model. `patient_id` identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates). `bootstrap()` cannot run without it.
 
 ```{r coxphGPU}
 coxphGPU_fit <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
                          data = data,
                          ties = "breslow",
-                         x = TRUE)
+                         x = TRUE,
+                         patient_id = "id")
 ```
 
-`bootstrap()` refits the model on `R` resamples of `data`. `patient_id` identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates).
+`bootstrap()` refits the model on `R` patient-level resamples of the data stored in the fit, so it always uses exactly the data the model was fitted on.
 
 The bootstrap resamples are drawn by PyTorch, not by R, so `set.seed()` has no effect on them. To get reproducible results, set PyTorch's seed:
 
@@ -61,8 +62,7 @@ invisible(reticulate::import("torch")$manual_seed(42L))
 ```
 
 ```{r bootstrap}
-coxphGPU_bootstrap <- bootstrap(coxphGPU_fit, R = 50, patient_id = "id",
-                                data = data)
+coxphGPU_bootstrap <- bootstrap(coxphGPU_fit, R = 50)
 
 # 50 bootstrap replicates for this example, but normally it's more.
 ```

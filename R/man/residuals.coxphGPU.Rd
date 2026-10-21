@@ -30,10 +30,12 @@ Only enough of the string to determine a unique match is required.
 }
 
 \item{collapse}{
-  either a logical (TRUE/FALSE), or a vector indicating which rows to
-  collapse (sum) over.
-  In time-dependent models more than one row data can pertain
-  to a single individual or group.
+vector indicating which rows to collapse (sum) over.
+In time-dependent models more than one row data can pertain
+to a single individual.
+If there were 4 individuals represented by 3, 1, 2 and 4 rows of data
+respectively, then \code{collapse=c(1,1,1, 2, 3,3, 4,4,4,4)} could be used to
+obtain per subject rather than per observation residuals.
 }
 
 \item{weighted}{

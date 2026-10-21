@@ -25,6 +25,7 @@ To learn more about survivalGPU, start with the vignette :
 \seealso{
 Useful links:
 \itemize{
+  \item \url{https://jeanfeydy.github.io/survivalGPU/}
   \item \url{https://github.com/jeanfeydy/survivalGPU}
   \item Report bugs at \url{https://github.com/jeanfeydy/survivalGPU/issues}
 }
@@ -35,7 +36,6 @@ Useful links:
 
 Authors:
 \itemize{
-  \item Antoine Poirot-Bourdain \email{antoine.poirot.bourdain@gmail.com}
   \item Jean FEYDY \email{jean.feydy@inria.fr}
   \item Alexis van STRAATEN \email{alexis.vanstraaten@outlook.fr}
 }

@@ -63,10 +63,11 @@ The number of interior knots of the splines is usually not known in advance. As 
 wce_gpu <- wceGPU(data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
                   event = "Event", start = "Start", stop = "Stop",
                   expos = "dose", covariates = c("age", "sex"),
-                  constrained = FALSE, aic = FALSE, confint = 0.95)
+                  constrained = FALSE, aic = FALSE, confint = 0.95,
+                  x = TRUE)
 ```
 
-`wceGPU()` fits the model only. Bootstrap confidence intervals are added afterwards with `bootstrap()`, which refits the model on `R` patient-level resamples of `data` (the patients are identified by the `id` column given to `wceGPU()`), processed `batchsize` copies at a time on the GPU.
+`wceGPU()` fits the model only; with `x = TRUE`, it also stores the columns of `data` that the model uses. Bootstrap confidence intervals are added afterwards with `bootstrap()`, which refits the model on `R` patient-level resamples of that stored data (the patients are identified by the `id` column), processed `batchsize` copies at a time on the GPU. The bootstrap therefore always uses exactly the data the model was fitted on.
 
 The bootstrap resamples are drawn by PyTorch, not by R, so `set.seed()` has no effect on them. To get reproducible results, set PyTorch's seed:
 
@@ -75,8 +76,7 @@ invisible(reticulate::import("torch")$manual_seed(42L))
 ```
 
 ```{r bootstrap}
-wce_gpu_bootstrap <- bootstrap(wce_gpu, R = n_bootstrap, data = drugdata,
-                               batchsize = batchsize)
+wce_gpu_bootstrap <- bootstrap(wce_gpu, R = n_bootstrap, batchsize = batchsize)
 ```
 
 In the summary, there are estimated coefficients for the covariates of the selected model with his confidence interval, calculated with var-covariance matrix, and information to see the significance of the covariates. It's also possible to have confidence interval with bootstrap.

@@ -11,10 +11,10 @@ wce_gpu <- wceGPU(
   event = "Event", start = "Start", stop = "Stop",
   expos = "dose", covariates = c("age", "sex"),
   constrained = FALSE, aic = FALSE, confint = 0.95,
-  verbosity = 3, double_precision = TRUE
+  verbosity = 3, double_precision = TRUE, x = TRUE
 )
 
-wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 15, data = drugdata, batchsize = 0)
+wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 15, batchsize = 0)
 
 # Original WCE
 wce <- WCE::WCE(
@@ -394,9 +394,9 @@ test_that("WCE - bootstrap selects the best knot per replicate", {
     data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose", covariates = c("age", "sex"),
-    constrained = FALSE, aic = FALSE, confint = 0.95
+    constrained = FALSE, aic = FALSE, confint = 0.95, x = TRUE
   )
-  wce_boot <- bootstrap(wce_fit, R = nbootstraps, data = drugdata, batchsize = 10)
+  wce_boot <- bootstrap(wce_fit, R = nbootstraps, batchsize = 10)
 
   expect_true(wce_boot$is_bootstraps)
   expect_length(wce_boot$bootstrap.best.nknots, nbootstraps)
@@ -424,11 +424,32 @@ test_that("WCE - bootstrap rejects a numeric init with several nknots", {
   wce_fit <- wceGPU(
     data = drugdata, nknots = 1:2, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
-    expos = "dose", covariates = c("age", "sex")
+    expos = "dose", covariates = c("age", "sex"), x = TRUE
   )
   expect_error(
-    bootstrap(wce_fit, R = 2, data = drugdata, init = rep(0, 6)),
+    bootstrap(wce_fit, R = 2, init = rep(0, 6)),
     "single nknots value"
+  )
+})
+
+test_that("WCE - x = TRUE stores the columns used by the model", {
+  expect_equal(
+    wce_gpu$data,
+    drugdata[c("Id", "Event", "Start", "Stop", "dose", "age", "sex")]
+  )
+
+  wce_no_x <- wceGPU(
+    data = drugdata, nknots = 1, cutoff = 90, id = "Id",
+    event = "Event", start = "Start", stop = "Stop", expos = "dose"
+  )
+  expect_null(wce_no_x$data)
+  expect_error(bootstrap(wce_no_x, R = 2), "x = TRUE")
+})
+
+test_that("WCE - bootstrap() does not take a data argument", {
+  expect_error(
+    bootstrap(wce_gpu, R = 2, data = drugdata),
+    "doesn't take a data argument"
   )
 })
 
@@ -450,9 +471,9 @@ test_that("WCE - bootstrap with a single replicate", {
     data = drugdata, nknots = 1, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose", covariates = c("age", "sex"),
-    constrained = FALSE, aic = FALSE, confint = 0.95
+    constrained = FALSE, aic = FALSE, confint = 0.95, x = TRUE
   )
-  wce_test <- bootstrap(wce_test, R = 1, data = drugdata)
+  wce_test <- bootstrap(wce_test, R = 1)
 
   expect_equal(dim(wce_test$bootstrap_beta.hat.covariates), c(1, 2))
   expect_equal(dim(wce_test$bootstrap_est), c(1, ncol(wce_test$est)))
@@ -465,9 +486,9 @@ test_that("WCE - bootstrap with a single covariate", {
     data = drugdata, nknots = 1, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose", covariates = "age",
-    constrained = FALSE, aic = FALSE, confint = 0.95
+    constrained = FALSE, aic = FALSE, confint = 0.95, x = TRUE
   )
-  wce_test <- bootstrap(wce_test, R = nbootstraps, data = drugdata)
+  wce_test <- bootstrap(wce_test, R = nbootstraps)
 
   expect_equal(dim(wce_test$bootstrap_beta.hat.covariates), c(nbootstraps, 1))
   expect_equal(colnames(wce_test$bootstrap_beta.hat.covariates), "age")
@@ -479,9 +500,9 @@ test_that("WCE - summary() of a bootstrap fit without covariates", {
     data = drugdata, nknots = 1, cutoff = 90, id = "Id",
     event = "Event", start = "Start", stop = "Stop",
     expos = "dose",
-    constrained = FALSE, aic = FALSE, confint = 0.95
+    constrained = FALSE, aic = FALSE, confint = 0.95, x = TRUE
   )
-  wce_test <- bootstrap(wce_test, R = 5, data = drugdata)
+  wce_test <- bootstrap(wce_test, R = 5)
 
   out <- capture.output(summary(wce_test))
   expect_true(any(grepl("Partial log-likelihood", out)))
