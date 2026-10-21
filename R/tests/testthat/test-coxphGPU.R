@@ -311,11 +311,11 @@ coxph_right_strata <- coxph(
   ties = ties
 )
 
-# coxphGPU_right_strata <- coxphGPU(
-#   Surv(Stop, Event) ~ strata(sex) + age,
-#   drugdata,
-#   ties = ties
-# )
+coxphGPU_right_strata <- coxphGPU(
+  Surv(Stop, Event) ~ strata(sex) + age,
+  drugdata,
+  ties = ties
+)
 
 test_that("CoxphGPU counting with strata - Coefs", {
   expect_equal(
@@ -325,13 +325,32 @@ test_that("CoxphGPU counting with strata - Coefs", {
   )
 })
 
-# test_that("CoxphGPU right with strata - Coefs", {
-#   expect_equal(
-#     coxph_right_strata$coefficients,
-#     coxphGPU_right_strata$coefficients,
-#     tolerance = 1e-5
-#   )
-# })
+test_that("CoxphGPU right with strata - Coefs", {
+  expect_equal(
+    coxph_right_strata$coefficients,
+    coxphGPU_right_strata$coefficients,
+    tolerance = 1e-5
+  )
+})
+
+# The strata are sent to Python in row order: the fit must not depend on how
+# the rows are ordered (it did when they were sent sorted by time).
+test_that("CoxphGPU right with strata - row order, several strata", {
+  lung_shuffled <- survival::lung[c(seq(2, 228, by = 2), seq(1, 227, by = 2)), ]
+  for (d in list(survival::lung, lung_shuffled)) {
+    ref <- coxph(Surv(time, status) ~ age + strata(inst), d, ties = ties)
+    gpu <- coxphGPU(Surv(time, status) ~ age + strata(inst), d, ties = ties)
+    expect_equal(gpu$coefficients, ref$coefficients, tolerance = 1e-5)
+    expect_equal(gpu$loglik, ref$loglik, tolerance = 1e-5)
+  }
+})
+
+test_that("CoxphGPU without covariates - clear error", {
+  expect_error(
+    coxphGPU(Surv(time, status) ~ 1, survival::lung),
+    "at least one covariate"
+  )
+})
 
 test_that("CoxphGPU counting with strata - predict", {
   expect_equal(

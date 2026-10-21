@@ -211,170 +211,45 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
 
   rname <- rownames(X)
 
-  # if (type == "right") stop("right Surv not yet implemented in coxphGPU.
-  #                          Please use `Surv(time1,time2,event)` in formula")
-
-  if(type == "counting"){
-
-  # from agreg.fit.R (survival) / for counting type Surv object
-  nvar <- ncol(X)
-  event <- Y[, 3]
-
-  if (all(event == 0)) stop("Can't fit a Cox model with 0 failures")
-
-  if (missing(offset) || is.null(offset)) offset <- rep(0.0, nrow(Y))
-  if (missing(weights) || is.null(weights)) {
-    weights <- rep(1.0, nrow(Y))
-  } else if (any(weights <= 0)) {
-    stop("Invalid weights, must be >0")
-  } else {
-    weights <- as.vector(weights)
+  if (ncol(X) == 0) {
+    stop("coxphGPU() needs at least one covariate; use survival::coxph() ",
+         "for a model without covariates.")
   }
 
-  # Find rows to be ignored.  We have to match within strata: a
-  #  value that spans a death in another stratum, but not it its
-  #  own, should be removed.  Hence the per stratum delta
-  if (length(istrat) == 0) {
-    y1 <- Y[, 1]
-    y2 <- Y[, 2]
-    strata <- NULL
-  } else {
-    if (is.numeric(istrat)) {
-      strata <- as.integer(istrat)
+  maxiter <- control$iter.max
+  storage.mode(X) <- "double"
+
+  # `strata`, sent to Python, has one value per row of X and Y, in the same
+  # (unsorted) row order: the strata as defined by survival::coxph()
+  # (prep$strata), or a single stratum 0 for counting data without strata.
+  if (type == "counting") {
+    # As in survival's agreg.fit(): the times of each stratum are shifted by
+    # a multiple of the overall time range, so that no risk set spans two
+    # strata.
+    if (length(istrat) == 0) {
+      y1 <- Y[, 1]
+      y2 <- Y[, 2]
+      strata <- rep(0L, nrow(Y))
     } else {
-      strata <- as.integer(as.factor(istrat))
-    }
-    delta <- strata * (1 + max(Y[, 2]) - min(Y[, 1]))
-    y1 <- Y[, 1] + delta
-    y2 <- Y[, 2] + delta
-  }
-  event <- Y[, 3] > 0
-  dtime <- sort(unique(y2[event]))
-  indx1 <- findInterval(y1, dtime)
-  indx2 <- findInterval(y2, dtime)
-  # indx1 != indx2 for any obs that spans an event time
-  ignore <- (indx1 == indx2)
-  nused <- sum(!ignore)
-
-  # Sort the data (or rather, get a list of sorted indices)
-  #  For both stop and start times, the indices go from last to first
-  if (length(strata) == 0) {
-    sort.end <- order(ignore, -Y[, 2]) - 1L # indices start at 0 for C code
-    sort.start <- order(ignore, -Y[, 1]) - 1L
-    strata <- rep(0L, nrow(Y))
-  } else {
-    sort.end <- order(ignore, strata, -Y[, 2]) - 1L
-    sort.start <- order(ignore, strata, -Y[, 1]) - 1L
-  }
-
-  if (is.null(nvar) || nvar == 0) {
-    # A special case: Null model.  Just return obvious stuff
-    #  To keep the C code to a small set, we call the usual routines, but
-    #  with a dummy X matrix and 0 iterations
-    nvar <- 1
-    x <- matrix(as.double(1:nrow(Y)), ncol = 1) # keep the .C call happy
-    maxiter <- 0
-    nullmodel <- TRUE
-    if (length(init) != 0) stop("Wrong length for initial values")
-    init <- 0.0 # dummy value to keep a .C call happy (doesn't like 0 length)
-  } else {
-    nullmodel <- FALSE
-    maxiter <- control$iter.max
-
-    # In commentary below because Null value for coxph_R
-    #if (is.null(init)) init <- rep(0., nvar)
-    #if (length(init) != nvar) stop("Wrong length for initial values")
-  }
-
-  # 2021 change: pass in per covariate centering.  This gives
-  #  us more freedom to experiment.  Default is to leave 0/1 variables alone
-
-  # It seems y,
-  if (is.null(nocenter)) zero.one <- rep(FALSE, ncol(X))
-  # zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
-  mat <- as.matrix(X)
-  zero.one <- colSums(!array(mat %in% nocenter, dim(mat))) == 0
-
-  # the returned value of agfit$coef starts as a copy of init, so make sure
-  #  is is a vector and not a matrix; as.double suffices.
-  # Solidify the storage mode of other arguments
-  storage.mode(Y) <- storage.mode(X) <- "double"
-  storage.mode(offset) <- storage.mode(weights) <- "double"
-
-  # # survival routine
-  # agfit <- .Call("agfit4", nused,
-  #                Y, X, strata, weights,
-  #                offset,
-  #                as.double(init),
-  #                sort.start, sort.end,
-  #                as.integer(method=="efron"),
-  #                as.integer(maxiter),
-  #                as.double(control$eps),
-  #                as.double(control$toler.chol),
-  #                ifelse(zero.one, 0L, 1L))
-
-  # agfit4 centers variables within strata, so does not return a vector
-  #  of means.  Use a fill in consistent with other coxph routines
-
-  agmeans <- ifelse(zero.one, 0, colMeans(X))
-
-  }else if(type == "right"){
-
-    n <-  nrow(Y)
-    if (is.matrix(X)) nvar <- ncol(X)
-    else {
-      if (length(X)==0) nvar <-0
-      else nvar <-1
-    }
-    time <- Y[,1]
-    status <- Y[,2]
-
-    # Sort the data (or rather, get a list of sorted indices)
-    if (length(istrat)==0) {
-      sorted <- order(time)
-      strata <- NULL
-      newstrat <- as.integer(rep(0,n))
-    }
-    else {
-      sorted <- order(istrat, time)
-      strata <- istrat[sorted]
-      newstrat <- as.integer(c(1*(diff(as.numeric(strata))!=0), 1))
-    }
-    if (missing(offset) || is.null(offset)) offset <- rep(0,n)
-    if (missing(weights)|| is.null(weights))weights<- rep(1,n)
-    else {
-      if (any(weights<=0)) stop("Invalid weights, must be >0")
-      weights <- weights[sorted]
-    }
-    stime <- as.double(time[sorted])
-    sstat <- as.integer(status[sorted])
-
-    if (nvar==0) {
-      # A special case: Null model.
-      #  (This is why I need the rownames arg- can't use x' names)
-      # Set things up for 0 iterations on a dummy variable
-      x <- as.matrix(rep(1.0, n))
-      nullmodel <- TRUE
-      nvar <- 1
-      init <- 0
-      maxiter <- 0
-    }
-    else {
-      nullmodel <- FALSE
-      maxiter <- control$iter.max
-      if (!missing(init) && length(init)>0) {
-        if (length(init) != nvar) stop("Wrong length for initial values")
-      }
-      else init <- rep(0,nvar)
+      strata <- istrat
+      delta <- strata * (1 + max(Y[, 2]) - min(Y[, 1]))
+      y1 <- Y[, 1] + delta
+      y2 <- Y[, 2] + delta
     }
 
-    # 2012 change: individually choose which variable to rescale
-    # default: leave 0/1 variables alone
-    if (is.null(nocenter)) zero.one <- rep(FALSE, ncol(X))
-    else zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
+    # Covariate means used to centre the linear predictor, as in survival's
+    # agreg.fit(): by default, 0/1 variables are left uncentred.
+    if (is.null(nocenter)) {
+      zero.one <- rep(FALSE, ncol(X))
+    } else {
+      zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
+    }
+    agmeans <- ifelse(zero.one, 0, colMeans(X))
 
-    storage.mode(weights) <- storage.mode(init) <- "double"
-
+  } else if (type == "right") {
+    time <- Y[, 1]
+    status <- Y[, 2]
+    strata <- istrat
   }
 
 
@@ -402,34 +277,8 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
   event <- db$event
   data_Y <- db$data_Y
 
-  # data_Y <- cbind(data_Y,X)
-
-  # return(list(y1=y1,
-  #             y=y2,
-  #             x = X,
-  #             event = Y[,3]))
-
   # Covariables
-  #covar <- assign
   covar <- colnames(X)
-
-
-  # # remove NA for coxph_R
-  # #keep_col <- c(stop, event, colnames(X))
-  # keep_col <- c(stop, event, names(covar))
-  # data_real <- as.data.frame(data)[,keep_col]
-
-
-  # return(list(data_real = data_real,
-  #             data= data))
-  # return(list(dataset = as.data.frame(data),
-  #             y = Y,
-  #             stime=stime,
-  #             sstat=sstat,
-  #             x = X))
-
-  # data <- quote(options()$na.action)
-  data <- na.omit(data)
 
   coxfit <- .coxphGPU_call_python(
     data_Y = data_Y, data_X = X, start = start, stop = stop, death = event,
@@ -449,16 +298,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
   # Post processing of survival::coxph
   #
   ##############################################################################
-
-  if (is.matrix(X)) {
-    nvar <- ncol(X)
-  } else {
-    if (length(X) == 0) {
-      nvar <- 0
-    } else {
-      nvar <- 1
-    }
-  }
 
   coef <- c(coxfit$coef)
   names(coef) <- dimnames(X)[[2]]
@@ -537,7 +376,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
     # if (coxfit$flag < nvar) which.sing <- diag(var)==0
     # else which.sing <- rep(FALSE,nvar)
 
-    infs <- abs(coxfit$u %*% var)
+    # infs <- abs(coxfit$u %*% var)
     # if (maxiter >1) {
     #   if (coxfit$flag == 1000) {
     #     warning("Ran out of iterations and did not converge")
