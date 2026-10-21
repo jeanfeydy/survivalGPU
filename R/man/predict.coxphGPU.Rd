@@ -65,18 +65,25 @@ entry per observation.
 
 \item{...}{For future methods}
 }
+\value{
+The predictions computed by \code{\link[survival:predict.coxph]{survival::predict.coxph()}}: a numeric
+vector with one element per observation, or a matrix with one column per
+model term if \code{type = "terms"}. If \code{se.fit = TRUE}, a list with
+components \code{fit} (the predictions) and \code{se.fit} (their standard errors).
+}
 \description{
 Compute fitted values and regression terms for a model fitted by coxphGPU
 }
 \examples{
 \dontrun{
 library(survival)
-options(na.action = na.exclude) # retain NA in predictions
+old_options <- options(na.action = na.exclude) # retain NA in predictions
 fit <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung)
 predict(fit, type = "lp")
 predict(fit, type = "expected")
 predict(fit, type = "risk", se.fit = TRUE)
 predict(fit, type = "terms", se.fit = TRUE)
+options(old_options) # restore the previous setting
 }
 }
 \references{

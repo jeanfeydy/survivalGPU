@@ -1,8 +1,8 @@
 ---
-title: "Cox Proportional Hazards regression"
+title: "Cox Proportional Hazards"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Cox Proportional Hazards regression}
+  %\VignetteIndexEntry{Cox Proportional Hazards}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -11,17 +11,17 @@ vignette: >
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>"
+  collapse = FALSE,
+  comment = NA
 )
 ```
 
 
-Présenter le modèle de Cox[^cox1] [^cox2]
+The Cox proportional hazards model[^cox1] [^cox2] is a semi-parametric regression model for survival (time-to-event) data. It relates the hazard of an event at time $t$ to a set of covariates through a hazard ratio, without requiring the baseline hazard to follow a specific parametric form, and its coefficients are estimated by maximizing a partial likelihood.
 
 
 
-Let's make an example with `lung` cancer dataset from survival package. Check `?survival::lung` if you want more explanations about this dataset. Before load `survivalGPU`, use your virtual python environment (see `vignette("python_connect")`).
+Let's make an example with `lung` cancer dataset from survival package. Check `?survival::lung` if you want more explanations about this dataset. Before load `survivalGPU`, use your virtual python environment (see `vignette("installation")`).
 
 ```{r}
 library(reticulate)
@@ -44,6 +44,12 @@ head(data)
 ```
 
 You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula. If you use `bootstrap`, `patient_id` must be provided: it identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates).
+
+The bootstrap resamples are drawn by PyTorch, not by R, so `set.seed()` has no effect on them. To get reproducible results, set PyTorch's seed:
+
+```{r seed}
+invisible(reticulate::import("torch")$manual_seed(42L))
+```
 
 ```{r coxphGPU}
 coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,

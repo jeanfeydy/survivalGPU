@@ -6,8 +6,9 @@
 \alias{survivalGPU}
 \title{survivalGPU: Fast survival analysis}
 \description{
-Allows to perform survivals analysis on GPU with coxph and WCE
-models, and several features to use bootstrap and manage memory.
+Performs survival analysis on GPU-accelerated hardware using
+Cox proportional hazards and weighted cumulative exposure (WCE) models,
+with support for bootstrap resampling and memory management.
 
 To learn more about survivalGPU, start with the vignette :
 \code{vignette("survivalGPU")}
@@ -21,9 +22,29 @@ To learn more about survivalGPU, start with the vignette :
 }
 }
 
-\author{
+\seealso{
+Useful links:
 \itemize{
-\item \href{https://www.jeanfeydy.com}{Jean FEYDY}
-\item Alexis van STRAATEN
+  \item \url{https://github.com/jeanfeydy/survivalGPU}
+  \item Report bugs at \url{https://github.com/jeanfeydy/survivalGPU/issues}
 }
+
+}
+\author{
+\strong{Maintainer}: Antoine Poirot-Bourdain \email{antoine.poirot.bourdain@gmail.com}
+
+Authors:
+\itemize{
+  \item Antoine Poirot-Bourdain \email{antoine.poirot.bourdain@gmail.com}
+  \item Jean FEYDY \email{jean.feydy@inria.fr}
+  \item Alexis van STRAATEN \email{alexis.vanstraaten@outlook.fr}
+}
+
+Other contributors:
+\itemize{
+  \item Terry THERNEAU (Author of the 'survival' package, from which the C code and parts of the R code are adapted) [contributor, copyright holder]
+  \item Pierre SABATIER [contributor]
+  \item Anne-Sophie JANNOT [contributor]
+}
+
 }

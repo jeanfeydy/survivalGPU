@@ -10,10 +10,15 @@ HR(object, vecnum, vecdenom, level = 0.95)
 \item{object}{wceGPU object.}
 
 \item{vecnum}{A vector of time-dependent exposures corresponding to a
-scenario of interest (numerator of the HR).}
+scenario of interest (numerator of the HR), in reverse chronological
+order: the first value is the exposure at the current time, the second
+the exposure one time unit earlier, and so on. A vector longer than the
+\code{cutoff} of the model is truncated, and a shorter one is padded with zeros
+(no exposure further back in time).}
 
 \item{vecdenom}{A vector of time-dependent exposures corresponding to a
-scenario for the reference category (denominator of the HR).}
+scenario for the reference category (denominator of the HR), in the same
+order and with the same length rules as \code{vecnum}.}
 
 \item{level}{the confidence level required for HR CI. Default to 0.95.}
 }
@@ -22,8 +27,8 @@ Returns a HR according to the scenarios. If bootstrap is present
 in the wceGPU object, this function returns a confidence interval for the HR.
 }
 \description{
-Calcul the hazard ratio from a wceGPU object to compare two scenarios of
-time-dependant exposures.
+Calculate the hazard ratio from a wceGPU object to compare two scenarios of
+time-dependent exposures.
 }
 \examples{
 \dontrun{
@@ -32,12 +37,12 @@ drugdata <- WCE::drugdata
 
 # WCE model with bootstrap (example with 20 bootstraps)
 cutoff <- 90
-wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff,
-                            id = "Id", event = "Event", start = "Start",
-                            stop = "Stop", expos = "dose",
-                            covariates = c("age", "sex"),
-                            constrained = FALSE, aic = FALSE, confint = 0.95,
-                            nbootstraps = 20, batchsize = 0)
+wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff,
+                  id = "Id", event = "Event", start = "Start",
+                  stop = "Stop", expos = "dose",
+                  covariates = c("age", "sex"),
+                  constrained = FALSE, aic = FALSE, confint = 0.95)
+wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20, data = drugdata)
 
 # Exposed at a dose vs. unexposed
 exposed   <- rep(1, cutoff)

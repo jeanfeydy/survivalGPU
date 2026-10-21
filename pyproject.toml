@@ -19,7 +19,6 @@ dependencies = [
   "numpy",
   "matplotlib",
   "torch",
-  "pykeops",
   "beartype",
   "jaxtyping",
   "pandas",
@@ -36,6 +35,13 @@ keywords = [
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python"
+]
+
+[project.optional-dependencies]
+# PyKeOps powers the WCE model only; it is not available on Windows, so it
+# is kept out of the base dependencies. The CoxPH model does not need it.
+wce = [
+  "pykeops",
 ]
 
 [dependency-groups]
@@ -89,6 +95,9 @@ xfail_strict = true
 filterwarnings = [
   "error",
 ]
+markers = [
+  "needs_keops: marks tests that require the optional pykeops dependency (WCE model); auto-skipped with a warning when pykeops is not installed (see python/tests/conftest.py).",
+]
 log_cli_level = "info"
 testpaths = [
   "python/tests",
@@ -97,14 +106,13 @@ testpaths = [
 
 [tool.repo-review]
 ignore = [
-    "PY004", # explicit doc/ folder
     "PY005", # explicit test/ folder
     "PY007", # nox or tox
     "PC140", # MyPy
     "PC170", # PyGrep (because no rst files)
     "PC180", # Prettier
     "MY", # MyPy
-    "RTD", # ReadTheDocs
+    "RTD", # ReadTheDocs -- docs are hosted on GitHub Pages instead, not RTD
     ]
 
 
@@ -166,6 +174,11 @@ typing-modules = ["survivalgpu.typecheck"]
   ]
 # RUF003: Ambiguous no-break spaces
 # E402: module level import not at top of file
+
+# For conftest.py: pytest hooks (e.g. pytest_terminal_summary's `exitstatus`)
+# have fixed signatures that pluggy fills in by parameter name, so unused
+# hook arguments can't be renamed/prefixed with "_" like normal dummy args.
+"**conftest.py" = ["ARG001"]
 
 
 [tool.codespell]

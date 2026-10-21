@@ -1,4 +1,6 @@
-"""CoxPH, class API, WITH bootstrap resampling, CPU.
+"""
+CoxPH, class API, WITH bootstrap resampling, CPU
+===================================================
 
 Passing `nbootstraps` to `CoxPHSurvivalAnalysis` fits the main model once
 (`model.coef_`, ...) and additionally re-fits it on `nbootstraps` patient-level

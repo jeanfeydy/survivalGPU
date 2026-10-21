@@ -6,6 +6,11 @@
 \usage{
 use_cuda()
 }
+\value{
+A single logical value: \code{TRUE} if PyTorch detects a CUDA-capable
+GPU, in which case computations run on it by default; \code{FALSE} if they run
+on the CPU. An error is raised if the Python backend cannot be loaded.
+}
 \description{
 Specifies whether you are using GPUs or not. If TRUE, CUDA drivers are
 detected, and you are using GPU.

@@ -1,3 +1,5 @@
+skip_if_no_backend()
+
 library(survival)
 
 options(na.action=na.exclude) # preserve missing
