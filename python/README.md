@@ -7,6 +7,9 @@ with the WCE model additionally relying on [KeOps](https://www.kernel-operations
 survivalGPU scales classical survival models to large datasets and to heavy
 bootstrap resampling by running the core computations on the GPU.
 
+**Documentation**, with user guides and API reference:
+<https://jeanfeydy.github.io/survivalGPU/>
+
 
 ## Features
 
@@ -135,6 +138,19 @@ The test suite (`pip` >= 25.1 required) can then be run in two modes:
 Both modes are exercised in CI (see
 [python-tests.yml](https://github.com/jeanfeydy/survivalGPU/blob/main/.github/workflows/python-tests.yml)),
 the no-`pykeops` mode across Linux, macOS and Windows.
+
+## Acknowledgements
+
+survivalGPU's models follow two reference R packages, and are tested against
+them:
+
+- the Cox model, the [`survival`](https://CRAN.R-project.org/package=survival)
+  package by Terry Therneau;
+- the WCE model, the [`WCE`](https://CRAN.R-project.org/package=WCE) package by
+  Marie-Pierre Sylvestre and colleagues
+  ([doi:10.32614/CRAN.package.WCE](https://doi.org/10.32614/CRAN.package.WCE)),
+  which implements the method of Sylvestre and Abrahamowicz (2009),
+  [doi:10.1002/sim.3701](https://doi.org/10.1002/sim.3701).
 
 ## Citation
 
