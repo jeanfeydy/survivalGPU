@@ -438,6 +438,9 @@ print.wceGPU <- function(x, ...) {
   invisible(x)
 }
 
+
+
+
 #' Summary method for wceGPU object
 #'
 #' @param object wceGPU object
@@ -451,95 +454,73 @@ summary.wceGPU <- function(object, allres = FALSE, ...) {
 
   objname <- deparse(substitute(object))
 
-  if (allres == FALSE) {
-    sumWCEall(object, objname, ...)
+  if (isTRUE(allres)) {
+    criterion <- if (isTRUE(object$aic)) "AIC" else "BIC"
+    tab <- data.frame(
+      nknots = object$nknots.grid,
+      loglik = object$loglik.grid,
+      info.criterion = object$info.criterion.grid
+    )
+    colnames(tab)[3] <- criterion
+
+    cat("\nCandidate models tried:\n")
+    print(tab)
+    cat("\nBest model: ", object$best.nknots, " knot(s), by ", criterion,
+        ".\n", sep = "")
+    return(invisible(NULL))
+  }
+
+  shape <- if (isFALSE(object$constrained)) {
+    "unconstrained"
+  } else if (toupper(substr(object$constrained, 1, 1)) == "R") {
+    "constrained to go smoothly to zero for exposures far in the past"
   } else {
-    sumWCEgrid(object, objname, ...)
+    "constrained to start at zero for current exposures"
   }
-}
+  cat("Weighted cumulative exposure (WCE) in a Cox proportional hazards model\n")
+  cat("Weight function: cubic spline with ", format(object$best.nknots),
+      " interior knot(s), ", shape, "\n\n", sep = "")
 
-#' Prints the summary for the already-selected best model. Knot selection
-#' itself happens in Python (see best.nknots, and best_index_ /
-#' bootstrap_best_index_ on the Python side): object$info.criterion and the
-#' other fields read below already describe that single selected model, so
-#' which.min() here is a no-op unless something upstream changes.
-#' @noRd
-sumWCEall <- function(object, objname, ...) {
-
-  best <- which.min(object$info.criterion)
-
-  if (is.na(object$loglik[best]) == TRUE) {cat('Warning : the model did not converge, and no \npartial log-likelihood was produced. Results \nfor this model should be ignored.\n\n')}
-  if (sum(object$SED[[best]]==0) >0) {cat('Warning : some of the SE for the spline \nvariables in the model are exactlty zero, probably \nbecause the model did not converge. Variable(s)',  names(which(object$SED[[1]]==0)), ' \nhad SE=0. Consider re-parametrizing or increasing \nthe number of iterations\n\n')}
-
-  if (object$analysis == 'Cox') lab <- 'Proportional hazards model'
-
-  if (object$constrained == 'Left') {
-    cat("\n*** Left-constrained estimated WCE function (",lab ,").***\n", sep='')}
-  if (object$constrained == 'Right') {
-    cat("\n*** Right-constrained estimated WCE function  (",lab ,").***\n", sep='')}
-  if (object$constrained == FALSE) {
-    cat("\nUnconstrained estimated WCE function (",lab ,").***\n", sep='')}
-  if (object$aic == FALSE) {criterion <- "BIC: "} else {criterion <- "AIC: "}
-  if (is.null(object$covariates[1]) == FALSE){
-    cat("\nEstimated coefficients for the covariates: \n")
-    bhat <- unlist(object$beta.hat.covariates[best,])
-    s_hat <- unlist(object$se.covariates[best,])
-    coefmat <- data.frame(cbind(bhat, exp(bhat), s_hat, unlist(bhat/s_hat),  2*pnorm(-abs(unlist(bhat/s_hat)))))
-    rownames(coefmat) <-  object$covariates
-    colnames(coefmat) <- c("coef", "exp(coef)", "se(coef)", "z","p")
-    print(round(coefmat, 4))
-    cat('\n')
+  if (is.na(object$loglik)) {
+    warning("The model did not converge: its results should not be used.",
+            call. = FALSE)
+  }
+  zero_se <- colnames(object$SED)[which(object$SED[1, ] == 0)]
+  if (length(zero_se) > 0) {
+    warning("Standard error exactly zero for the spline coefficient(s) ",
+            paste(zero_se, collapse = ", "),
+            ": the model probably did not converge.", call. = FALSE)
   }
 
-  if (object$is_bootstraps && !is.null(object$covariates)) {
-    # cat("\n ---------------- \n")
-    cat(paste0(
-      "With bootstrap (", object$nbootstraps,
-      " bootstraps), conf.level = ", object$confint, " :\n"
-    ))
-    cat("\nCI of estimates :\n")
-    print(t(signif(object$coef_CI[, object$covariates, drop = FALSE])))
-    cat('\n')
-    # cat("\n ---------------- \n")
-    # cat("\n")
-    # cat("Quantile Partial log-Likelihoods :\n")
-    # print(quantile(object$loglik))
-    # cat("\n")
-    # cat(paste("Quantile", ifelse(object$aic==TRUE,"AIC :","BIC :")),
-    #     sep = "\n")
-    # print(quantile(object$info.criterion))
+  if (!is.null(object$covariates)) {
+    est <- object$beta.hat.covariates[1, ]
+    se <- object$se.covariates[1, ]
+    z <- est / se
+    tab <- cbind(est, exp(est), se, z, 2 * stats::pnorm(-abs(z)))
+    dimnames(tab) <- list(object$covariates,
+                          c("coef", "exp(coef)", "se(coef)", "z", "Pr(>|z|)"))
+    cat("Covariates:\n")
+    stats::printCoefmat(tab, P.values = TRUE, has.Pvalue = TRUE)
+    cat("\n")
+
+    if (object$is_bootstraps) {
+      cat("Bootstrap percentile intervals for the coefficients (",
+          object$nbootstraps, " replicates, level ", format(object$confint),
+          "):\n", sep = "")
+      print(signif(t(object$coef_CI[, object$covariates, drop = FALSE]), 4))
+      cat("\n")
+    }
   }
 
+  criterion <- if (isTRUE(object$aic)) "AIC" else "BIC"
+  cat("Partial log-likelihood: ", format(object$loglik), ", ", criterion,
+      ": ", format(object$info.criterion), "\n", sep = "")
+  cat("Number of events: ", object$nevents, "\n", sep = "")
+  cat("\nSee plot(", objname, ") for the estimated weight function.\n",
+      sep = "")
 
-
-
-  cat("Partial log-likelihood: ", object$loglik[which.min(object$info.criterion)], "  ", criterion, min(object$info.criterion), "\n\n", sep='')
-  cat("Number of events: ", object$nevents, "\n\n", sep='')
-  cat("Use plot(", objname , ') to see the estimated weight function corresponding to this model.\n', sep="")
-
-
-
+  invisible(NULL)
 }
-
-#' Prints every candidate nknots that was tried, alongside the one selected.
-#' @noRd
-sumWCEgrid <- function(object, objname, ...) {
-
-  criterion_label <- ifelse(object$aic, "AIC", "BIC")
-
-  tab <- data.frame(
-    nknots = object$nknots.grid,
-    loglik = object$loglik.grid,
-    info.criterion = object$info.criterion.grid
-  )
-  colnames(tab)[3] <- criterion_label
-
-  cat("\nCandidate models tried:\n")
-  print(tab)
-  cat("\nBest model: ", object$best.nknots, " knot(s), by ", criterion_label,
-      ".\n", sep = "")
-}
-
 
 #' Coef method for wceGPU object
 #'

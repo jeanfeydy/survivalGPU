@@ -8,9 +8,11 @@ This is a new submission.
   tarball, on an account with no Python configured (empty home directory,
   `RETICULATE_PYTHON` unset), as on a CRAN check machine. This machine
   reports one more NOTE, only because HTML Tidy is not installed on it.
-* TODO before submitting: add the win-builder (R-devel, R-release) and macOS
-  builder results here, and the GitHub Actions result for the submitted
-  commit. Remove this line.
+* macOS builder, R-release (4.6.1, arm64): Status OK.
+* win-builder, R-release (4.6.1, Windows Server 2022): 1 NOTE, the
+  incoming-feasibility NOTE below.
+* win-builder, R-devel (2026-10-18 r90707, Windows Server 2022): 1 NOTE, the
+  incoming-feasibility NOTE below.
 
 ## R CMD check results
 

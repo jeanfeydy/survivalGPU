@@ -45,6 +45,12 @@ head(data)
 
 You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula. If you use `bootstrap`, `patient_id` must be provided: it identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates).
 
+The bootstrap resamples are drawn by PyTorch, not by R, so `set.seed()` has no effect on them. To get reproducible results, set PyTorch's seed:
+
+```{r seed}
+invisible(reticulate::import("torch")$manual_seed(42L))
+```
+
 ```{r coxphGPU}
 coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
                                data = data,

@@ -35,7 +35,6 @@ Useful links:
 
 Authors:
 \itemize{
-  \item Antoine Poirot-Bourdain \email{antoine.poirot.bourdain@gmail.com}
   \item Jean FEYDY \email{jean.feydy@inria.fr}
   \item Alexis van STRAATEN \email{alexis.vanstraaten@outlook.fr}
 }
