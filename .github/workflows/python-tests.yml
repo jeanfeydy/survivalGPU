@@ -65,7 +65,7 @@ jobs:
 
       - name: Install package (with dependencies for tests)
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           # Install the 'wce' extra (pykeops) too, so CI keeps covering the
           # WCE model -- it's optional at install time since it's not
           # available on Windows, but this runner is Linux/macOS.
@@ -127,7 +127,7 @@ jobs:
       - name: Install package (without the 'wce' extra)
         shell: bash
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           # Deliberately omit the 'wce' extra: verifies the whole suite
           # passes cleanly (WCE tests auto-skipped + warning banner) when
           # pykeops is genuinely not installed.

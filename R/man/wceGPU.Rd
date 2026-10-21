@@ -23,7 +23,10 @@ corresponds to one and only one time unit for a given individual.}
 
 \item{nknots}{Corresponds to the number(s) of interior knots for the cubic
 splines to estimate the weight function. For example, if nknots is set to
-2, then a model with two interior knots is fitted.}
+2, then a model with two interior knots is fitted. If several values are
+given (e.g. \code{1:3}), one model is fitted per candidate and the one that
+minimizes the information criterion (see \code{aic}) is selected -- see
+\code{best.nknots} and the \verb{*.grid} fields in the returned object.}
 
 \item{cutoff}{Integer. Time window over which the WCE model is estimated.
 Corresponds to the length of the estimated weight function.}
@@ -74,8 +77,9 @@ the coxph function. See coxph.control for more details.}
 
 \item{object}{wceGPU object.}
 
-\item{allres}{Post-processing calculations. If TRUE, returns
-linear predictors, wald.test, concordance for all bootstraps.}
+\item{allres}{If TRUE, \code{summary()} prints every candidate number of knots
+that was tried, with its partial log-likelihood and information criterion,
+instead of the summary of the selected model.}
 
 \item{x}{wceGPU object.}
 
@@ -91,11 +95,48 @@ parameters are considered.}
 \item{digits}{significant digits to print.}
 }
 \value{
-WCE results
+\code{wceGPU()} returns an object of class \code{wceGPU}: a list that describes
+the selected model, i.e. the candidate in \code{nknots} that minimizes the
+information criterion. Its main components are:
+\itemize{
+\item \code{WCEmat}: matrix with one row and \code{cutoff} columns, the estimated weight
+function.
+\item \code{beta.hat.covariates}, \code{se.covariates}: one-row matrices with the
+estimated coefficients of the covariates and their standard errors.
+\item \code{est}, \code{SED}: one-row matrices with the estimated spline coefficients
+and their standard errors.
+\item \code{vcovmat}: list holding the variance-covariance matrix of all the
+coefficients (covariates, then spline coefficients).
+\item \code{knotsmat}: one-row matrix with the knots of the spline basis.
+\item \code{loglik}, \code{info.criterion}, \code{nevents}: partial log-likelihood,
+information criterion (the BIC, or the AIC if \code{aic = TRUE}) and number of
+events.
+\item \code{best.nknots}: the selected number of interior knots. \code{nknots.grid},
+\code{info.criterion.grid} and \code{loglik.grid} give the candidates and the
+information criterion and partial log-likelihood obtained for each.
+}
+
+After \code{\link[=bootstrap]{bootstrap()}}, the object also contains:
+\itemize{
+\item \code{WCEmat_bootstrap}, \code{bootstrap_beta.hat.covariates}: matrices with one
+row per bootstrap replicate, for the weight function and for the
+coefficients of the covariates.
+\item \code{WCEmat_CI}, \code{coef_CI}: two-row matrices with their lower and upper
+percentile confidence limits, at level \code{confint}.
+\item \code{bootstrap.best.nknots}: the number of knots selected in each replicate.
+\item \code{bootstrap_est}, \code{est_CI}: the same for the spline coefficients, only
+when a single \code{nknots} value is given.
+}
+
+\code{summary()} and \code{plot()} are called for their side effects (printing the
+model, plotting the weight function) and return \code{NULL} invisibly.
+\code{confint()} returns a matrix with one row per covariate and two columns:
+the lower and upper confidence limits of its coefficient, based on the
+normal approximation.
 }
 \description{
 New implementation of the Weighted Cumulative Exposure model
-(see @details), compatible with GPU to accelerate calculation speed and
+(see Details), compatible with GPU to accelerate calculation speed and
 work with large datasets. Fits a point estimate only; call \code{\link[=bootstrap]{bootstrap()}}
 on the result for bootstrap-based inference.
 
@@ -127,8 +168,9 @@ summary(wce_gpu)
 # See estimated weight function
 plot(wce_gpu)
 
-# Bootstrap-based inference, as a separate step (normally R > 500)
-wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20, data = drugdata, batchsize = 0)
+# Bootstrap-based inference, as a separate step (example with 20
+# replicates, but normally R > 500)
+wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20, data = drugdata)
 
 # See confidence bands for the estimated weight function due to bootstrap
 plot(wce_gpu_bootstrap)

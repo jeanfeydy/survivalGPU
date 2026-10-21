@@ -1,4 +1,4 @@
-testthat::skip_if_not(reticulate::py_module_available("survivalgpu"))
+skip_if_no_backend()
 skip_if_no_pykeops()
 
 # This file directly compares the R package's own wceGPU()/bootstrap()
@@ -11,7 +11,7 @@ skip_if_no_pykeops()
 # comparison.
 
 drugdata <- WCE::drugdata
-survivalgpu <- reticulate::import("survivalgpu")
+# `survivalgpu` is the package's own (bundled) Python module, see zzz.R.
 torch <- reticulate::import("torch")
 
 R_reps <- 20

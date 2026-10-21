@@ -15,6 +15,14 @@
 
 \item{signif.stars}{show stars to highlight small p-values}
 }
+\value{
+\code{x}, invisibly. Called for its side effect: printing the model.
+}
 \description{
-Print method for coxphGPU object
+Prints a model fitted by \code{\link[=coxphGPU]{coxphGPU()}} in the same way as a
+\code{\link[survival:coxph]{survival::coxph()}} fit. If \code{\link[=bootstrap]{bootstrap()}} was called on the model, a note
+points to \code{summary()} for the bootstrap confidence intervals.
+}
+\seealso{
+\code{\link[=coxphGPU]{coxphGPU()}}, \code{\link[survival:coxph]{survival::coxph()}}
 }

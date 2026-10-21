@@ -106,14 +106,13 @@ testpaths = [
 
 [tool.repo-review]
 ignore = [
-    "PY004", # explicit doc/ folder
     "PY005", # explicit test/ folder
     "PY007", # nox or tox
     "PC140", # MyPy
     "PC170", # PyGrep (because no rst files)
     "PC180", # Prettier
     "MY", # MyPy
-    "RTD", # ReadTheDocs
+    "RTD", # ReadTheDocs -- docs are hosted on GitHub Pages instead, not RTD
     ]
 
 

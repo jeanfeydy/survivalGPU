@@ -1,4 +1,4 @@
-testthat::skip_if_not(reticulate::py_module_available("survivalgpu"))
+skip_if_no_backend()
 
 library(survival)
 options(na.action=na.exclude) # preserve missing

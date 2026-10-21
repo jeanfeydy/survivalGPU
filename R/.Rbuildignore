@@ -17,3 +17,9 @@
 ^vignettes/precompile\.R$
 ^src/.*\.o$
 ^src/.*\.so$
+(^|/)__pycache__$
+\.py[cod]$
+(^|/)htmlcov$
+(^|/)coverage\.xml$
+(^|/)\.pytest_cache$
+(^|/)\.hypothesis$

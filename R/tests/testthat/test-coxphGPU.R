@@ -1,4 +1,4 @@
-testthat::skip_if_not(reticulate::py_module_available("survivalgpu"))
+skip_if_no_backend()
 
 # Dataset
 drugdata <- WCE::drugdata
@@ -476,4 +476,75 @@ test_that("bootstrap() works for a stratified counting-type model", {
   )
   expect_equal(fit_strata$coefficients, fit_strata_boot$coefficients, tolerance = 1e-8)
   expect_equal(fit_strata_boot$nbootstraps, 15)
+})
+
+# Bootstrap edge cases ------
+
+# Rows dropped from the model frame (missing values, `subset`) must also be
+# dropped from the patient ids used for the bootstrap resampling.
+lung_id <- survival::lung
+lung_id$id <- seq_len(nrow(lung_id)) # one row per patient
+
+test_that("coxphGPU bootstrap - rows with missing values", {
+  fit <- coxphGPU(
+    Surv(time, status) ~ age + ph.ecog,
+    lung_id,
+    x = TRUE
+  )
+  fit <- bootstrap(fit, R = 5, patient_id = "id", data = lung_id)
+  ref <- survival::coxph(Surv(time, status) ~ age + ph.ecog, lung_id)
+
+  expect_equal(fit$n, ref$n)
+  expect_equal(
+    as.numeric(fit$coefficients),
+    as.numeric(ref$coefficients),
+    tolerance = 1e-5
+  )
+  expect_equal(dim(fit$coef_bootstrap), c(5, 2))
+})
+
+test_that("coxphGPU bootstrap - subset", {
+  fit <- coxphGPU(
+    Surv(time, status) ~ age + ph.ecog,
+    lung_id,
+    subset = sex == 2,
+    x = TRUE
+  )
+  fit <- bootstrap(fit, R = 5, patient_id = "id", data = lung_id)
+  ref <- survival::coxph(
+    Surv(time, status) ~ age + ph.ecog,
+    lung_id,
+    subset = sex == 2
+  )
+
+  expect_equal(fit$n, ref$n)
+  expect_equal(
+    as.numeric(fit$coefficients),
+    as.numeric(ref$coefficients),
+    tolerance = 1e-5
+  )
+  expect_equal(dim(fit$coef_bootstrap), c(5, 2))
+})
+
+# coef_bootstrap must be stored as soon as there is one replicate, since
+# summary() reads it whenever nbootstraps > 0.
+test_that("coxphGPU bootstrap - a single replicate", {
+  fit <- coxphGPU(
+    Surv(Start, Stop, Event) ~ sex + age,
+    drugdata,
+    x = TRUE
+  )
+  fit <- bootstrap(fit, R = 1, patient_id = "Id", data = drugdata)
+
+  expect_equal(dim(fit$coef_bootstrap), c(1, 2))
+  expect_equal(dim(summary(fit)$conf.int_bootstrap), c(2, 2))
+  expect_output(print(summary(fit)), "Confidence interval with 1 bootstraps")
+})
+
+test_that("coxphGPU no longer takes the fit-time bootstrap arguments", {
+  expect_error(
+    coxphGPU(Surv(Start, Stop, Event) ~ sex + age, drugdata,
+             patient_id = "Id", bootstrap = 5),
+    "no longer takes patient_id, bootstrap"
+  )
 })

@@ -1,4 +1,4 @@
-testthat::skip_if_not(reticulate::py_module_available("survivalgpu"))
+skip_if_no_backend()
 
 # This file directly compares the R package's own coxphGPU()/bootstrap()
 # pipeline against calling the underlying Python survivalgpu functions via
@@ -12,7 +12,7 @@ testthat::skip_if_not(reticulate::py_module_available("survivalgpu"))
 # meant to catch it.
 
 drugdata <- WCE::drugdata
-survivalgpu <- reticulate::import("survivalgpu")
+# `survivalgpu` is the package's own (bundled) Python module, see zzz.R.
 torch <- reticulate::import("torch")
 
 R_reps <- 25
@@ -34,7 +34,7 @@ fit_boot <- bootstrap(
 data_X <- as.matrix(drugdata[, c("sex", "age")])
 storage.mode(data_X) <- "double"
 
-data_Y <- data.table::data.table(
+data_Y <- data.frame(
   Start = as.integer(drugdata$Start),
   Stop = as.integer(drugdata$Stop),
   Event = as.integer(drugdata$Event),

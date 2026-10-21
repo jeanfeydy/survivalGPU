@@ -34,77 +34,52 @@ It’s also possible to use the library without a GPU (CPU fallback).
 
 ## Installation
 
-survivalGPU wraps a Python backend (via the `reticulate` R package), so
-it needs a working Python environment with `torch` installed (`pykeops`
-too, if you need `wceGPU()`). To configure this properly, check
-`vignette("python_connect")` — the short version:
+Install survivalGPU from CRAN, together with the Python libraries it uses
+behind the scenes (via the `reticulate` R package). You need **R >= 4.1**
+and **Python >= 3.10**.
+
+``` r
+# 1. The R package:
+install.packages("survivalGPU")
+
+# 2. The Python libraries, once (torch is a large download):
+library(reticulate)
+virtualenv_create("survivalGPU", version = ">=3.10")
+virtualenv_install("survivalGPU", c("numpy", "torch", "pandas", "scipy",
+                                    "matplotlib", "beartype", "jaxtyping"))
+# Only for wceGPU() -- not available on Windows:
+virtualenv_install("survivalGPU", "pykeops")
+```
+
+On macOS, `pykeops` also needs Apple's compiler (`xcode-select --install`)
+and OpenMP (`brew install libomp`). On Windows, `coxphGPU()` works but
+`wceGPU()` doesn't (use
+[WSL2](https://learn.microsoft.com/windows/wsl/install) if you need it).
+
+To install the development version from GitHub instead, use
+`remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")`. This
+builds the package from source, so it needs a C compiler
+([Rtools](https://cran.r-project.org/bin/windows/Rtools/) on Windows, the
+Xcode command line tools on macOS).
+
+At the start of each R session, select the Python environment **before**
+loading survivalGPU:
 
 ``` r
 library(reticulate)
-
-virtualenv_create("survivalGPU")
-# Add "pykeops" to this list if you need wceGPU() (not available on Windows):
-virtualenv_install("survivalGPU", packages = c("torch", "matplotlib",
-                                               "beartype", "jaxtyping"))
-# torch takes a long time to set up
+use_virtualenv("survivalGPU")
+library(survivalGPU)
 ```
 
-### Requirements
-
--   **R \>= 4.1**
--   **Python \>= 3.10**
--   **A C++ compiler (WCE only):**
-    [`pykeops`](https://www.kernel-operations.io) just-in-time compiles
-    C++/CUDA kernels at runtime, so a working C++ toolchain must be
-    present. For GPU acceleration you also need the **CUDA toolkit**
-    (`nvcc`) installed, not just a CUDA-capable GPU — the code runs on
-    CPU without one, the GPU is simply where the speedups come from.
-    `coxphGPU()` doesn’t need any of this.
-
-### macOS (Apple Silicon)
-
-> **Known issue:** calling `coxphGPU()`/`wceGPU()` from R currently
-> crashes with a native segfault on macOS, specifically when Python is
-> embedded via `reticulate` — see [MACOS_SEGFAULT.md](MACOS_SEGFAULT.md)
-> for the full investigation. It does **not** affect the [Python
-> package](https://github.com/jeanfeydy/survivalGPU/tree/main/python)
-> used directly, without R. If you’re on macOS and need the package
-> working today, use the Python package directly rather than the R
-> wrapper.
-
-`pykeops` needs [OpenMP](https://www.openmp.org), which isn’t bundled
-with Apple’s compiler toolchain on Apple Silicon (M1/M2/M3/M4). Without
-it, `pykeops` disables OpenMP and falls back to a much less-tested code
-path — we’ve seen this cause crashes. Install it via Homebrew before
-setting up your Python environment:
-
-``` bash
-brew install libomp
-```
-
-### Windows
-
-`coxphGPU()` installs and runs natively on Windows. **pykeops**, needed
-only for `wceGPU()`, compiles C++/CUDA kernels at runtime and is **not
-supported natively on Windows**. See the [Python package’s
-README](https://github.com/jeanfeydy/survivalGPU/blob/main/python/README.md#windows)
-for working alternatives (WSL2, Docker) if you need `wceGPU()`.
-
-The R package and its Python backend live together in the same
-[GitHub](https://github.com/) repository (no git submodule involved), so
-you can install the development version of survivalGPU directly with:
-
-``` r
-# install.packages("remotes")
-remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")
-```
+See `vignette("installation")` for troubleshooting, or to use your own
+Python environment.
 
 ## Quick start
 
 Let’s make a small example for a Cox PH model with the `lung` cancer
 dataset from the `survival` package. Before loading `survivalGPU`, use
 your virtual Python environment (see above or
-`vignette("python_connect")`).
+`vignette("installation")`).
 
 ``` r
 library(reticulate)
@@ -120,7 +95,6 @@ Check if CUDA is detected :
 
 ``` r
 use_cuda()
-#> [KeOps] Warning : CUDA libraries not found or could not be loaded; Switching to CPU only.
 #> [1] FALSE
 ```
 
@@ -220,7 +194,7 @@ plot a forestplot of your model. All is explain in the
 
 -   `vignette("coxPH")`
 -   `vignette("WCE")`
--   `vignette("python_connect")`
+-   `vignette("installation")`
 
 ## Development
 
@@ -244,7 +218,7 @@ devtools::test()
 environment with `torch` installed. `wceGPU()` tests
 ([test-wceGPU.R](https://github.com/jeanfeydy/survivalGPU/blob/main/R/tests/testthat/test-wceGPU.R))
 additionally need `pykeops` (not available on Windows) in that same
-environment — see `vignette("python_connect")` to add it to your
+environment — see `vignette("installation")` to add it to your
 virtualenv. If it’s missing, those tests are skipped with an informative
 message instead of failing.
 

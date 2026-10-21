@@ -1,4 +1,6 @@
-"""WCE (Weighted Cumulative Exposure), class API, no bootstrap, CPU.
+"""
+WCE (Weighted Cumulative Exposure), class API, no bootstrap, CPU
+====================================================================
 
 `WCESurvivalAnalysis` models a time-varying drug exposure by combining it
 with a bank of B-spline basis functions ("atoms") over a `cutoff`-long time
@@ -8,7 +10,7 @@ extra `covariates`, such as "sex" here). The fitted risk function
 still contributes to the current risk.
 
 Run with:
-    python 04_wce_basic.py
+    python 03_wce_basic.py
 """
 
 import numpy as np
