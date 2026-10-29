@@ -1,86 +1,132 @@
-#' Fast WCE
+#' Fast Weighted Cumulative Exposure Model
 #'
-#' @description New implementation of the Weighted Cumulative Exposure model
-#'   (see @details), compatible with GPU to accelerate calculation speed and
-#'   work with large datasets.
-#'
-#'   Use `summary()` and `plot()` methods to see results and risk function.
+#' @description Fits a weighted cumulative exposure (WCE) model on the GPU (or
+#'   the CPU). Only point estimates are computed: call [bootstrap()] on the
+#'   result for bootstrap confidence intervals, and inspect it with
+#'   `summary()` and `plot()`.
 #'
 #' @usage
 #' wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
-#'        event, start, stop, expos, covariates = NULL, nbootstraps = 0,
-#'        batchsize = 0, confint = 0.95, controls = NULL, ...)
+#'        event, start, stop, expos, covariates = NULL,
+#'        confint = 0.95, x = FALSE, ...)
 #'
-#' @param data A data frame in an interval (long) format, in which each line
-#'   corresponds to one and only one time unit for a given individual.
-#' @param nknots Corresponds to the number(s) of interior knots for the cubic
-#'   splines to estimate the weight function. For example, if nknots is set to
-#'   2, then a model with two interior knots is fitted.
-#' @param cutoff Integer. Time window over which the WCE model is estimated.
-#'   Corresponds to the length of the estimated weight function.
-#' @param constrained Controls whether the weight function should be constrained
-#'   to smoothly go to zero. Set to FALSE for unconstrained models, to 'Right'
-#'   or 'R' to constrain the weight function to smoothly go to zero for exposure
-#'   remote in time, and to 'Left' or 'L' to constrain the weight function to
-#'   start a zero for the current values.
-#' @param aic Logical. Controls which information criterion is reported in
-#'   `info.criterion`: the AIC if TRUE, the BIC if FALSE (default). Note that
-#'   the BIC implemented in WCE is the version suggested by Volinsky and
-#'   Raftery in Biometrics (2000), which corresponds to
-#'   BIC = -2 * log(PL) + p * log(d) where PL is the model's partial
-#'   likelihood, p is the number of estimated parameters and d is the number of
-#'   uncensored events; the AIC replaces the log(d) penalty with 2. See
-#'   Sylvestre and Abrahamowicz (2009) for more details.
-#' @param id Name of the variable in data corresponding to the identification of
-#'   subjects.
-#' @param event Name of the variable in data corresponding to event indicator.
-#'   Must be coded 1 = event and 0 = no event.
-#' @param start Name of the variable in data corresponding to the starting time
-#'   for the interval. Corresponds to time argument in function Surv in the
-#'   survival package.
-#' @param stop Name of the variable in data corresponding to the ending time for
-#'   the interval. Corresponds to time2 argument in function Surv in the
-#'   survival package.
-#' @param expos Name of the variable in data corresponding to the exposure
-#'   variable.
-#' @param covariates Optional. Vector of characters corresponding to the name(s)
-#'   of the variable(s) in data corresponding to the covariate(s) to be included
-#'   in the model. Default to NULL, which corresponds to fitting model(s)
-#'   without covariates.
-#' @param nbootstraps Number of repeats for the bootstrap cross-validation.
-#' @param batchsize Number of bootstrap copies that should be handled at a time.
-#'   Defaults to 0, which means that we handle all copies at once. If you run
-#'   into out of memory errors, please consider using batchsize=100, 10 or 1.
-#' @param confint Level for confidence intervals. Default to 0.95.
-#' @param controls List corresponding to the control parameters to be passed to
-#'   the coxph function. See coxph.control for more details.
-#' @param ... Optional; other parameters to be passed through to WCE
+#' @param data Data frame in counting-process (long) format, with one row per
+#'   subject and time unit.
+#' @param nknots Number of interior knots of the cubic spline that models the
+#'   weight function. With several values (e.g. `1:3`), one model is fitted
+#'   per value and the one with the smallest information criterion (see
+#'   `aic`) is kept; `best.nknots` and the `*.grid` components of the result
+#'   describe all the candidates.
+#' @param cutoff Length, in time units, of the exposure history that affects
+#'   the hazard: the weight function is estimated for lags `0` to
+#'   `cutoff - 1` (the `cutoff` columns of `WCEmat`), and older exposures have
+#'   no effect.
+#' @param constrained Shape constraint on the weight function. `FALSE`
+#'   (default): none. `"Right"` (or `"R"`): it decreases smoothly to zero at
+#'   the oldest lag. `"Left"` (or `"L"`): it is zero at lag 0, so the current
+#'   exposure has no effect.
+#' @param aic Logical. Information criterion used to choose among the
+#'   `nknots` candidates and reported in `info.criterion`: the AIC if `TRUE`,
+#'   the BIC if `FALSE` (default). Both equal
+#'   \eqn{-2 \log(PL) + k p}{-2 log(PL) + k p}, with \eqn{PL} the partial
+#'   likelihood and \eqn{p} the number of estimated parameters; \eqn{k = 2}
+#'   for the AIC and \eqn{k = \log(d)}{k = log(d)}, with \eqn{d} the number
+#'   of events, for the BIC (Volinsky and Raftery, 2000).
+#' @param id Name of the column of `data` that identifies the subjects.
+#' @param event Name of the column of `data` with the event indicator, coded
+#'   `1` (event) or `0` (no event).
+#' @param start Name of the column of `data` with the start time of each
+#'   interval (the `time` argument of [survival::Surv()]).
+#' @param stop Name of the column of `data` with the end time of each interval
+#'   (the `time2` argument of [survival::Surv()]).
+#' @param expos Name of the column of `data` with the exposure.
+#' @param covariates Character vector with the names of the columns of `data`
+#'   to adjust for. `NULL` (default): no adjustment.
+#' @param confint Level of the bootstrap confidence intervals computed by
+#'   [bootstrap()] (default `0.95`).
+#' @param x For `wceGPU()`: logical. If `TRUE`, the columns of `data` used by
+#'   the model (`id`, `event`, `start`, `stop`, `expos` and `covariates`) are
+#'   stored in the result, as `data`. Required by [bootstrap()], which
+#'   resamples exactly the data the model was fitted on. For `plot()`: a
+#'   `wceGPU` object.
+#' @param ... For `wceGPU()`: `device` (`"cpu"` or `"cuda"`; default: the GPU
+#'   if one is available) and `double_precision` (`TRUE`, the default, for
+#'   64-bit floats; `FALSE` for 32-bit floats, faster on most GPUs). For the
+#'   methods: not used.
 #'
-#' @details WCE implements a flexible method for modeling cumulative effects of
-#'   time-varying exposures, weighted according to their relative proximity in
-#'   time, and represented by time-dependent covariates. The current
-#'   implementation estimates the weight function in the Cox proportional
-#'   hazards model. The function that assigns weights to doses taken in the past
-#'   is estimated using cubic regression splines.
+#' @details At each time \eqn{t}, the exposure enters the Cox model through
+#'   its weighted cumulative exposure over the last `cutoff` time units,
+#'   \deqn{WCE(t) = \sum_{u=0}^{cutoff-1} w(u) X(t-u),}{WCE(t) = sum over u = 0, ..., cutoff - 1 of w(u) X(t - u),}
+#'   where \eqn{X(t-u)} is the exposure \eqn{u} time units before \eqn{t}.
+#'   The weight function \eqn{w} is a cubic spline with `nknots` interior
+#'   knots. \eqn{WCE(t)} is therefore a linear combination of spline-weighted
+#'   exposure histories, which enter a Cox proportional hazards model as
+#'   time-dependent covariates, together with `covariates`. Their estimated
+#'   coefficients give \eqn{w}, returned in `WCEmat`.
 #'
 #' @references Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative
 #'   effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov
-#'   30;28(27):3437-53.
+#'   30;28(27):3437-53. \doi{10.1002/sim.3701}
 #'
-#' @return WCE results
+#'   Sylvestre M (2025). _WCE: Weighted Cumulative Exposure Models_. R package
+#'   version 1.0.4. \doi{10.32614/CRAN.package.WCE}. The reference
+#'   implementation of the method: `wceGPU()` follows its interface, and its
+#'   results are tested against it.
+#'
+#'   Volinsky CT, Raftery AE (2000). Bayesian information criterion for
+#'   censored survival models. Biometrics, 56(1), 256-262.
+#'   \doi{10.1111/j.0006-341X.2000.00256.x}
+#'
+#' @return `wceGPU()` returns an object of class `wceGPU`: a list that describes
+#'   the selected model, i.e. the candidate in `nknots` that minimizes the
+#'   information criterion. Its main components are:
+#'   * `WCEmat`: matrix with one row and `cutoff` columns, the estimated weight
+#'   function.
+#'   * `beta.hat.covariates`, `se.covariates`: one-row matrices with the
+#'   estimated coefficients of the covariates and their standard errors.
+#'   * `est`, `SED`: one-row matrices with the estimated spline coefficients
+#'   and their standard errors.
+#'   * `vcovmat`: list holding the variance-covariance matrix of all the
+#'   coefficients (covariates, then spline coefficients).
+#'   * `knotsmat`: one-row matrix with the knots of the spline basis.
+#'   * `loglik`, `info.criterion`, `nevents`: partial log-likelihood,
+#'   information criterion (the BIC, or the AIC if `aic = TRUE`) and number of
+#'   events.
+#'   * `best.nknots`: the selected number of interior knots. `nknots.grid`,
+#'   `info.criterion.grid` and `loglik.grid` give the candidates and the
+#'   information criterion and partial log-likelihood obtained for each.
+#'   * `data`: with `x = TRUE`, the columns of `data` used by the model.
+#'
+#'   After [bootstrap()], the object also contains:
+#'   * `WCEmat_bootstrap`, `bootstrap_beta.hat.covariates`: matrices with one
+#'   row per bootstrap replicate, for the weight function and for the
+#'   coefficients of the covariates.
+#'   * `WCEmat_CI`, `coef_CI`: two-row matrices with their lower and upper
+#'   percentile confidence limits, at level `confint`.
+#'   * `bootstrap.best.nknots`: the number of knots selected in each replicate.
+#'   * `bootstrap_est`, `est_CI`: the same for the spline coefficients, only
+#'   when a single `nknots` value is given.
+#'
+#'   `summary()` and `plot()` are called for their side effects (printing the
+#'   model, plotting the weight function) and return `NULL` invisibly.
+#'   `confint()` returns a matrix with one row per covariate and two columns:
+#'   the lower and upper confidence limits of its coefficient, based on the
+#'   normal approximation.
 #' @export
+#'
+#' @seealso [bootstrap()]
 #'
 #' @examples
 #' \dontrun{
 #' # Dataset
 #' drugdata <- WCE::drugdata
 #'
-#' # WCE model
+#' # WCE model, point estimate only
 #' wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = 90, id = "Id",
 #'                   event = "Event", start = "Start", stop = "Stop",
 #'                   expos = "dose", covariates = c("age", "sex"),
 #'                   constrained = FALSE, aic = FALSE, confint = 0.95,
-#'                   nbootstraps = 1, batchsize = 0)
+#'                   x = TRUE)
 #'
 #' # Results
 #' wce_gpu
@@ -89,14 +135,9 @@
 #' # See estimated weight function
 #' plot(wce_gpu)
 #'
-#' # WCE model with bootstrap (example with 20 bootstraps, but normally
-#' # nbootstraps > 500)
-#' wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = 90,
-#'                             id = "Id", event = "Event", start = "Start",
-#'                             stop = "Stop", expos = "dose",
-#'                             covariates = c("age", "sex"),
-#'                             constrained = FALSE, aic = FALSE, confint = 0.95,
-#'                             nbootstraps = 20, batchsize = 0)
+#' # Bootstrap-based inference, as a separate step (example with 20
+#' # replicates, but normally R > 500)
+#' wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20)
 #'
 #' # See confidence bands for the estimated weight function due to bootstrap
 #' plot(wce_gpu_bootstrap)
@@ -112,8 +153,7 @@
 #' }
 wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
                    event, start, stop, expos, covariates = NULL,
-                   nbootstraps = 0, batchsize = 0, confint = 0.95,
-                   controls = NULL, ...) {
+                   confint = 0.95, x = FALSE, ...) {
   UseMethod("wceGPU")
 }
 
@@ -124,57 +164,43 @@ wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
 #' @exportS3Method wceGPU default
 wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                            aic = FALSE, id, event, start, stop, expos,
-                           covariates = NULL, nbootstraps = 0, batchsize = 0,
-                           confint = 0.95, controls = NULL, device = NULL, double_precision = TRUE, ...) {
+                           covariates = NULL,
+                           confint = 0.95, x = FALSE,
+                           device = NULL, double_precision = TRUE, ...) {
   # survivalgpu <- use_survivalGPU()
 
-  wce_R <- survivalgpu$wce_R
-
-
-  # Minor changes for python inputs
-  if (constrained == FALSE) {
-    py_constrained <- "None"
-  } else {
-    py_constrained <- constrained
+  # Bootstrap is no longer requested at fit time. Without this check, the old
+  # arguments would be silently swallowed by `...` and the fit returned
+  # without any bootstrap.
+  removed <- intersect(names(list(...)), c("nbootstraps", "batchsize"))
+  if (length(removed)) {
+    stop("wceGPU() no longer takes ", paste(removed, collapse = ", "),
+         ": fit the model with x = TRUE, then call bootstrap(fit, R = ).",
+         call. = FALSE)
   }
 
-
-  if (length(covariates) < 2) {
-    py_covariates <- as.list(covariates)
-  } else {
-    py_covariates <- covariates
-  }
-
-
-
-
-  wce <- wce_R(
-    data = data, ids = id, covars = py_covariates, start = start, stop = stop,
-    doses = expos, events = event, nknots = nknots,
-    constrained = py_constrained, cutoff = cutoff, aic = aic,
-    bootstrap = nbootstraps, batchsize = batchsize,
-    device = device, double_precision = double_precision,
+  wce <- .wceGPU_call_python(
+    data = data, id = id, event = event, start = start, stop = stop,
+    expos = expos, covariates = covariates, nknots = nknots,
+    constrained = constrained, cutoff = cutoff, aic = aic,
+    bootstrap = 0, batchsize = 0, init = NULL,
+    device = device, double_precision = double_precision
   )
 
-
-  if (is.null(nbootstraps)) {
-    is_bootstraps <- FALSE
-  }
-  else if (nbootstraps == 0) {
-     is_bootstraps <- FALSE
-  }
-  else if (nbootstraps > 0) {
-     is_bootstraps <- TRUE
-  }
-  else {
-      stop(sprintf("Invalid value for nbootstraps: %s. Expect NULL or an positive integer", deparse(nbootstraps)))
+  model_data <- if (isTRUE(x)) {
+    data[unique(c(id, event, start, stop, expos, covariates))]
   }
 
 
   # call WCE outputs and rename them to follow R WCE convention
 
+  # best.nknots is the candidate (out of possibly several) that Python
+  # already selected by information criterion; every field below describes
+  # that selected model, not the raw candidate list in `nknots`.
+  best.nknots <- as.numeric(wce$best_nknots)[1]
+
   knotsmat <- matrix(c(wce$knotsmat), nrow = 1)
-  rownames(knotsmat) <- paste(nknots, "knot(s)")
+  rownames(knotsmat) <- paste(best.nknots, "knot(s)")
 
 
   WCEmat <- wce$risk_function
@@ -199,9 +225,6 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 
   loglik <- c(wce$loglik)
 
-  vcovmat <- wce$imat   # (1, n, m) array — will need to adapt it if we do with mode than one nknots
-
-
   vcovmat <- list()
 
   vcovmat_knot <- drop(wce$imat)
@@ -209,7 +232,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
   rownames(vcovmat_knot) <- cov
   colnames(vcovmat_knot) <- cov
 
-  vcovmat[[paste(nknots, "knot(s)")]] <- vcovmat_knot
+  vcovmat[[paste(best.nknots, "knot(s)")]] <- vcovmat_knot
 
 
 
@@ -228,6 +251,7 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     se.covariates = se.covariates,
     est = est,
     SED = SED,
+    total_covariates = total_covariates,
     WCEmat = WCEmat,
     vcovmat = vcovmat,
     covariates = covariates,
@@ -237,46 +261,119 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
     aic = aic,
     info.criterion = info_criterion,
     nknots = nknots,
+    best.nknots = best.nknots,
+    nknots.grid = as.vector(wce$nknots_grid),
+    info.criterion.grid = as.vector(wce$info_criterion_grid),
+    loglik.grid = as.vector(wce$loglik_grid),
+    cutoff = cutoff,
     confint = confint,
-    nbootstraps = nbootstraps,
-    is_bootstraps = is_bootstraps
+    nbootstraps = 0, # no bootstrap at fit time; see bootstrap()
+    is_bootstraps = FALSE,
+    # Stored so bootstrap() can be called later without re-supplying every
+    # column name.
+    id = id,
+    event = event,
+    start = start,
+    stop = stop,
+    expos = expos
   )
 
-
-  if (is_bootstraps) {
-
-    bootstrap_beta.hat.covariates <- drop(wce$bootstrap_coef)
-    rownames(bootstrap_beta.hat.covariates) <- paste0("bootstrap", 1:nbootstraps)
-    colnames(bootstrap_beta.hat.covariates) <- covariates
-    results$bootstrap_beta.hat.covariates <- bootstrap_beta.hat.covariates
-
-    bootstrap_est <- drop(wce$bootstrap_WCE_coef)
-    rownames(bootstrap_est) <- paste0("bootstrap", 1:nbootstraps)
-    colnames(bootstrap_est) <- paste0("D", 1:(ncol(bootstrap_est)))
-    results$bootstrap_est <- bootstrap_est
-
-
-    WCEmat_bootstrap = wce$bootstrap_risk_functions
-    rownames(WCEmat_bootstrap) <- paste0("bootstrap", 1:nbootstraps)
-    colnames(WCEmat_bootstrap) <- paste0("t", 1:cutoff)
-    results$WCEmat_bootstrap <- WCEmat_bootstrap
-
-
-    probs <- c((1 - confint) / 2, 1 - (1 - confint) / 2)
-    # confidence Interval for weights (default 95%)
-    results$WCEmat_CI <- apply(WCEmat_bootstrap, 2, stats::quantile, p = probs)
-
-
-    # confidence Interval for coefficients (default 95%)
-    results$coef_CI  <- apply(bootstrap_beta.hat.covariates, 2, stats::quantile, p = probs)
-    results$est_CI  <- apply(bootstrap_est, 2, stats::quantile, p = probs)
-  }
-
   results$analysis <- "Cox"
+  results$data <- model_data
 
   # wceGPU object
   class(results) <- "wceGPU"
   return(results)
+}
+
+
+## Internal helpers, shared between wceGPU.default() and bootstrap.wceGPU()
+## ------------------------------------------------------------------------
+
+#' @noRd
+.wceGPU_call_python <- function(data, id, event, start, stop, expos,
+                                covariates, nknots, cutoff, constrained, aic,
+                                bootstrap, batchsize, init, device,
+                                double_precision) {
+  wce_R <- tryCatch(
+    survivalgpu$wce_R,
+    error = function(e) survivalgpu_unavailable_error(e, need_keops = TRUE)
+  )
+
+  # Minor changes for python inputs
+  if (isFALSE(constrained)) {
+    py_constrained <- "None"
+  } else {
+    py_constrained <- constrained
+  }
+
+  if (length(covariates) < 2) {
+    py_covariates <- as.list(covariates)
+  } else {
+    py_covariates <- covariates
+  }
+
+  # wce_R is resolved lazily even when pykeops (required only for WCE, not
+  # for coxphGPU) isn't installed, so the informative error only surfaces
+  # here, at call time, rather than at attribute-fetch time above.
+  tryCatch(
+    wce_R(
+      data = data, ids = id, covars = py_covariates, start = start, stop = stop,
+      doses = expos, events = event, nknots = nknots,
+      constrained = py_constrained, cutoff = cutoff, aic = aic,
+      bootstrap = bootstrap, batchsize = batchsize, init = init,
+      device = device, double_precision = double_precision,
+    ),
+    error = function(e) survivalgpu_unavailable_error(e, need_keops = TRUE)
+  )
+}
+
+#' @noRd
+.wceGPU_extract_bootstrap <- function(wce, nbootstraps, cutoff, covariates,
+                                      confint) {
+  boot <- list(nbootstraps = nbootstraps, is_bootstraps = TRUE)
+
+  # Which candidate won each replicate -- the actual measure of
+  # knot-selection uncertainty when nknots has several candidates:
+  boot$bootstrap.best.nknots <- as.vector(wce$bootstrap_best_nknots)
+
+  # bootstrap_coef has shape (nbootstraps, 1, number of covariates): remove
+  # the middle axis only. drop() would also collapse the other two when
+  # there is a single replicate or a single covariate.
+  bootstrap_beta.hat.covariates <- wce$bootstrap_coef
+  dim(bootstrap_beta.hat.covariates) <- dim(wce$bootstrap_coef)[c(1, 3)]
+  rownames(bootstrap_beta.hat.covariates) <- paste0("bootstrap", 1:nbootstraps)
+  colnames(bootstrap_beta.hat.covariates) <- covariates
+  boot$bootstrap_beta.hat.covariates <- bootstrap_beta.hat.covariates
+
+  probs <- c((1 - confint) / 2, 1 - (1 - confint) / 2)
+
+  # bootstrap_WCE_coef (the raw spline coefficients) is only present when a
+  # single nknots candidate was given: with several candidates, different
+  # replicates may have selected different-width spline coefficients, so
+  # Python does not report a single dense array for it.
+  if (!is.null(wce$bootstrap_WCE_coef)) {
+    bootstrap_est <- wce$bootstrap_WCE_coef
+    dim(bootstrap_est) <- dim(wce$bootstrap_WCE_coef)[c(1, 3)]
+    rownames(bootstrap_est) <- paste0("bootstrap", 1:nbootstraps)
+    colnames(bootstrap_est) <- paste0("D", 1:(ncol(bootstrap_est)))
+    boot$bootstrap_est <- bootstrap_est
+    # confidence Interval for coefficients (default 95%)
+    boot$est_CI <- apply(bootstrap_est, 2, stats::quantile, p = probs)
+  }
+
+  WCEmat_bootstrap = wce$bootstrap_risk_functions
+  rownames(WCEmat_bootstrap) <- paste0("bootstrap", 1:nbootstraps)
+  colnames(WCEmat_bootstrap) <- paste0("t", 1:cutoff)
+  boot$WCEmat_bootstrap <- WCEmat_bootstrap
+
+  # confidence Interval for weights (default 95%)
+  boot$WCEmat_CI <- apply(WCEmat_bootstrap, 2, stats::quantile, p = probs)
+
+  # confidence Interval for coefficients (default 95%)
+  boot$coef_CI <- apply(bootstrap_beta.hat.covariates, 2, stats::quantile, p = probs)
+
+  boot
 }
 
 
@@ -287,10 +384,10 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 ## wceGPU Methods ------------------------
 
 
-#' Print method for wceGPU
+#' Print a wceGPU Model
 #'
-#' @param x wceGPU object
-#' @param ... additional argument(s) for methods.
+#' @param x A `wceGPU` object.
+#' @param ... Not used.
 #' @exportS3Method print wceGPU
 #' @noRd
 print.wceGPU <- function(x, ...) {
@@ -306,11 +403,11 @@ print.wceGPU <- function(x, ...) {
   }
 
   cat(paste(
-    "------- ", cat_constrained, "model, with", object$nknots,
-    ifelse(object$nknots > 1, "knots", "knot"), " -------\n"
+    "------- ", cat_constrained, "model, with", object$best.nknots,
+    ifelse(object$best.nknots > 1, "knots", "knot"), " -------\n"
   ))
 
-  print("Estimated WCE function\n:")
+  cat("Estimated WCE function :\n")
   print(object$WCEmat)
 
   if (object$is_bootstraps) {
@@ -363,109 +460,98 @@ print.wceGPU <- function(x, ...) {
       print(signif(object$coef_CI[, object$covariates]))
     }
   }
+
+  invisible(x)
 }
 
 
-#' Summary method for wceGPU object
+
+
+#' Summary of a wceGPU Model
 #'
-#' @param object wceGPU object
-#' @param allres Post-processing calculations. If TRUE, returns
-#'   linear predictors, wald.test, concordance for all bootstraps.
-#' @param ... additional argument(s) for methods.
+#' @param object A `wceGPU` object.
+#' @param allres Logical. If `TRUE`, `summary()` prints every candidate number
+#'   of knots that was tried, with its partial log-likelihood and information
+#'   criterion, instead of the summary of the selected model (default
+#'   `FALSE`).
 #' @exportS3Method summary wceGPU
 #' @rdname wceGPU
 summary.wceGPU <- function(object, allres = FALSE, ...) {
 
   objname <- deparse(substitute(object))
 
-  if (allres == FALSE) {
-    sumWCEall(object, objname, ...)
+  if (isTRUE(allres)) {
+    criterion <- if (isTRUE(object$aic)) "AIC" else "BIC"
+    tab <- data.frame(
+      nknots = object$nknots.grid,
+      loglik = object$loglik.grid,
+      info.criterion = object$info.criterion.grid
+    )
+    colnames(tab)[3] <- criterion
+
+    cat("\nCandidate models tried:\n")
+    print(tab)
+    cat("\nBest model: ", object$best.nknots, " knot(s), by ", criterion,
+        ".\n", sep = "")
+    return(invisible(NULL))
+  }
+
+  shape <- if (isFALSE(object$constrained)) {
+    "unconstrained"
+  } else if (toupper(substr(object$constrained, 1, 1)) == "R") {
+    "constrained to go smoothly to zero for exposures far in the past"
   } else {
-    print("The model with more than one number of knots is not yet implemented in wceGPU.")
+    "constrained to start at zero for current exposures"
   }
-}
+  cat("Weighted cumulative exposure (WCE) in a Cox proportional hazards model\n")
+  cat("Weight function: cubic spline with ", format(object$best.nknots),
+      " interior knot(s), ", shape, "\n\n", sep = "")
 
-#' For the moment there is only the poissibility to use 1 knot
-#' In the future it will be possible to select for several knots
-#' Then we will have to do a summary_best and a summary_all, use a parameter
-#' @noRd
-sumWCEall <- function(object, objname, ...) {
+  if (is.na(object$loglik)) {
+    warning("The model did not converge: its results should not be used.",
+            call. = FALSE)
+  }
+  zero_se <- colnames(object$SED)[which(object$SED[1, ] == 0)]
+  if (length(zero_se) > 0) {
+    warning("Standard error exactly zero for the spline coefficient(s) ",
+            paste(zero_se, collapse = ", "),
+            ": the model probably did not converge.", call. = FALSE)
+  }
 
-  best <- which.min(object$info.criterion)
+  if (!is.null(object$covariates)) {
+    est <- object$beta.hat.covariates[1, ]
+    se <- object$se.covariates[1, ]
+    z <- est / se
+    tab <- cbind(est, exp(est), se, z, 2 * stats::pnorm(-abs(z)))
+    dimnames(tab) <- list(object$covariates,
+                          c("coef", "exp(coef)", "se(coef)", "z", "Pr(>|z|)"))
+    cat("Covariates:\n")
+    stats::printCoefmat(tab, P.values = TRUE, has.Pvalue = TRUE)
+    cat("\n")
 
-  if (is.na(object$loglik[best]) == T) {cat('Warning : the model did not converge, and no \npartial log-likelihood was produced. Results \nfor this model should be ignored.\n\n')}
-  if (sum(object$SED[[best]]==0) >0) {cat('Warning : some of the SE for the spline \nvariables in the model are exactlty zero, probably \nbecause the model did not converge. Variable(s)',  names(which(object$SED[[1]]==0)), ' \nhad SE=0. Consider re-parametrizing or increasing \nthe number of iterations\n\n')}
-
-  if (object$analysis == 'Cox') lab <- 'Proportional hazards model'
-
-  nknots <-  length(object$knotsmat)
-
-  if (nknots == 1) {
-    sub <- "A single model with 1 knot was estimated.\n\n"} else {
-      sub3 <- paste("\nThe best-fitting estimated weight function has ", length(get_interior(object$knotsmat[[best]])), 'knots(s).\n\n', sep ='')
+    if (object$is_bootstraps) {
+      cat("Bootstrap percentile intervals for the coefficients (",
+          object$nbootstraps, " replicates, level ", format(object$confint),
+          "):\n", sep = "")
+      print(signif(t(object$coef_CI[, object$covariates, drop = FALSE]), 4))
+      cat("\n")
     }
-
-  if (object$constrained == 'Left') {
-    cat("\n*** Left-constrained estimated WCE function (",lab ,").***\n", sep='')}
-  if (object$constrained == 'Right') {
-    cat("\n*** Right-constrained estimated WCE function  (",lab ,").***\n", sep='')}
-  if (object$constrained == FALSE) {
-    cat("\nUnconstrained estimated WCE function (",lab ,").***\n", sep='')}
-  if (object$aic == F) {criterion <- "BIC: "} else {criterion <- "AIC: "}
-  if (is.null(object$covariates[1]) == F){
-    cat("\nEstimated coefficients for the covariates: \n")
-    bhat <- unlist(object$beta.hat.covariates[best,])
-    s_hat <- unlist(object$se.covariates[best,])
-    coefmat <- data.frame(cbind(bhat, exp(bhat), s_hat, unlist(bhat/s_hat),  2*pnorm(-abs(unlist(bhat/s_hat)))))
-    rownames(coefmat) <-  object$covariates
-    colnames(coefmat) <- c("coef", "exp(coef)", "se(coef)", "z","p")
-    print(round(coefmat, 4))
-    cat('\n')
   }
 
-  if (object$is_bootstraps) {
-    # cat("\n ---------------- \n")
-    cat(paste0(
-      "With bootstrap (", object$nbootstraps,
-      " bootstraps), conf.level = ", object$confint, " :\n"
-    ))
-    cat("\nCI of estimates :\n")
-    print(t(signif(object$coef_CI[, object$covariates])))
-    cat('\n')
-    # cat("\n ---------------- \n")
-    # cat("\n")
-    # cat("Quantile Partial log-Likelihoods :\n")
-    # print(quantile(object$loglik))
-    # cat("\n")
-    # cat(paste("Quantile", ifelse(object$aic==TRUE,"AIC :","BIC :")),
-    #     sep = "\n")
-    # print(quantile(object$info.criterion))
-  }
+  criterion <- if (isTRUE(object$aic)) "AIC" else "BIC"
+  cat("Partial log-likelihood: ", format(object$loglik), ", ", criterion,
+      ": ", format(object$info.criterion), "\n", sep = "")
+  cat("Number of events: ", object$nevents, "\n", sep = "")
+  cat("\nSee plot(", objname, ") for the estimated weight function.\n",
+      sep = "")
 
-
-
-
-  objname <- deparse(substitute(object))
-
-  cat("Partial log-likelihood: ", object$loglik[which.min(object$info.criterion)], "  ", criterion, min(object$info.criterion), "\n\n", sep='')
-  cat("Number of events: ", object$nevents, "\n\n", sep='')
-  cat("Use plot(", objname , ') to see the estimated weight function corresponding to this model.\n', sep="")
-
-
-
+  invisible(NULL)
 }
 
-get_interior <- function(g){
-  g <- unlist(g)
-  g <- g[5:length(g)]
-  g[1:(length(g) - 4)]
-}
-
-
-#' Coef method for wceGPU object
+#' Coefficients of a wceGPU Model
 #'
-#' @param object wceGPU object.
-#' @param ... additional argument(s) for methods.
+#' @param object A `wceGPU` object.
+#' @param ... Not used.
 #' @exportS3Method coef wceGPU
 #' @noRd
 coef.wceGPU <- function(object, ...) {
@@ -490,12 +576,11 @@ coef.wceGPU <- function(object, ...) {
 }
 
 
-#' Plot method for wceGPU
+#' Plot a wceGPU Model
 #'
-#' @param x wceGPU object.
-#' @param hist.covariates show histogram for each covariates if you use
-#'   bootstrap.
-#' @param ... additional argument(s) for methods.
+#' @param hist.covariates Logical. If `TRUE` and [bootstrap()] was called on
+#'   the model, `plot()` also draws, for each covariate, the histogram of its
+#'   bootstrap coefficients (default `FALSE`).
 #' @importFrom graphics matplot
 #' @importFrom graphics hist
 #' @importFrom graphics title
@@ -503,7 +588,7 @@ coef.wceGPU <- function(object, ...) {
 #' @exportS3Method plot wceGPU
 plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
   object <- x
-  if (object$nbootstraps == 1) {
+  if (!object$is_bootstraps) {
     if (object$aic == TRUE) {
       info <- "AIC"
     } else {
@@ -521,12 +606,12 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
 
     if (isTRUE(hist.covariates) & !is.null(object$covariates)) {
       for (i in object$covariates) {
-        graphics::hist(object$beta.hat.covariate[, i],
+        graphics::hist(object$bootstrap_beta.hat.covariates[, i],
                        main = paste0(
                          "Histogram of ", i, " coefficient with ",
                          object$nbootstraps,
                          " bootstraps\n (without bootstraps coef = ",
-                         round(object$beta.hat.covariate[1, i], 2), ")"
+                         round(object$beta.hat.covariates[1, i], 2), ")"
                        ),
                        xlab = "Coefficient"
         )
@@ -535,7 +620,8 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
 
     graphics::matplot((object$WCEmat[1,]),
                       lty = 1, type = "l", ylab = "weights",
-                      xlab = "Time elapsed"
+                      xlab = "Time elapsed",
+                      ylim = range(object$WCEmat[1,], object$WCEmat_CI)
     )
     graphics::title(paste0(
       "Estimated weight functions\n with confidence interval (",
@@ -561,15 +647,13 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
 }
 
 
-#' Confint method for wceGPU
+#' Confidence Intervals of a wceGPU Model
 #'
-#' @param object wceGPU object.
-#' @param parm a specification of which parameters are to be given confidence
-#'   intervals, either a vector of numbers or a vector of names. If missing, all
-#'   parameters are considered.
-#' @param level the confidence level required.
-#' @param digits significant digits to print.
-#' @param ... additional argument(s) for methods.
+#' @param parm Covariates whose coefficients get a confidence interval, as
+#'   numbers or names. Missing (default): all of them.
+#' @param level Confidence level of `confint()` (default `0.95`).
+#' @param digits Number of significant digits of the levels in the column
+#'   names of `confint()` (default `3`).
 #' @exportS3Method confint wceGPU
 #' @rdname wceGPU
 confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
@@ -587,27 +671,37 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
   pct <- paste(format(100 * a, trim = TRUE, scientific = FALSE, digits = digits), "%")
   fac <- qnorm(a)
   ci <- array(NA, dim = c(length(parm), 2L), dimnames = list(parm, pct))
-  ses <- sqrt(diag(object$vcovmat))[parm] # seems to be same thing as object$se.covariates
+  # vcovmat is a named list with a single element (the selected model's
+  # covariance matrix) -- unwrap it before indexing into its diagonal.
+  vcovmat <- object$vcovmat[[1]]
+  ses <- sqrt(diag(vcovmat))[parm] # seems to be same thing as object$se.covariates
   ci[] <- cf[parm] + ses %o% fac
   ci
 }
 
 
-#' Hazard Ratio for WCE model
+#' Hazard Ratio of a WCE Model
 #'
-#' Calcul the hazard ratio from a wceGPU object to compare two scenarios of
-#' time-dependant exposures.
+#' Computes, from a model fitted by [wceGPU()], the hazard ratio between two
+#' exposure histories.
 #'
-#' @param object wceGPU object.
-#' @param vecnum 	A vector of time-dependent exposures corresponding to a
-#'   scenario of interest (numerator of the HR).
-#' @param vecdenom A vector of time-dependent exposures corresponding to a
-#'   scenario for the reference category (denominator of the HR).
-#' @param level the confidence level required for HR CI. Default to 0.95.
+#' @param object A `wceGPU` object.
+#' @param vecnum Numeric vector: the exposure history of interest (numerator
+#'   of the HR), in reverse chronological order: the first value is the
+#'   exposure at the current time, the second the exposure one time unit
+#'   earlier, and so on. A vector longer than the `cutoff` of the model is
+#'   truncated, and a shorter one is padded with zeros (no exposure further
+#'   back in time).
+#' @param vecdenom Numeric vector: the reference exposure history (denominator
+#'   of the HR), in the same order and with the same length rules as
+#'   `vecnum`.
+#' @param level Level of the bootstrap confidence interval of the HR (default
+#'   `0.95`).
 #'
 #' @export
-#' @return Returns a HR according to the scenarios. If bootstrap is present
-#' in the wceGPU object, this function returns a confidence interval for the HR.
+#' @return A one-row matrix with the HR and, if [bootstrap()] was called on
+#'   `object`, the lower and upper limits of its bootstrap percentile
+#'   confidence interval.
 #' @examples
 #' \dontrun{
 #' # Dataset
@@ -615,12 +709,13 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #'
 #' # WCE model with bootstrap (example with 20 bootstraps)
 #' cutoff <- 90
-#' wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff,
-#'                             id = "Id", event = "Event", start = "Start",
-#'                             stop = "Stop", expos = "dose",
-#'                             covariates = c("age", "sex"),
-#'                             constrained = FALSE, aic = FALSE, confint = 0.95,
-#'                             nbootstraps = 20, batchsize = 0)
+#' wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = cutoff,
+#'                   id = "Id", event = "Event", start = "Start",
+#'                   stop = "Stop", expos = "dose",
+#'                   covariates = c("age", "sex"),
+#'                   constrained = FALSE, aic = FALSE, confint = 0.95,
+#'                   x = TRUE)
+#' wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20)
 #'
 #' # Exposed at a dose vs. unexposed
 #' exposed   <- rep(1, cutoff)
@@ -629,29 +724,99 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 #' HR(wce_gpu_bootstrap, exposed, unexposed)
 #' }
 HR <- function(object, vecnum, vecdenom, level = 0.95) {
-
   if (!inherits(object, "wceGPU")) stop("It's not a wceGPU object.")
   cutoff <- ncol(object$WCEmat)
-  if (length(vecnum) != cutoff | length(vecdenom) != cutoff) stop("At least one of the vector provided as the numerator or denominator is not of proper length.")
+    fit_length <- function(x, n) {
+    c(head(x, n), rep(0, max(0, n - length(x))))
+  }
 
-  hr <- exp(object$WCEmat[1, ] %*% vecnum) / exp(object$WCEmat[1, ] %*% vecdenom)
+  vecnum  <- fit_length(vecnum, cutoff)
+  vecdenom <- fit_length(vecdenom, cutoff)
 
- if (object$is_bootstraps) {
-   hr_boot <- apply(object$WCEmat_bootstrap, 1, function(x) exp(x %*% vecnum) / exp(x %*% vecdenom))
-   a <- (1 - level) / 2
-   a <- c(a, 1 - a)
-   ci <- quantile(hr_boot, p = a)
-   pct <- paste0(format(100 * a, trim = TRUE, scientific = FALSE), "%")
-   results <- matrix(c(hr, ci), nrow = 1L)
-   colnames(results) <- c(
-     "HR",
-     paste("CI", pct[1]),
-     paste("CI", pct[2])
-   )
- } else {
-   results <- matrix(hr, nrow = 1L)
-   colnames(results) <- "HR"
- }
+  hr <- exp(sum(object$WCEmat[1, ] * (vecnum - vecdenom)))
+
+  if (object$is_bootstraps) {
+    hr_boot <- as.vector(exp(object$WCEmat_bootstrap %*% (vecnum - vecdenom)))
+    a <- (1 - level) / 2
+    a <- c(a, 1 - a)
+    ci <- quantile(hr_boot, p = a)
+    pct <- paste0(format(100 * a, trim = TRUE, scientific = FALSE), "%")
+    results <- matrix(c(hr, ci), nrow = 1L)
+    colnames(results) <- c(
+      "HR",
+      paste("CI", pct[1]),
+      paste("CI", pct[2])
+    )
+  } else {
+    results <- matrix(hr, nrow = 1L)
+    colnames(results) <- "HR"
+  }
 
   return(results)
+
+}
+
+
+#' @rdname bootstrap
+#' @exportS3Method bootstrap wceGPU
+#' @examples
+#' \dontrun{
+#' drugdata <- WCE::drugdata
+#' fit <- wceGPU(data = drugdata, nknots = 1:3, cutoff = 90, id = "Id",
+#'               event = "Event", start = "Start", stop = "Stop",
+#'               expos = "dose", covariates = c("age", "sex"), x = TRUE)
+#' fit_boot <- bootstrap(fit, R = 500, batchsize = 100)
+#' summary(fit_boot)
+#' table(fit_boot$bootstrap.best.nknots)
+#' }
+bootstrap.wceGPU <- function(object, R, batchsize = 0, init = TRUE,
+                             device = NULL, double_precision = TRUE, ...) {
+
+  if (missing(R) || is.null(R) || R < 1) {
+    stop("R (number of bootstrap replicates) must be a positive integer.")
+  }
+  if ("data" %in% names(list(...))) {
+    stop("bootstrap() resamples the data stored by wceGPU(..., x = TRUE), so ",
+         "that it always matches the fit: it doesn't take a data argument.",
+         call. = FALSE)
+  }
+  if (is.null(object$data)) {
+    stop("bootstrap() requires the data stored on the fitted object. Refit ",
+         "with wceGPU(..., x = TRUE), then call bootstrap() again.",
+         call. = FALSE)
+  }
+
+  # Python passes the same `init` to every nknots candidate, but their
+  # spline coefficients have different lengths: a warm start is only
+  # possible with a single candidate.
+  single_candidate <- length(object$nknots.grid) == 1
+  init_vec <- if (isTRUE(init)) {
+    if (single_candidate) unname(object$total_covariates) else NULL
+  } else if (isFALSE(init)) {
+    NULL
+  } else {
+    if (!single_candidate) {
+      stop("A numeric init can only be given for a model fitted with a ",
+           "single nknots value.")
+    }
+    init
+  }
+
+  wce <- .wceGPU_call_python(
+    data = object$data, id = object$id, event = object$event,
+    start = object$start,
+    stop = object$stop, expos = object$expos, covariates = object$covariates,
+    nknots = object$nknots, constrained = object$constrained,
+    cutoff = object$cutoff, aic = object$aic,
+    bootstrap = R, batchsize = batchsize, init = init_vec,
+    device = device, double_precision = double_precision
+  )
+
+  fit <- object
+  boot_fields <- .wceGPU_extract_bootstrap(
+    wce, nbootstraps = R, cutoff = object$cutoff,
+    covariates = object$covariates, confint = object$confint
+  )
+  fit[names(boot_fields)] <- boot_fields
+  fit
 }

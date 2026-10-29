@@ -4,26 +4,48 @@
 \name{survivalGPU-package}
 \alias{survivalGPU-package}
 \alias{survivalGPU}
-\title{survivalGPU: Fast survival analysis}
+\title{survivalGPU: Fast Survival Analysis}
 \description{
-Allows to perform survivals analysis on GPU with coxph and WCE
-models, and several features to use bootstrap and manage memory.
+Fits Cox proportional hazards and weighted cumulative exposure
+(WCE) models on graphics processing units (GPUs), with bootstrap confidence
+intervals computed in batches.
 
-To learn more about survivalGPU, start with the vignette :
-\code{vignette("survivalGPU")}
+To learn more about survivalGPU, start with \code{vignette("survivalGPU")}.
 }
 \section{Functions}{
 
 \itemize{
-\item \code{use_cuda()}: check CUDA drivers for GPU use.
-\item \code{coxphGPU()}: fit a Cox proportional hazards regression model.
-\item \code{wceGPU()}:   fit a Weighted Cumulative Exposure model.
+\item \code{\link[=use_cuda]{use_cuda()}}: tells whether computations run on a GPU.
+\item \code{\link[=coxphGPU]{coxphGPU()}}: fits a Cox proportional hazards model.
+\item \code{\link[=wceGPU]{wceGPU()}}: fits a weighted cumulative exposure model.
+\item \code{\link[=bootstrap]{bootstrap()}}: adds bootstrap confidence intervals to a fitted model.
+\item \code{\link[=HR]{HR()}}: hazard ratio between two exposure histories, for a WCE model.
 }
 }
 
-\author{
+\seealso{
+Useful links:
 \itemize{
-\item \href{https://www.jeanfeydy.com}{Jean FEYDY}
-\item Alexis van STRAATEN
+  \item \url{https://jeanfeydy.github.io/survivalGPU/}
+  \item \url{https://github.com/jeanfeydy/survivalGPU}
+  \item Report bugs at \url{https://github.com/jeanfeydy/survivalGPU/issues}
 }
+
+}
+\author{
+\strong{Maintainer}: Antoine Poirot-Bourdain \email{antoine.poirot.bourdain@gmail.com}
+
+Authors:
+\itemize{
+  \item Jean FEYDY \email{jean.feydy@inria.fr}
+  \item Alexis van STRAATEN \email{alexis.vanstraaten@outlook.fr}
+}
+
+Other contributors:
+\itemize{
+  \item Terry THERNEAU (Author of the 'survival' package, from which parts of the R code are adapted) [contributor, copyright holder]
+  \item Pierre SABATIER [contributor]
+  \item Anne-Sophie JANNOT [contributor]
+}
+
 }

@@ -15,7 +15,34 @@ from .simulations import (
     simulate_for_experiment,
 )
 from .utils import float32, int32, int64, use_cuda
-from .wce import WCESurvivalAnalysis, wce_numpy, wce_R
+
+# WCE relies on PyKeOps, which is an optional dependency (not available on
+# Windows). Importing survivalgpu (and using the CoxPH model) must succeed
+# even if pykeops is missing; only actually calling into WCE should fail,
+# with a clear, actionable error message.
+try:
+    from .wce import WCESurvivalAnalysis, wce_numpy, wce_R
+except ImportError as _wce_import_error:
+
+    def _wce_unavailable(*_args, **_kwargs):
+        msg = (
+            "The WCE model requires the optional 'pykeops' dependency, "
+            "which is not installed (PyKeOps is not available on Windows). "
+            "Install it with `pip install survivalgpu[wce]` on Linux/macOS "
+            "to use WCESurvivalAnalysis. The CoxPH model does not require "
+            "pykeops and remains usable."
+        )
+        raise ImportError(msg) from _wce_import_error
+
+    class WCESurvivalAnalysis:
+        def __init__(self, *_args, **_kwargs):
+            _wce_unavailable()
+
+    def wce_numpy(*_args, **_kwargs):
+        _wce_unavailable()
+
+    def wce_R(*_args, **_kwargs):
+        _wce_unavailable()
 
 # On Ampere+ GPUs, the default behaviour of PyTorch is to sacrifice
 # precision for speed using tensor cores (with typical errors ~0.1%).

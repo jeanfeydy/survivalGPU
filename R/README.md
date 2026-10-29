@@ -8,53 +8,80 @@
 [![R-CMD-check](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jeanfeydy/survivalGPU/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-The survivalGPU library allows you to perform survival analyzes using
-the resources of Graphic Processing Units (GPU) in order to accelerate
-the speed of calculations. Currently, two models have been implemented :
+**GPU-accelerated survival analysis** — Cox Proportional Hazards (CoxPH)
+and Weighted Cumulative Exposure (WCE) models, built on
+[PyTorch](https://pytorch.org), with an R interface via
+[reticulate](https://rstudio.github.io/reticulate/). The WCE model
+additionally relies on [KeOps](https://www.kernel-operations.io).
+survivalGPU scales classical survival models to large datasets and to
+heavy bootstrap resampling by running the core computations on the GPU.
+It’s also possible to use the library without a GPU (CPU fallback).
 
--   Cox Proportional Hazards regression model
--   Weighted Cumulative Exposure model
+**Documentation**, with user guides and API reference:
+<https://jeanfeydy.github.io/survivalGPU/>
 
-It’s also possible to use the library without having Graphics Processing
-Units (with CPU).
+## Features
+
+-   **Cox Proportional Hazards** models (`coxphGPU()`), with Breslow and
+    Efron handling of ties, built as a drop-in companion to
+    `survival::coxph()`. Only requires PyTorch — works on Windows.
+-   **Weighted Cumulative Exposure (WCE)** models (`wceGPU()`) for
+    time-varying exposure effects, built as a drop-in companion to
+    `WCE::WCE()`. Requires the optional `pykeops` package, which is
+    **not available on Windows** (see below); `wceGPU()` raises an
+    informative error if it’s missing.
+-   **GPU acceleration** of the likelihood and its gradients via PyTorch
+    (+ KeOps for WCE), with a CPU fallback (`use_cuda()` to check what’s
+    available).
+-   **Bootstrap** resampling for confidence intervals on both models, as
+    a separate step after the fit (`bootstrap()`).
 
 ## Installation
 
-survivalGPU is a package based on a package written in python, dependent
-on the `reticulate` R package. To use it, it’s necessary to have
-installed some python libraries such as `torch` and `pykeops`. To use
-survivalGPU, you can create a virtual python environment through
-`reticulate`. It’s highly recommended to not to use the default python
-executable.
+Install survivalGPU from CRAN, together with the Python libraries it
+uses behind the scenes (via the `reticulate` R package). You need **R
+\>= 4.1** and **Python \>= 3.10**.
+
+``` r
+# 1. The R package:
+install.packages("survivalGPU")
+
+# 2. The Python libraries, once (torch is a large download):
+library(reticulate)
+virtualenv_create("survivalGPU", version = ">=3.10")
+virtualenv_install("survivalGPU", c("numpy", "torch", "pandas", "scipy",
+                                    "matplotlib", "beartype", "jaxtyping"))
+# Only for wceGPU() -- not available on Windows:
+virtualenv_install("survivalGPU", "pykeops")
+```
+
+On macOS, `pykeops` also needs Apple’s compiler
+(`xcode-select --install`) and OpenMP (`brew install libomp`). On
+Windows, `coxphGPU()` works but `wceGPU()` doesn’t (use
+[WSL2](https://learn.microsoft.com/windows/wsl/install) if you need it).
+
+To install the development version from GitHub instead, use
+`remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")`. The R
+package has no compiled code, so this doesn’t need a compiler.
+
+At the start of each R session, select the Python environment **before**
+loading survivalGPU:
 
 ``` r
 library(reticulate)
-
-virtualenv_create("survivalGPU")
-virtualenv_install("survivalGPU", packages = c("torch", "pykeops", "matplotlib",
-                                               "beartype", "jaxtyping"))
-# torch takes a long time to set up
+use_virtualenv("survivalGPU")
+library(survivalGPU)
 ```
 
-To configure properly and understand your python environment, check
-`vignette("python_connect")`
+See `vignette("installation")` for troubleshooting, or to use your own
+Python environment.
 
-The R package and its Python backend live together in the same
-[GitHub](https://github.com/) repository (no git submodule involved), so
-you can install the development version of survivalGPU directly with:
+## Quick start
 
-``` r
-# install.packages("remotes")
-remotes::install_github("jeanfeydy/survivalGPU", subdir = "R")
-```
-
-> **Warning**: Currently, survivalGPU is not available for Windows.
-
-## Example
-
-Let’s make a small example for a Cox PH model with `lung` cancer dataset
-from `survival` package. Before load `survivalGPU`, use your virtual
-python environment (see above or `vignette("python_connect")`).
+Let’s make a small example for a Cox PH model with the `lung` cancer
+dataset from the `survival` package. Before loading `survivalGPU`, use
+your virtual Python environment (see above or
+`vignette("installation")`).
 
 ``` r
 library(reticulate)
@@ -70,13 +97,12 @@ Check if CUDA is detected :
 
 ``` r
 use_cuda()
-#> [KeOps] Warning : CUDA libraries not found or could not be loaded; Switching to CPU only.
 #> [1] FALSE
 ```
 
 By default, functions run with GPU if detected. Then we specify the
-number of bootstrap, and consequently the batchsize argument, according
-to CUDA drivers detection.
+number of bootstrap replicates, and consequently the batchsize argument,
+according to CUDA drivers detection.
 
 ``` r
 if (use_cuda()) {
@@ -90,35 +116,40 @@ if (use_cuda()) {
 
 You can realize the Cox model with the `coxphGPU()` function, which is
 written in the same way as the `survival::coxph()` function from
-survival package, with a Surv object in the formula. If you use
-`bootstrap`, `patient_id` must be provided: it identifies each patient
-(subject) in `data`, so that bootstrap resampling is performed at the
-patient level rather than at the row level (relevant when a patient has
-several rows, e.g. with time-varying covariates).
+survival package, with a Surv object in the formula. Bootstrap
+confidence intervals are added afterwards with `bootstrap()`, which
+reuses the design matrix and the patient ids stored in the fitted
+model: fit it with `x = TRUE` and `patient_id`. `patient_id` identifies
+each patient (subject) in `data`, so that bootstrap resampling is
+performed at the patient level rather than at the row level (relevant
+when a patient has several rows,
+e.g. with time-varying covariates);
+`bootstrap()` cannot run without it.
 
 ``` r
 lung <- lung[stats::complete.cases(lung[c("time", "status", "age", "sex", "ph.ecog")]), ]
 lung$id <- seq_len(nrow(lung)) # one row per patient here, so a row index works as patient_id
 
-coxphGPU_bootstrap <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
-                               data = lung,
-                               patient_id = "id",
-                               bootstrap = n_bootstrap,
-                               batchsize = batchsize,
-                               ties = "breslow")
+coxphGPU_fit <- coxphGPU(Surv(time, status) ~ age + sex + ph.ecog,
+                         data = lung,
+                         ties = "breslow",
+                         x = TRUE,
+                         patient_id = "id")
+
+coxphGPU_bootstrap <- bootstrap(coxphGPU_fit, R = n_bootstrap,
+                                batchsize = batchsize)
 ```
 
 With `summary` method, you obtain results for initial model, and a
 confidence interval by normal distribution process. A confidence
-interval is also estimated for coefficients by bootstrap (if bootstrap
-\> 1 in your coxphGPU object).
+interval is also estimated for coefficients by bootstrap (if
+`bootstrap()` was called on the model).
 
 ``` r
 summary(coxphGPU_bootstrap)
 #> Call:
 #> coxphGPU.default(formula = Surv(time, status) ~ age + sex + ph.ecog,
-#>     data = lung, ties = "breslow", patient_id = "id", bootstrap = n_bootstrap,
-#>     batchsize = batchsize)
+#>     data = lung, ties = "breslow", x = TRUE)
 #>
 #>   n= 227, number of events= 164
 #>
@@ -142,9 +173,9 @@ summary(coxphGPU_bootstrap)
 #>  ----------------
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>             2.5%    97.5%
-#> age     0.998209 1.027550
-#> sex     0.429259 0.747363
-#> ph.ecog 1.276450 2.033300
+#> age     0.987929 1.027300
+#> sex     0.442419 0.759111
+#> ph.ecog 1.267270 1.988060
 ```
 
 To visualize your model, you can plot adjusted survival curves with
@@ -170,4 +201,51 @@ plot a forestplot of your model. All is explain in the
 
 -   `vignette("coxPH")`
 -   `vignette("WCE")`
--   `vignette("python_connect")`
+-   `vignette("installation")`
+
+## Development
+
+Clone the repository and install the R package in development mode:
+
+``` r
+# git clone https://github.com/jeanfeydy/survivalGPU.git
+# cd survivalGPU/R
+
+devtools::install_deps(dependencies = TRUE)
+devtools::load_all()
+```
+
+Run the test suite with:
+
+``` r
+devtools::test()
+```
+
+`coxphGPU()` tests run as long as `reticulate` can reach a Python
+environment with `torch` installed. `wceGPU()` tests
+([test-wceGPU.R](https://github.com/jeanfeydy/survivalGPU/blob/main/R/tests/testthat/test-wceGPU.R))
+additionally need `pykeops` (not available on Windows) in that same
+environment — see `vignette("installation")` to add it to your
+virtualenv. If it’s missing, those tests are skipped with an informative
+message instead of failing.
+
+Both cases are exercised in CI (see
+[R-CMD-check.yaml](https://github.com/jeanfeydy/survivalGPU/blob/main/.github/workflows/R-CMD-check.yaml)):
+one matrix leg installs `pykeops` for real WCE coverage, the others
+don’t, to check the graceful-skip path.
+
+## Citation
+
+If you use survivalGPU in your research, please cite it.
+
+    @software{survivalgpu,
+      author = {Jean Feydy, Antoine Poirot-Bourdain, Alexis van Straaten},
+      title  = {{survivalGPU}: GPU-accelerated survival analysis},
+      url    = {https://github.com/jeanfeydy/survivalGPU},
+      year   = {2026},
+    }
+
+## License
+
+Distributed under the terms of the **LGPL-2.1-or-later** license. See
+[LICENSE](https://github.com/jeanfeydy/survivalGPU/blob/main/LICENSE).
