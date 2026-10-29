@@ -94,6 +94,8 @@ addopts = [
 xfail_strict = true
 filterwarnings = [
   "error",
+  # GitHub's macOS runners have a virtual GPU without Metal 2.0
+  "ignore:Skipping device Apple Paravirtual device:UserWarning",
 ]
 markers = [
   "needs_keops: marks tests that require the optional pykeops dependency (WCE model); auto-skipped with a warning when pykeops is not installed (see python/tests/conftest.py).",
