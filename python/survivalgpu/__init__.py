@@ -66,7 +66,7 @@ __all__ = [
         "simulate_dataset_batch"
     ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # Ties in the CoxPH model:
 SUPPORTED_TIES = ["breslow", "efron"]
