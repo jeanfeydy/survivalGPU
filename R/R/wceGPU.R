@@ -1,71 +1,68 @@
-#' Fast WCE
+#' Fast Weighted Cumulative Exposure Model
 #'
-#' @description New implementation of the Weighted Cumulative Exposure model
-#'   (see Details), compatible with GPU to accelerate calculation speed and
-#'   work with large datasets. Fits a point estimate only; call [bootstrap()]
-#'   on the result for bootstrap-based inference.
-#'
-#'   Use `summary()` and `plot()` methods to see results and risk function.
+#' @description Fits a weighted cumulative exposure (WCE) model on the GPU (or
+#'   the CPU). Only point estimates are computed: call [bootstrap()] on the
+#'   result for bootstrap confidence intervals, and inspect it with
+#'   `summary()` and `plot()`.
 #'
 #' @usage
 #' wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
 #'        event, start, stop, expos, covariates = NULL,
-#'        confint = 0.95, controls = NULL, x = FALSE, ...)
+#'        confint = 0.95, x = FALSE, ...)
 #'
-#' @param data A data frame in an interval (long) format, in which each line
-#'   corresponds to one and only one time unit for a given individual.
-#' @param nknots Corresponds to the number(s) of interior knots for the cubic
-#'   splines to estimate the weight function. For example, if nknots is set to
-#'   2, then a model with two interior knots is fitted. If several values are
-#'   given (e.g. `1:3`), one model is fitted per candidate and the one that
-#'   minimizes the information criterion (see `aic`) is selected -- see
-#'   `best.nknots` and the `*.grid` fields in the returned object.
-#' @param cutoff Integer. Time window over which the WCE model is estimated.
-#'   Corresponds to the length of the estimated weight function.
-#' @param constrained Controls whether the weight function should be constrained
-#'   to smoothly go to zero. Set to FALSE for unconstrained models, to 'Right'
-#'   or 'R' to constrain the weight function to smoothly go to zero for exposure
-#'   remote in time, and to 'Left' or 'L' to constrain the weight function to
-#'   start a zero for the current values.
-#' @param aic Logical. Controls which information criterion is reported in
-#'   `info.criterion`: the AIC if TRUE, the BIC if FALSE (default). Note that
-#'   the BIC implemented in WCE is the version suggested by Volinsky and
-#'   Raftery in Biometrics (2000), which corresponds to
-#'   BIC = -2 * log(PL) + p * log(d) where PL is the model's partial
-#'   likelihood, p is the number of estimated parameters and d is the number of
-#'   uncensored events; the AIC replaces the log(d) penalty with 2. See
-#'   Sylvestre and Abrahamowicz (2009) for more details.
-#' @param id Name of the variable in data corresponding to the identification of
-#'   subjects.
-#' @param event Name of the variable in data corresponding to event indicator.
-#'   Must be coded 1 = event and 0 = no event.
-#' @param start Name of the variable in data corresponding to the starting time
-#'   for the interval. Corresponds to time argument in function Surv in the
-#'   survival package.
-#' @param stop Name of the variable in data corresponding to the ending time for
-#'   the interval. Corresponds to time2 argument in function Surv in the
-#'   survival package.
-#' @param expos Name of the variable in data corresponding to the exposure
-#'   variable.
-#' @param covariates Optional. Vector of characters corresponding to the name(s)
-#'   of the variable(s) in data corresponding to the covariate(s) to be included
-#'   in the model. Default to NULL, which corresponds to fitting model(s)
-#'   without covariates.
-#' @param confint Level for confidence intervals. Default to 0.95.
-#' @param controls List corresponding to the control parameters to be passed to
-#'   the coxph function. See coxph.control for more details.
-#' @param x Logical. If TRUE, the columns of `data` used by the model (`id`,
-#'   `event`, `start`, `stop`, `expos` and `covariates`) are stored in the
-#'   returned object, as `data`. Required by [bootstrap()], which resamples
-#'   exactly the data the model was fitted on.
-#' @param ... Optional; other parameters to be passed through to WCE
+#' @param data Data frame in counting-process (long) format, with one row per
+#'   subject and time unit.
+#' @param nknots Number of interior knots of the cubic spline that models the
+#'   weight function. With several values (e.g. `1:3`), one model is fitted
+#'   per value and the one with the smallest information criterion (see
+#'   `aic`) is kept; `best.nknots` and the `*.grid` components of the result
+#'   describe all the candidates.
+#' @param cutoff Length, in time units, of the exposure history that affects
+#'   the hazard: the weight function is estimated for lags `0` to
+#'   `cutoff - 1` (the `cutoff` columns of `WCEmat`), and older exposures have
+#'   no effect.
+#' @param constrained Shape constraint on the weight function. `FALSE`
+#'   (default): none. `"Right"` (or `"R"`): it decreases smoothly to zero at
+#'   the oldest lag. `"Left"` (or `"L"`): it is zero at lag 0, so the current
+#'   exposure has no effect.
+#' @param aic Logical. Information criterion used to choose among the
+#'   `nknots` candidates and reported in `info.criterion`: the AIC if `TRUE`,
+#'   the BIC if `FALSE` (default). Both equal
+#'   \eqn{-2 \log(PL) + k p}{-2 log(PL) + k p}, with \eqn{PL} the partial
+#'   likelihood and \eqn{p} the number of estimated parameters; \eqn{k = 2}
+#'   for the AIC and \eqn{k = \log(d)}{k = log(d)}, with \eqn{d} the number
+#'   of events, for the BIC (Volinsky and Raftery, 2000).
+#' @param id Name of the column of `data` that identifies the subjects.
+#' @param event Name of the column of `data` with the event indicator, coded
+#'   `1` (event) or `0` (no event).
+#' @param start Name of the column of `data` with the start time of each
+#'   interval (the `time` argument of [survival::Surv()]).
+#' @param stop Name of the column of `data` with the end time of each interval
+#'   (the `time2` argument of [survival::Surv()]).
+#' @param expos Name of the column of `data` with the exposure.
+#' @param covariates Character vector with the names of the columns of `data`
+#'   to adjust for. `NULL` (default): no adjustment.
+#' @param confint Level of the bootstrap confidence intervals computed by
+#'   [bootstrap()] (default `0.95`).
+#' @param x For `wceGPU()`: logical. If `TRUE`, the columns of `data` used by
+#'   the model (`id`, `event`, `start`, `stop`, `expos` and `covariates`) are
+#'   stored in the result, as `data`. Required by [bootstrap()], which
+#'   resamples exactly the data the model was fitted on. For `plot()`: a
+#'   `wceGPU` object.
+#' @param ... For `wceGPU()`: `device` (`"cpu"` or `"cuda"`; default: the GPU
+#'   if one is available) and `double_precision` (`TRUE`, the default, for
+#'   64-bit floats; `FALSE` for 32-bit floats, faster on most GPUs). For the
+#'   methods: not used.
 #'
-#' @details WCE implements a flexible method for modeling cumulative effects of
-#'   time-varying exposures, weighted according to their relative proximity in
-#'   time, and represented by time-dependent covariates. The current
-#'   implementation estimates the weight function in the Cox proportional
-#'   hazards model. The function that assigns weights to doses taken in the past
-#'   is estimated using cubic regression splines.
+#' @details At each time \eqn{t}, the exposure enters the Cox model through
+#'   its weighted cumulative exposure over the last `cutoff` time units,
+#'   \deqn{WCE(t) = \sum_{u=0}^{cutoff-1} w(u) X(t-u),}{WCE(t) = sum over u = 0, ..., cutoff - 1 of w(u) X(t - u),}
+#'   where \eqn{X(t-u)} is the exposure \eqn{u} time units before \eqn{t}.
+#'   The weight function \eqn{w} is a cubic spline with `nknots` interior
+#'   knots. \eqn{WCE(t)} is therefore a linear combination of spline-weighted
+#'   exposure histories, which enter a Cox proportional hazards model as
+#'   time-dependent covariates, together with `covariates`. Their estimated
+#'   coefficients give \eqn{w}, returned in `WCEmat`.
 #'
 #' @references Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative
 #'   effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov
@@ -75,6 +72,10 @@
 #'   version 1.0.4. \doi{10.32614/CRAN.package.WCE}. The reference
 #'   implementation of the method: `wceGPU()` follows its interface, and its
 #'   results are tested against it.
+#'
+#'   Volinsky CT, Raftery AE (2000). Bayesian information criterion for
+#'   censored survival models. Biometrics, 56(1), 256-262.
+#'   \doi{10.1111/j.0006-341X.2000.00256.x}
 #'
 #' @return `wceGPU()` returns an object of class `wceGPU`: a list that describes
 #'   the selected model, i.e. the candidate in `nknots` that minimizes the
@@ -152,7 +153,7 @@
 #' }
 wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
                    event, start, stop, expos, covariates = NULL,
-                   confint = 0.95, controls = NULL, x = FALSE, ...) {
+                   confint = 0.95, x = FALSE, ...) {
   UseMethod("wceGPU")
 }
 
@@ -164,7 +165,7 @@ wceGPU <- function(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
 wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
                            aic = FALSE, id, event, start, stop, expos,
                            covariates = NULL,
-                           confint = 0.95, controls = NULL, x = FALSE,
+                           confint = 0.95, x = FALSE,
                            device = NULL, double_precision = TRUE, ...) {
   # survivalgpu <- use_survivalGPU()
 
@@ -383,10 +384,10 @@ wceGPU.default <- function(data, nknots, cutoff, constrained = FALSE,
 ## wceGPU Methods ------------------------
 
 
-#' Print method for wceGPU
+#' Print a wceGPU Model
 #'
-#' @param x wceGPU object
-#' @param ... additional argument(s) for methods.
+#' @param x A `wceGPU` object.
+#' @param ... Not used.
 #' @exportS3Method print wceGPU
 #' @noRd
 print.wceGPU <- function(x, ...) {
@@ -466,13 +467,13 @@ print.wceGPU <- function(x, ...) {
 
 
 
-#' Summary method for wceGPU object
+#' Summary of a wceGPU Model
 #'
-#' @param object wceGPU object
-#' @param allres If TRUE, `summary()` prints every candidate number of knots
-#'   that was tried, with its partial log-likelihood and information criterion,
-#'   instead of the summary of the selected model.
-#' @param ... additional argument(s) for methods.
+#' @param object A `wceGPU` object.
+#' @param allres Logical. If `TRUE`, `summary()` prints every candidate number
+#'   of knots that was tried, with its partial log-likelihood and information
+#'   criterion, instead of the summary of the selected model (default
+#'   `FALSE`).
 #' @exportS3Method summary wceGPU
 #' @rdname wceGPU
 summary.wceGPU <- function(object, allres = FALSE, ...) {
@@ -547,10 +548,10 @@ summary.wceGPU <- function(object, allres = FALSE, ...) {
   invisible(NULL)
 }
 
-#' Coef method for wceGPU object
+#' Coefficients of a wceGPU Model
 #'
-#' @param object wceGPU object.
-#' @param ... additional argument(s) for methods.
+#' @param object A `wceGPU` object.
+#' @param ... Not used.
 #' @exportS3Method coef wceGPU
 #' @noRd
 coef.wceGPU <- function(object, ...) {
@@ -575,12 +576,11 @@ coef.wceGPU <- function(object, ...) {
 }
 
 
-#' Plot method for wceGPU
+#' Plot a wceGPU Model
 #'
-#' @param x wceGPU object.
-#' @param hist.covariates show histogram for each covariates if you use
-#'   bootstrap.
-#' @param ... additional argument(s) for methods.
+#' @param hist.covariates Logical. If `TRUE` and [bootstrap()] was called on
+#'   the model, `plot()` also draws, for each covariate, the histogram of its
+#'   bootstrap coefficients (default `FALSE`).
 #' @importFrom graphics matplot
 #' @importFrom graphics hist
 #' @importFrom graphics title
@@ -647,15 +647,13 @@ plot.wceGPU <- function(x, ..., hist.covariates = FALSE) {
 }
 
 
-#' Confint method for wceGPU
+#' Confidence Intervals of a wceGPU Model
 #'
-#' @param object wceGPU object.
-#' @param parm a specification of which parameters are to be given confidence
-#'   intervals, either a vector of numbers or a vector of names. If missing, all
-#'   parameters are considered.
-#' @param level the confidence level required.
-#' @param digits significant digits to print.
-#' @param ... additional argument(s) for methods.
+#' @param parm Covariates whose coefficients get a confidence interval, as
+#'   numbers or names. Missing (default): all of them.
+#' @param level Confidence level of `confint()` (default `0.95`).
+#' @param digits Number of significant digits of the levels in the column
+#'   names of `confint()` (default `3`).
 #' @exportS3Method confint wceGPU
 #' @rdname wceGPU
 confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
@@ -682,26 +680,28 @@ confint.wceGPU <- function(object, parm, level = 0.95, ..., digits = 3) {
 }
 
 
-#' Hazard Ratio for WCE model
+#' Hazard Ratio of a WCE Model
 #'
-#' Calculate the hazard ratio from a wceGPU object to compare two scenarios of
-#' time-dependent exposures.
+#' Computes, from a model fitted by [wceGPU()], the hazard ratio between two
+#' exposure histories.
 #'
-#' @param object wceGPU object.
-#' @param vecnum A vector of time-dependent exposures corresponding to a
-#'   scenario of interest (numerator of the HR), in reverse chronological
-#'   order: the first value is the exposure at the current time, the second
-#'   the exposure one time unit earlier, and so on. A vector longer than the
-#'   `cutoff` of the model is truncated, and a shorter one is padded with zeros
-#'   (no exposure further back in time).
-#' @param vecdenom A vector of time-dependent exposures corresponding to a
-#'   scenario for the reference category (denominator of the HR), in the same
-#'   order and with the same length rules as `vecnum`.
-#' @param level the confidence level required for HR CI. Default to 0.95.
+#' @param object A `wceGPU` object.
+#' @param vecnum Numeric vector: the exposure history of interest (numerator
+#'   of the HR), in reverse chronological order: the first value is the
+#'   exposure at the current time, the second the exposure one time unit
+#'   earlier, and so on. A vector longer than the `cutoff` of the model is
+#'   truncated, and a shorter one is padded with zeros (no exposure further
+#'   back in time).
+#' @param vecdenom Numeric vector: the reference exposure history (denominator
+#'   of the HR), in the same order and with the same length rules as
+#'   `vecnum`.
+#' @param level Level of the bootstrap confidence interval of the HR (default
+#'   `0.95`).
 #'
 #' @export
-#' @return Returns a HR according to the scenarios. If bootstrap is present
-#' in the wceGPU object, this function returns a confidence interval for the HR.
+#' @return A one-row matrix with the HR and, if [bootstrap()] was called on
+#'   `object`, the lower and upper limits of its bootstrap percentile
+#'   confidence interval.
 #' @examples
 #' \dontrun{
 #' # Dataset

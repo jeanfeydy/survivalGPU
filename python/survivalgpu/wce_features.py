@@ -1,4 +1,4 @@
-"""This file implements the core numerical routines of the WCE package.
+"""This file implements the WCE method of Sylvestre and Abrahamowicz (2009).
 
 We rely on KeOps to compute convolutions with a collection of B-Spline kernels,
 at arbitrary time sampling locations.

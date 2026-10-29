@@ -1,23 +1,27 @@
-#' Fast Cox Proportional Hazards Regression Model
+#' Fast Cox Proportional Hazards Model
 #'
-#' @description Fits a Cox proportional hazards regression model. An extension
-#'   to use (or not) your GPU to speed up calculations. Fits a point estimate
-#'   only; call [bootstrap()] on the result for bootstrap-based inference.
+#' @description Fits a Cox proportional hazards model on the GPU (or the CPU),
+#'   with the interface of [survival::coxph()]. Only point estimates are
+#'   computed: call [bootstrap()] on the result for bootstrap confidence
+#'   intervals, and inspect it with `summary()`.
 #'
 #' @usage coxphGPU(formula, data, ties = c("efron", "breslow"), init, control,
 #'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
 #'          patient_id = NULL, ...)
 #'
 #' @inheritParams survival::coxph
-#' @param formula a formula object, with the response on the left of a ~
-#'   operator, and the terms on the right. The response must be a survival
-#'   object as returned by the Surv function.
-#' @param patient_id name of the column of `data` that identifies each patient
+#' @param formula A formula with a survival object (see [survival::Surv()]) on
+#'   the left of `~` and the terms on the right.
+#' @param patient_id Name of the column of `data` that identifies each patient
 #'   (subject). Required by [bootstrap()], which resamples patients rather than
 #'   rows, so that all the rows of a patient (e.g. with time-varying
 #'   covariates) are kept together. With one row per patient, a column of row
 #'   indices (`data$id <- seq_len(nrow(data))`) can be used.
-#' @param ... Other arguments for methods.
+#' @param ... For `coxphGPU()`: `device` (`"cpu"` or `"cuda"`; default: the
+#'   GPU if one is available), `double_precision` (`TRUE`, the default, for
+#'   64-bit floats; `FALSE` for 32-bit floats, faster on most GPUs), and
+#'   arguments of [survival::coxph.control()] (e.g. `iter.max`). For the
+#'   methods: not used.
 #'
 #' @details
 #' To compute bootstrap confidence intervals with [bootstrap()], fit the model
@@ -30,9 +34,11 @@
 #' @importFrom utils methods
 #' @importFrom utils head
 #'
-#' @return A coxphGPU object representing the fit. With `patient_id`, it also
-#'   contains `patient_id` (the column name) and `patient_ids` (the patient of
-#'   each row used by the model).
+#' @return `coxphGPU()` returns an object of class `coxphGPU`, with the
+#'   components of a [survival::coxph()] fit (coefficients, variance,
+#'   log-likelihood, ...). With `patient_id`, it also contains `patient_id`
+#'   (the column name) and `patient_ids` (the patient of each row used by the
+#'   model).
 #' @export
 #'
 #' @references Therneau T (2026). _A Package for Survival Analysis in R_. R
@@ -707,16 +713,16 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
 ## coxphGPU Methods ------------------------
 
 
-#' Print method for coxphGPU object
+#' Print a coxphGPU Model
 #'
 #' Prints a model fitted by [coxphGPU()] in the same way as a
 #' [survival::coxph()] fit. If [bootstrap()] was called on the model, a note
 #' points to `summary()` for the bootstrap confidence intervals.
 #'
-#' @param x a coxphGPU object
-#' @param digits significant digits to print
-#' @param signif.stars show stars to highlight small p-values
-#' @param ... additional argument(s) for methods.
+#' @param x A `coxphGPU` object.
+#' @param digits Number of significant digits to print.
+#' @param signif.stars Logical. If `TRUE`, stars flag the small p-values.
+#' @param ... Not used.
 #'
 #' @return `x`, invisibly. Called for its side effect: printing the model.
 #'
@@ -736,25 +742,22 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
 }
 
 
-#' Summary method for coxphGPU object
+#' Summary of a coxphGPU Model
 #'
-#' Use `summary()` method to see confidence interval for covariates with two
-#' process : normal distribution and bootstrap (if [bootstrap()] was called
-#' on the object first).
 #' @inheritParams survival::summary.coxph
-#' @param object a coxphGPU object
+#' @param object A `coxphGPU` object.
 #'
-#' @return With `summary()` :
-#' * `conf.int`:                  a matrix with one row for each coefficient,
-#' containing the confidence limits for exp(coef).
-#' * `conf.int_bootstrap`:        confidence limits for exp(coef) determined by
-#' bootstrap
-#' * `logtest, sctest, waldtest`: the overall likelihood ratio, score, and Wald
-#' test statistics for the model
-#' * `concordance`:               the concordance statistic and its standard
-#' error
-#' * `rsq`:                       an approximate R^2 based on Nagelkirke
-#' (Biometrika 1991).
+#' @return `summary()` returns an object of class `summary.coxphGPU`, with
+#'   confidence intervals for the hazard ratios from the normal approximation
+#'   and, if [bootstrap()] was called on the model, from the bootstrap. Its
+#'   main components are:
+#'   * `conf.int`: matrix with one row per coefficient and the confidence
+#'   limits of `exp(coef)`.
+#'   * `conf.int_bootstrap`: the same limits, from the bootstrap.
+#'   * `logtest`, `sctest`, `waldtest`: likelihood ratio, score and Wald tests
+#'   of the model.
+#'   * `concordance`: concordance statistic and its standard error.
+#'   * `rsq`: approximate \eqn{R^2} of Nagelkerke (Biometrika, 1991).
 #' @exportS3Method summary coxphGPU
 #' @rdname coxphGPU
 summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
@@ -777,12 +780,12 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
 }
 
 
-#' Print summary for coxphGPU object
+#' Print the Summary of a coxphGPU Model
 #'
-#' @param x summary.coxphGPU object
-#' @param digits significant digits to print
-#' @param signif.stars show stars to highlight small p-values
-#' @param ... additional argument(s) for methods.
+#' @param x A `summary.coxphGPU` object.
+#' @param digits Number of significant digits to print.
+#' @param signif.stars Logical. If `TRUE`, stars flag the small p-values.
+#' @param ... Not used.
 #'
 #' @exportS3Method print summary.coxphGPU
 #' @noRd
@@ -806,10 +809,10 @@ print.summary.coxphGPU <- function(x, ...,
 }
 
 
-#' Coef method for coxphGPU object
+#' Coefficients of a coxphGPU Model
 #'
-#' @param object coxphGPU object.
-#' @param ... additional argument(s) for methods.
+#' @param object A `coxphGPU` object.
+#' @param ... Not used.
 #' @exportS3Method coef coxphGPU
 #' @noRd
 coef.coxphGPU <- function(object, ...) {
@@ -817,7 +820,7 @@ coef.coxphGPU <- function(object, ...) {
 }
 
 
-#' Residuals method for coxphGPU
+#' Residuals of a coxphGPU Model
 #'
 #' @inherit survival::residuals.coxph description references
 #' @inheritParams survival::residuals.coxph
@@ -857,13 +860,14 @@ residuals.coxphGPU <- function(object, ...,
 }
 
 
-#' Predict method for coxphGPU
+#' Predictions from a coxphGPU Model
 #'
-#' Compute fitted values and regression terms for a model fitted by coxphGPU
+#' Computes fitted values and regression terms for a model fitted by
+#' [coxphGPU()], with [survival::predict.coxph()].
 #'
 #' @inherit survival::predict.coxph references
 #' @inheritParams survival::predict.coxph
-#' @param object the results of a coxphGPU fit.
+#' @param object A `coxphGPU` object.
 #'
 #' @return The predictions computed by [survival::predict.coxph()]: a numeric
 #'   vector with one element per observation, or a matrix with one column per
@@ -895,33 +899,30 @@ predict.coxphGPU <- function(object, newdata,
 }
 
 
-#' Bootstrap-based inference for a fitted model
+#' Bootstrap Confidence Intervals for a Fitted Model
 #'
-#' Adds bootstrap-based confidence intervals to a model already fit by
-#' [coxphGPU()] or [wceGPU()]. This lets you fit once and decide about
-#' bootstrap inference later, while still running all `R` replicate refits as
-#' a single batched GPU call to the Python backend. Resampling is performed at
-#' the patient level.
+#' Adds bootstrap confidence intervals to a model fitted by [coxphGPU()] or
+#' [wceGPU()]. The model is refitted on `R` resamples of the patients, in
+#' batches on the GPU.
 #'
-#' @param object a coxphGPU or wceGPU object.
-#' @param R number of bootstrap replicates.
-#' @param batchsize number of bootstrap copies handled at a time. Defaults to
-#'   0, which means that all copies are handled at once. If you run into out
-#'   of memory errors, please consider using batchsize=100, 10 or 1.
-#' @param init starting coefficients for the GPU refits. `TRUE` (the default)
-#'   reuses `object`'s own fitted coefficients as a warm start; `FALSE` starts
-#'   from zero; or supply a numeric vector directly. For a wceGPU model fitted
-#'   with several `nknots` candidates, whose spline coefficients have
-#'   different lengths, `TRUE` starts from zero and a numeric vector is not
-#'   allowed.
-#' @param device device on which the refits run (e.g. `"cpu"` or `"cuda"`).
-#'   Defaults to `NULL`, i.e. the GPU if available.
-#' @param double_precision if `TRUE` (the default), computations use 64-bit
-#'   floats; otherwise 32-bit floats, which are faster on most GPUs.
-#' @param ... additional argument(s) for methods.
+#' @param object A `coxphGPU` or `wceGPU` object.
+#' @param R Number of bootstrap replicates.
+#' @param batchsize Number of bootstrap replicates processed at a time. `0`
+#'   (default): all of them at once. If you run out of memory, try `100`, `10`
+#'   or `1`.
+#' @param init Starting coefficients of the refits. `TRUE` (default): the
+#'   coefficients of `object`. `FALSE`: zero. Or a numeric vector. For a
+#'   `wceGPU` model fitted with several `nknots` candidates, whose spline
+#'   coefficients have different lengths, `TRUE` starts from zero and a
+#'   numeric vector is not allowed.
+#' @param device Device on which the refits run (`"cpu"` or `"cuda"`). `NULL`
+#'   (default): the GPU if one is available.
+#' @param double_precision Logical. `TRUE` (default) for 64-bit floats;
+#'   `FALSE` for 32-bit floats, faster on most GPUs.
+#' @param ... Not used.
 #'
 #' @details
-#' For a coxphGPU model, `object` must have been fit with `x = TRUE` and
+#' For a `coxphGPU` model, `object` must have been fit with `x = TRUE` and
 #' `patient_id` (`coxphGPU(..., x = TRUE, patient_id = "id")`). The bootstrap
 #' resamples patients, not rows, so that all the rows of a patient (e.g. with
 #' time-varying covariates) are kept together: `patient_id` tells which rows
@@ -930,7 +931,7 @@ predict.coxphGPU <- function(object, newdata,
 #' exactly the data the model was fitted on, including after `subset =` or
 #' rows dropped for missing values.
 #'
-#' For a wceGPU model, `object` must have been fit with `x = TRUE`
+#' For a `wceGPU` model, `object` must have been fit with `x = TRUE`
 #' (`wceGPU(..., x = TRUE)`): the columns used by the model are stored in the
 #' fit, and the bootstrap resamples them, so it always uses exactly the data
 #' the model was fitted on. The spline-basis features are rebuilt from them
@@ -941,13 +942,12 @@ predict.coxphGPU <- function(object, newdata,
 #' `bootstrap.best.nknots`), so that the confidence intervals account for the
 #' uncertainty on that choice.
 #'
-#' @return A copy of `object` with its bootstrap fields updated from the new
-#'   bootstrap run; every point-estimate field (coefficients, variance,
-#'   residuals, ...) is left untouched, so `summary()`, `plot()` and [HR()]
-#'   pick up the bootstrap confidence intervals automatically.
-#'   * For a coxphGPU model: `coef_bootstrap` (one row per replicate) and
+#' @return A copy of `object` with its bootstrap components updated; the point
+#'   estimates (coefficients, variance, residuals, ...) are unchanged, so
+#'   `summary()`, `plot()` and [HR()] show the bootstrap confidence intervals.
+#'   * For a `coxphGPU` model: `coef_bootstrap` (one row per replicate) and
 #'   `nbootstraps`.
-#'   * For a wceGPU model: `bootstrap_beta.hat.covariates`,
+#'   * For a `wceGPU` model: `bootstrap_beta.hat.covariates`,
 #'   `WCEmat_bootstrap`, `WCEmat_CI`, `coef_CI`, `bootstrap.best.nknots`,
 #'   `nbootstraps`, `is_bootstraps`, and `bootstrap_est`/`est_CI` for a
 #'   single `nknots` value.
@@ -957,8 +957,8 @@ bootstrap <- function(object, ...) {
   UseMethod("bootstrap")
 }
 
-#' @param control (coxphGPU only) a [survival::coxph.control()] object;
-#'   defaults to the one used at the original fit (stored on `object`).
+#' @param control (`coxphGPU` only) A [survival::coxph.control()] object.
+#'   Default: the one used to fit `object`.
 #'
 #' @rdname bootstrap
 #' @exportS3Method bootstrap coxphGPU

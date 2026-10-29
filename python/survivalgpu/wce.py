@@ -59,8 +59,7 @@ class WCESurvivalAnalysis:
             criterion (str): Which information criterion to report in `self.info_criterion_`: "aic"
                 (penalty = 2 per degree of freedom) or "bic" (penalty =
                 log(n_events) per degree of freedom). Defaults to "bic".
-                Matches the `my_bic_c()` formula from the reference `WCE` R
-                package.
+                The BIC is the one of Volinsky and Raftery (2000).
             constrained (str or None): Whether the B-splines should be constrained.
                 Defaults to None (i.e. no constraint).
 
@@ -397,10 +396,10 @@ class WCESurvivalAnalysis:
             self.n_covariates = covariates.shape[-1]
 
         self.n_events_ = int(np.sum(event))
-        # Penalty per degree of freedom for the information criterion, matching
-        # the `my_bic_c()` formula from the reference `WCE` R package: AIC uses
-        # a penalty of 2, BIC uses log(n_events). Candidate-invariant, since it
-        # only depends on the (fixed) data, not on nknots.
+        # Penalty per degree of freedom for the information criterion: AIC uses
+        # 2, BIC uses log(n_events), the BIC of Volinsky and Raftery (2000).
+        # Candidate-invariant, since it only depends on the (fixed) data, not
+        # on nknots.
         penalty_per_df = 2.0 if self.criterion == "aic" else np.log(self.n_events_)
 
         knots_grid = []

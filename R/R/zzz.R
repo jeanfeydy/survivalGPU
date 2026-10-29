@@ -35,9 +35,9 @@ python_requirements <- c("torch", "numpy", "pandas", "scipy", "matplotlib",
 #' some Python packages are missing; anything else, in which case the original
 #' error is reported as it is.
 #'
-#' @param e the error caught by `tryCatch()`.
-#' @param need_keops `TRUE` when called from `wceGPU()`: 'pykeops' is then
-#'   checked too. `coxphGPU()` and `use_cuda()` don't need it.
+#' @param e The error caught by `tryCatch()`.
+#' @param need_keops Logical. `TRUE` when called from `wceGPU()`: 'pykeops'
+#'   is then checked too. `coxphGPU()` and `use_cuda()` don't need it.
 #' @noRd
 survivalgpu_unavailable_error <- function(e, need_keops = FALSE) {
   setup <- paste0(

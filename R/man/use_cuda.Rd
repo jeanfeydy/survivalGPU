@@ -2,18 +2,18 @@
 % Please edit documentation in R/survivalGPU-package.R
 \name{use_cuda}
 \alias{use_cuda}
-\title{CUDA utilisation}
+\title{Check Whether a GPU Is Used}
 \usage{
 use_cuda()
 }
 \value{
-A single logical value: \code{TRUE} if PyTorch detects a CUDA-capable
+A single logical value: \code{TRUE} if 'PyTorch' detects a CUDA-capable
 GPU, in which case computations run on it by default; \code{FALSE} if they run
 on the CPU. An error is raised if the Python backend cannot be loaded.
 }
 \description{
-Specifies whether you are using GPUs or not. If TRUE, CUDA drivers are
-detected, and you are using GPU.
+Tells whether computations run on a GPU, i.e. whether 'PyTorch' detects
+CUDA drivers and a CUDA-capable GPU.
 }
 \examples{
 \dontrun{

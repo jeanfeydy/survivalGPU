@@ -2,7 +2,7 @@
 % Please edit documentation in R/coxphGPU.R
 \name{residuals.coxphGPU}
 \alias{residuals.coxphGPU}
-\title{Residuals method for coxphGPU}
+\title{Residuals of a coxphGPU Model}
 \usage{
 \method{residuals}{coxphGPU}(
   object,

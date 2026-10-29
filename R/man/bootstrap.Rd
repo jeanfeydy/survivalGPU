@@ -4,7 +4,7 @@
 \alias{bootstrap}
 \alias{bootstrap.coxphGPU}
 \alias{bootstrap.wceGPU}
-\title{Bootstrap-based inference for a fitted model}
+\title{Bootstrap Confidence Intervals for a Fitted Model}
 \usage{
 bootstrap(object, ...)
 
@@ -30,55 +30,51 @@ bootstrap(object, ...)
 )
 }
 \arguments{
-\item{object}{a coxphGPU or wceGPU object.}
+\item{object}{A \code{coxphGPU} or \code{wceGPU} object.}
 
-\item{...}{additional argument(s) for methods.}
+\item{...}{Not used.}
 
-\item{R}{number of bootstrap replicates.}
+\item{R}{Number of bootstrap replicates.}
 
-\item{batchsize}{number of bootstrap copies handled at a time. Defaults to
-0, which means that all copies are handled at once. If you run into out
-of memory errors, please consider using batchsize=100, 10 or 1.}
+\item{batchsize}{Number of bootstrap replicates processed at a time. \code{0}
+(default): all of them at once. If you run out of memory, try \code{100}, \code{10}
+or \code{1}.}
 
-\item{init}{starting coefficients for the GPU refits. \code{TRUE} (the default)
-reuses \code{object}'s own fitted coefficients as a warm start; \code{FALSE} starts
-from zero; or supply a numeric vector directly. For a wceGPU model fitted
-with several \code{nknots} candidates, whose spline coefficients have
-different lengths, \code{TRUE} starts from zero and a numeric vector is not
-allowed.}
+\item{init}{Starting coefficients of the refits. \code{TRUE} (default): the
+coefficients of \code{object}. \code{FALSE}: zero. Or a numeric vector. For a
+\code{wceGPU} model fitted with several \code{nknots} candidates, whose spline
+coefficients have different lengths, \code{TRUE} starts from zero and a
+numeric vector is not allowed.}
 
-\item{control}{(coxphGPU only) a \code{\link[survival:coxph.control]{survival::coxph.control()}} object;
-defaults to the one used at the original fit (stored on \code{object}).}
+\item{control}{(\code{coxphGPU} only) A \code{\link[survival:coxph.control]{survival::coxph.control()}} object.
+Default: the one used to fit \code{object}.}
 
-\item{device}{device on which the refits run (e.g. \code{"cpu"} or \code{"cuda"}).
-Defaults to \code{NULL}, i.e. the GPU if available.}
+\item{device}{Device on which the refits run (\code{"cpu"} or \code{"cuda"}). \code{NULL}
+(default): the GPU if one is available.}
 
-\item{double_precision}{if \code{TRUE} (the default), computations use 64-bit
-floats; otherwise 32-bit floats, which are faster on most GPUs.}
+\item{double_precision}{Logical. \code{TRUE} (default) for 64-bit floats;
+\code{FALSE} for 32-bit floats, faster on most GPUs.}
 }
 \value{
-A copy of \code{object} with its bootstrap fields updated from the new
-bootstrap run; every point-estimate field (coefficients, variance,
-residuals, ...) is left untouched, so \code{summary()}, \code{plot()} and \code{\link[=HR]{HR()}}
-pick up the bootstrap confidence intervals automatically.
+A copy of \code{object} with its bootstrap components updated; the point
+estimates (coefficients, variance, residuals, ...) are unchanged, so
+\code{summary()}, \code{plot()} and \code{\link[=HR]{HR()}} show the bootstrap confidence intervals.
 \itemize{
-\item For a coxphGPU model: \code{coef_bootstrap} (one row per replicate) and
+\item For a \code{coxphGPU} model: \code{coef_bootstrap} (one row per replicate) and
 \code{nbootstraps}.
-\item For a wceGPU model: \code{bootstrap_beta.hat.covariates},
+\item For a \code{wceGPU} model: \code{bootstrap_beta.hat.covariates},
 \code{WCEmat_bootstrap}, \code{WCEmat_CI}, \code{coef_CI}, \code{bootstrap.best.nknots},
 \code{nbootstraps}, \code{is_bootstraps}, and \code{bootstrap_est}/\code{est_CI} for a
 single \code{nknots} value.
 }
 }
 \description{
-Adds bootstrap-based confidence intervals to a model already fit by
-\code{\link[=coxphGPU]{coxphGPU()}} or \code{\link[=wceGPU]{wceGPU()}}. This lets you fit once and decide about
-bootstrap inference later, while still running all \code{R} replicate refits as
-a single batched GPU call to the Python backend. Resampling is performed at
-the patient level.
+Adds bootstrap confidence intervals to a model fitted by \code{\link[=coxphGPU]{coxphGPU()}} or
+\code{\link[=wceGPU]{wceGPU()}}. The model is refitted on \code{R} resamples of the patients, in
+batches on the GPU.
 }
 \details{
-For a coxphGPU model, \code{object} must have been fit with \code{x = TRUE} and
+For a \code{coxphGPU} model, \code{object} must have been fit with \code{x = TRUE} and
 \code{patient_id} (\code{coxphGPU(..., x = TRUE, patient_id = "id")}). The bootstrap
 resamples patients, not rows, so that all the rows of a patient (e.g. with
 time-varying covariates) are kept together: \code{patient_id} tells which rows
@@ -87,7 +83,7 @@ patient of each row are stored in the fit, so the bootstrap always uses
 exactly the data the model was fitted on, including after \verb{subset =} or
 rows dropped for missing values.
 
-For a wceGPU model, \code{object} must have been fit with \code{x = TRUE}
+For a \code{wceGPU} model, \code{object} must have been fit with \code{x = TRUE}
 (\code{wceGPU(..., x = TRUE)}): the columns used by the model are stored in the
 fit, and the bootstrap resamples them, so it always uses exactly the data
 the model was fitted on. The spline-basis features are rebuilt from them

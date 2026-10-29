@@ -62,3 +62,10 @@ from the 'survival' package (LGPL (>= 2)). The package has no compiled code:
 the model frame and the martingale residuals are computed by calling
 `survival::coxph()` itself. The author of 'survival', Terry Therneau, is
 listed in `Authors@R` with the roles `ctb` and `cph`.
+
+The WCE model implements the method of Sylvestre and Abrahamowicz (2009),
+cited in the Description, and `wceGPU()` follows the interface of the 'WCE'
+package (GPL-2 | GPL-3), cited in the documentation. No code or
+documentation from 'WCE' is included in this package, so its license does
+not apply here. 'WCE' is only in Suggests: for its example dataset
+`drugdata`, and for tests that compare our results with it.

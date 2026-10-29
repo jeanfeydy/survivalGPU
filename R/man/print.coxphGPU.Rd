@@ -2,18 +2,18 @@
 % Please edit documentation in R/coxphGPU.R
 \name{print.coxphGPU}
 \alias{print.coxphGPU}
-\title{Print method for coxphGPU object}
+\title{Print a coxphGPU Model}
 \usage{
 \method{print}{coxphGPU}(x, ..., digits = max(1L, getOption("digits") - 3L), signif.stars = FALSE)
 }
 \arguments{
-\item{x}{a coxphGPU object}
+\item{x}{A \code{coxphGPU} object.}
 
-\item{...}{additional argument(s) for methods.}
+\item{...}{Not used.}
 
-\item{digits}{significant digits to print}
+\item{digits}{Number of significant digits to print.}
 
-\item{signif.stars}{show stars to highlight small p-values}
+\item{signif.stars}{Logical. If \code{TRUE}, stars flag the small p-values.}
 }
 \value{
 \code{x}, invisibly. Called for its side effect: printing the model.

@@ -2,33 +2,35 @@
 % Please edit documentation in R/wceGPU.R
 \name{HR}
 \alias{HR}
-\title{Hazard Ratio for WCE model}
+\title{Hazard Ratio of a WCE Model}
 \usage{
 HR(object, vecnum, vecdenom, level = 0.95)
 }
 \arguments{
-\item{object}{wceGPU object.}
+\item{object}{A \code{wceGPU} object.}
 
-\item{vecnum}{A vector of time-dependent exposures corresponding to a
-scenario of interest (numerator of the HR), in reverse chronological
-order: the first value is the exposure at the current time, the second
-the exposure one time unit earlier, and so on. A vector longer than the
-\code{cutoff} of the model is truncated, and a shorter one is padded with zeros
-(no exposure further back in time).}
+\item{vecnum}{Numeric vector: the exposure history of interest (numerator
+of the HR), in reverse chronological order: the first value is the
+exposure at the current time, the second the exposure one time unit
+earlier, and so on. A vector longer than the \code{cutoff} of the model is
+truncated, and a shorter one is padded with zeros (no exposure further
+back in time).}
 
-\item{vecdenom}{A vector of time-dependent exposures corresponding to a
-scenario for the reference category (denominator of the HR), in the same
-order and with the same length rules as \code{vecnum}.}
+\item{vecdenom}{Numeric vector: the reference exposure history (denominator
+of the HR), in the same order and with the same length rules as
+\code{vecnum}.}
 
-\item{level}{the confidence level required for HR CI. Default to 0.95.}
+\item{level}{Level of the bootstrap confidence interval of the HR (default
+\code{0.95}).}
 }
 \value{
-Returns a HR according to the scenarios. If bootstrap is present
-in the wceGPU object, this function returns a confidence interval for the HR.
+A one-row matrix with the HR and, if \code{\link[=bootstrap]{bootstrap()}} was called on
+\code{object}, the lower and upper limits of its bootstrap percentile
+confidence interval.
 }
 \description{
-Calculate the hazard ratio from a wceGPU object to compare two scenarios of
-time-dependent exposures.
+Computes, from a model fitted by \code{\link[=wceGPU]{wceGPU()}}, the hazard ratio between two
+exposure histories.
 }
 \examples{
 \dontrun{

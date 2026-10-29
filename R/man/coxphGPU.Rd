@@ -3,7 +3,7 @@
 \name{coxphGPU}
 \alias{coxphGPU}
 \alias{summary.coxphGPU}
-\title{Fast Cox Proportional Hazards Regression Model}
+\title{Fast Cox Proportional Hazards Model}
 \usage{
 coxphGPU(formula, data, ties = c("efron", "breslow"), init, control,
          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
@@ -12,9 +12,8 @@ coxphGPU(formula, data, ties = c("efron", "breslow"), init, control,
 \method{summary}{coxphGPU}(object, ..., conf.int = 0.95, scale = 1)
 }
 \arguments{
-\item{formula}{a formula object, with the response on the left of a ~
-operator, and the terms on the right. The response must be a survival
-object as returned by the Surv function.}
+\item{formula}{A formula with a survival object (see \code{\link[survival:Surv]{survival::Surv()}}) on
+the left of \code{~} and the terms on the right.}
 
 \item{data}{
     a data.frame in which to interpret the variables named in
@@ -68,15 +67,19 @@ object as returned by the Surv function.}
     component \code{y}.
   }
 
-\item{patient_id}{name of the column of \code{data} that identifies each patient
+\item{patient_id}{Name of the column of \code{data} that identifies each patient
 (subject). Required by \code{\link[=bootstrap]{bootstrap()}}, which resamples patients rather than
 rows, so that all the rows of a patient (e.g. with time-varying
 covariates) are kept together. With one row per patient, a column of row
 indices (\code{data$id <- seq_len(nrow(data))}) can be used.}
 
-\item{...}{Other arguments for methods.}
+\item{...}{For \code{coxphGPU()}: \code{device} (\code{"cpu"} or \code{"cuda"}; default: the
+GPU if one is available), \code{double_precision} (\code{TRUE}, the default, for
+64-bit floats; \code{FALSE} for 32-bit floats, faster on most GPUs), and
+arguments of \code{\link[survival:coxph.control]{survival::coxph.control()}} (e.g. \code{iter.max}). For the
+methods: not used.}
 
-\item{object}{a coxphGPU object}
+\item{object}{A \code{coxphGPU} object.}
 
 \item{conf.int}{
     level for computation of the confidence intervals.
@@ -90,32 +93,31 @@ indices (\code{data$id <- seq_len(nrow(data))}) can be used.}
   }
 }
 \value{
-A coxphGPU object representing the fit. With \code{patient_id}, it also
-contains \code{patient_id} (the column name) and \code{patient_ids} (the patient of
-each row used by the model).
+\code{coxphGPU()} returns an object of class \code{coxphGPU}, with the
+components of a \code{\link[survival:coxph]{survival::coxph()}} fit (coefficients, variance,
+log-likelihood, ...). With \code{patient_id}, it also contains \code{patient_id}
+(the column name) and \code{patient_ids} (the patient of each row used by the
+model).
 
-With \code{summary()} :
+\code{summary()} returns an object of class \code{summary.coxphGPU}, with
+confidence intervals for the hazard ratios from the normal approximation
+and, if \code{\link[=bootstrap]{bootstrap()}} was called on the model, from the bootstrap. Its
+main components are:
 \itemize{
-\item \code{conf.int}:                  a matrix with one row for each coefficient,
-containing the confidence limits for exp(coef).
-\item \code{conf.int_bootstrap}:        confidence limits for exp(coef) determined by
-bootstrap
-\item \verb{logtest, sctest, waldtest}: the overall likelihood ratio, score, and Wald
-test statistics for the model
-\item \code{concordance}:               the concordance statistic and its standard
-error
-\item \code{rsq}:                       an approximate R^2 based on Nagelkirke
-(Biometrika 1991).
+\item \code{conf.int}: matrix with one row per coefficient and the confidence
+limits of \code{exp(coef)}.
+\item \code{conf.int_bootstrap}: the same limits, from the bootstrap.
+\item \code{logtest}, \code{sctest}, \code{waldtest}: likelihood ratio, score and Wald tests
+of the model.
+\item \code{concordance}: concordance statistic and its standard error.
+\item \code{rsq}: approximate \eqn{R^2} of Nagelkerke (Biometrika, 1991).
 }
 }
 \description{
-Fits a Cox proportional hazards regression model. An extension
-to use (or not) your GPU to speed up calculations. Fits a point estimate
-only; call \code{\link[=bootstrap]{bootstrap()}} on the result for bootstrap-based inference.
-
-Use \code{summary()} method to see confidence interval for covariates with two
-process : normal distribution and bootstrap (if \code{\link[=bootstrap]{bootstrap()}} was called
-on the object first).
+Fits a Cox proportional hazards model on the GPU (or the CPU),
+with the interface of \code{\link[survival:coxph]{survival::coxph()}}. Only point estimates are
+computed: call \code{\link[=bootstrap]{bootstrap()}} on the result for bootstrap confidence
+intervals, and inspect it with \code{summary()}.
 }
 \details{
 To compute bootstrap confidence intervals with \code{\link[=bootstrap]{bootstrap()}}, fit the model
