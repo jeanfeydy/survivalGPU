@@ -118,12 +118,11 @@ You can realize the Cox model with the `coxphGPU()` function, which is
 written in the same way as the `survival::coxph()` function from
 survival package, with a Surv object in the formula. Bootstrap
 confidence intervals are added afterwards with `bootstrap()`, which
-reuses the design matrix and the patient ids stored in the fitted
-model: fit it with `x = TRUE` and `patient_id`. `patient_id` identifies
-each patient (subject) in `data`, so that bootstrap resampling is
-performed at the patient level rather than at the row level (relevant
-when a patient has several rows,
-e.g. with time-varying covariates);
+reuses the design matrix and the patient ids stored in the fitted model:
+fit it with `x = TRUE` and `patient_id`. `patient_id` identifies each
+patient (subject) in `data`, so that bootstrap resampling is performed
+at the patient level rather than at the row level (relevant when a
+patient has several rows, e.g. with time-varying covariates);
 `bootstrap()` cannot run without it.
 
 ``` r
@@ -149,7 +148,7 @@ interval is also estimated for coefficients by bootstrap (if
 summary(coxphGPU_bootstrap)
 #> Call:
 #> coxphGPU.default(formula = Surv(time, status) ~ age + sex + ph.ecog,
-#>     data = lung, ties = "breslow", x = TRUE)
+#>     data = lung, ties = "breslow", x = TRUE, patient_id = "id")
 #>
 #>   n= 227, number of events= 164
 #>
@@ -173,9 +172,9 @@ summary(coxphGPU_bootstrap)
 #>  ----------------
 #> Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
 #>             2.5%    97.5%
-#> age     0.987929 1.027300
-#> sex     0.442419 0.759111
-#> ph.ecog 1.267270 1.988060
+#> age     0.986309 1.032110
+#> sex     0.409196 0.759636
+#> ph.ecog 1.302890 2.020790
 ```
 
 To visualize your model, you can plot adjusted survival curves with

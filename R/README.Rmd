@@ -11,6 +11,7 @@ knitr::opts_chunk$set(
   fig.path = "man/figures/README-",
   out.width = "70%"
 )
+Sys.setenv(KEOPS_VERBOSE = "0") # before Python starts
 ```
 
 # survivalGPU <img src="man/figures/logo.png" align="right" height="139" />
@@ -120,6 +121,10 @@ if (use_cuda()) {
 ```
 
 You can realize the Cox model with the `coxphGPU()` function, which is written in the same way as the `survival::coxph()` function from survival package, with a Surv object in the formula. Bootstrap confidence intervals are added afterwards with `bootstrap()`, which reuses the design matrix and the patient ids stored in the fitted model: fit it with `x = TRUE` and `patient_id`. `patient_id` identifies each patient (subject) in `data`, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates); `bootstrap()` cannot run without it.
+
+```{r seed, include = FALSE}
+invisible(reticulate::import("torch")$manual_seed(42L))
+```
 
 ```{r coxphGPU}
 lung <- lung[stats::complete.cases(lung[c("time", "status", "age", "sex", "ph.ecog")]), ]
