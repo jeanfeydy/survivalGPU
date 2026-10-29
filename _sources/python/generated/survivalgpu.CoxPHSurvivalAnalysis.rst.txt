@@ -1,0 +1,25 @@
+﻿survivalgpu.CoxPHSurvivalAnalysis
+=================================
+
+.. currentmodule:: survivalgpu
+
+.. autoclass:: CoxPHSurvivalAnalysis
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~CoxPHSurvivalAnalysis.__init__
+      ~CoxPHSurvivalAnalysis.bootstrap
+      ~CoxPHSurvivalAnalysis.fit
+      ~CoxPHSurvivalAnalysis.to_numpy
+   
+   
+
+   
+   
+   

@@ -1,0 +1,38 @@
+﻿survivalgpu.WCESurvivalAnalysis
+===============================
+
+.. currentmodule:: survivalgpu
+
+.. autoclass:: WCESurvivalAnalysis
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~WCESurvivalAnalysis.HR
+      ~WCESurvivalAnalysis.__init__
+      ~WCESurvivalAnalysis.fit
+      ~WCESurvivalAnalysis.set_non_negative_int
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~WCESurvivalAnalysis.atom_areas
+      ~WCESurvivalAnalysis.atoms
+      ~WCESurvivalAnalysis.constrained
+      ~WCESurvivalAnalysis.cutoff
+      ~WCESurvivalAnalysis.n_atoms
+      ~WCESurvivalAnalysis.nknots
+      ~WCESurvivalAnalysis.nknots_candidates
+      ~WCESurvivalAnalysis.order
+   
+   

@@ -1,0 +1,6 @@
+﻿survivalgpu.simulate\_for\_experiment
+=====================================
+
+.. currentmodule:: survivalgpu
+
+.. autofunction:: simulate_for_experiment

@@ -1,0 +1,6 @@
+﻿survivalgpu.use\_cuda
+=====================
+
+.. currentmodule:: survivalgpu
+
+.. autodata:: use_cuda

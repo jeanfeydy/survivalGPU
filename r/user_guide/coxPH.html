@@ -1,0 +1,283 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cox Proportional Hazards &mdash; survivalGPU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Weighted Cumulative Exposure (WCE)" href="WCE.html" />
+    <link rel="prev" title="User guide" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            survivalGPU
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">survivalGPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../python/index.html">Python overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python/user_guide/index.html">User guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python/api.html">API reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">R</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index.html">R overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">User guide</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Cox Proportional Hazards</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#survival-curves">Survival Curves</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#test-the-proportional-hazards-assumption">Test the Proportional Hazards Assumption</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#forestplot">Forestplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="WCE.html">Weighted Cumulative Exposure (WCE)</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">survivalGPU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">User guide</a></li>
+      <li class="breadcrumb-item active">Cox Proportional Hazards</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/r/user_guide/coxPH.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="cox-proportional-hazards">
+<h1>Cox Proportional Hazards<a class="headerlink" href="#cox-proportional-hazards" title="Link to this heading"></a></h1>
+<p>The Cox proportional hazards model<a class="footnote-reference brackets" href="#cox1" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> <a class="footnote-reference brackets" href="#cox2" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a> is a semi-parametric regression model for survival (time-to-event) data. It relates the hazard of an event at time $t$ to a set of covariates through a hazard ratio, without requiring the baseline hazard to follow a specific parametric form, and its coefficients are estimated by maximizing a partial likelihood.</p>
+<p>Let’s make an example with <code class="docutils literal notranslate"><span class="pre">lung</span></code> cancer dataset from survival package. Check <code class="docutils literal notranslate"><span class="pre">?survival::lung</span></code> if you want more explanations about this dataset. Before load <code class="docutils literal notranslate"><span class="pre">survivalGPU</span></code>, use your virtual python environment (see <code class="docutils literal notranslate"><span class="pre">vignette(&quot;installation&quot;)</span></code>).</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">library</span><span class="p">(</span><span class="n">reticulate</span><span class="p">)</span>
+<span class="nf">use_virtualenv</span><span class="p">(</span><span class="n">virtualenv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"survivalGPU"</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Error in `use_virtualenv()`:
+! Directory ~/.virtualenvs/survivalGPU is not a Python virtualenv
+</pre></div>
+</div>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">library</span><span class="p">(</span><span class="n">survivalGPU</span><span class="p">)</span>
+<span class="nf">library</span><span class="p">(</span><span class="n">survival</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="c1"># ?survival::lung</span>
+<span class="n">data</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lung</span>
+<span class="n">data</span><span class="o">$</span><span class="n">status</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lung</span><span class="o">$</span><span class="n">status</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="c1"># event variable now coded in 0 - 1 (instead of 1 - 2)</span>
+<span class="n">data</span><span class="o">$</span><span class="n">sex</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">ifelse</span><span class="p">(</span><span class="n">lung</span><span class="o">$</span><span class="n">sex</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="s">"Male"</span><span class="p">,</span><span class="w"> </span><span class="s">"Female"</span><span class="p">)</span>
+<span class="n">data</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data</span><span class="p">[</span><span class="n">stats</span><span class="o">::</span><span class="nf">complete.cases</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="nf">c</span><span class="p">(</span><span class="s">"time"</span><span class="p">,</span><span class="w"> </span><span class="s">"status"</span><span class="p">,</span><span class="w"> </span><span class="s">"age"</span><span class="p">,</span><span class="w"> </span><span class="s">"sex"</span><span class="p">,</span><span class="w"> </span><span class="s">"ph.ecog"</span><span class="p">)]),</span><span class="w"> </span><span class="p">]</span>
+<span class="n">data</span><span class="o">$</span><span class="n">id</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">seq_len</span><span class="p">(</span><span class="nf">nrow</span><span class="p">(</span><span class="n">data</span><span class="p">))</span><span class="w"> </span><span class="c1"># one row per patient here, so a row index works as patient_id</span>
+<span class="nf">head</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>  inst time status age  sex ph.ecog ph.karno pat.karno meal.cal wt.loss id
+1    3  306      1  74 Male       1       90       100     1175      NA  1
+2    3  455      1  68 Male       0       90        90     1225      15  2
+3    3 1010      0  56 Male       0       90        90       NA      15  3
+4    5  210      1  57 Male       1       90        60     1150      11  4
+5    1  883      1  60 Male       0      100        90       NA       0  5
+6   12 1022      0  74 Male       1       50        80      513       0  6
+</pre></div>
+</div>
+<p>You can realize the Cox model with the <code class="docutils literal notranslate"><span class="pre">coxphGPU()</span></code> function, which is written in the same way as the <code class="docutils literal notranslate"><span class="pre">survival::coxph()</span></code> function from survival package<a class="footnote-reference brackets" href="#survival" id="id3" role="doc-noteref"><span class="fn-bracket">[</span>3<span class="fn-bracket">]</span></a>, with a Surv object in the formula. To add bootstrap confidence intervals afterwards, fit the model with <code class="docutils literal notranslate"><span class="pre">x</span> <span class="pre">=</span> <span class="pre">TRUE</span></code> and <code class="docutils literal notranslate"><span class="pre">patient_id</span></code>: <code class="docutils literal notranslate"><span class="pre">bootstrap()</span></code> reuses the design matrix and the patient ids stored in the fitted model. <code class="docutils literal notranslate"><span class="pre">patient_id</span></code> identifies each patient (subject) in <code class="docutils literal notranslate"><span class="pre">data</span></code>, so that bootstrap resampling is performed at the patient level rather than at the row level (relevant when a patient has several rows, e.g. with time-varying covariates). <code class="docutils literal notranslate"><span class="pre">bootstrap()</span></code> cannot run without it.</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="n">coxphGPU_fit</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">coxphGPU</span><span class="p">(</span><span class="nf">Surv</span><span class="p">(</span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">)</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="n">age</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">sex</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">ph.ecog</span><span class="p">,</span>
+<span class="w">                         </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">data</span><span class="p">,</span>
+<span class="w">                         </span><span class="n">ties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"breslow"</span><span class="p">,</span>
+<span class="w">                         </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">,</span>
+<span class="w">                         </span><span class="n">patient_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"id"</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">bootstrap()</span></code> refits the model on <code class="docutils literal notranslate"><span class="pre">R</span></code> patient-level resamples of the data stored in the fit, so it always uses exactly the data the model was fitted on.</p>
+<p>The bootstrap resamples are drawn by PyTorch, not by R, so <code class="docutils literal notranslate"><span class="pre">set.seed()</span></code> has no effect on them. To get reproducible results, set PyTorch’s seed:</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">invisible</span><span class="p">(</span><span class="n">reticulate</span><span class="o">::</span><span class="nf">import</span><span class="p">(</span><span class="s">"torch"</span><span class="p">)</span><span class="o">$</span><span class="nf">manual_seed</span><span class="p">(</span><span class="m">42L</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="n">coxphGPU_bootstrap</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">bootstrap</span><span class="p">(</span><span class="n">coxphGPU_fit</span><span class="p">,</span><span class="w"> </span><span class="n">R</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">50</span><span class="p">)</span>
+
+<span class="c1"># 50 bootstrap replicates for this example, but normally it's more.</span>
+</pre></div>
+</div>
+<p>You obtain with <code class="docutils literal notranslate"><span class="pre">summary</span></code> all results for the initial model, and a bootstrap confidence interval for the estimated coefficients.</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">summary</span><span class="p">(</span><span class="n">coxphGPU_bootstrap</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Call:
+coxphGPU.default(formula = Surv(time, status) ~ age + sex + ph.ecog, 
+    data = data, ties = "breslow", x = TRUE, patient_id = "id")
+
+  n= 227, number of events= 164 
+
+            coef exp(coef) se(coef)     z Pr(&gt;|z|)    
+age     0.011041  1.011102 0.009267 1.191    0.233    
+sexMale 0.551890  1.736531 0.167742 3.290    0.001 ** 
+ph.ecog 0.462947  1.588749 0.113574 4.076 4.58e-05 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+        exp(coef) exp(-coef) lower .95 upper .95
+age         1.011     0.9890    0.9929     1.030
+sexMale     1.737     0.5759    1.2500     2.412
+ph.ecog     1.589     0.6294    1.2717     1.985
+
+Concordance= 0.637  (se = 0.025 )
+Likelihood ratio test= 30.41  on 3 df,   p=1e-06
+Wald test            = 29.84  on 3 df,   p=1e-06
+Score (logrank) test = 30.41  on 3 df,   p=1e-06
+
+ ---------------- 
+Confidence interval with 50 bootstraps for exp(coef), conf.level = 0.95 :
+            2.5%   97.5%
+age     0.986309 1.03211
+sexMale 1.316420 2.44382
+ph.ecog 1.302890 2.02079
+</pre></div>
+</div>
+<section id="survival-curves">
+<h2>Survival Curves<a class="headerlink" href="#survival-curves" title="Link to this heading"></a></h2>
+<p>You can plot adjusted survival curves with <code class="docutils literal notranslate"><span class="pre">survminer::ggadjustedcurves()</span></code>.</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="n">survminer</span><span class="o">::</span><span class="nf">ggadjustedcurves</span><span class="p">(</span><span class="n">coxphGPU_bootstrap</span><span class="p">,</span>
+<span class="w">                            </span><span class="n">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"sex"</span><span class="p">,</span>
+<span class="w">                            </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><img alt="plot of chunk unnamed-chunk-5" src="../../_images/unnamed-chunk-5-1.png" /></p>
+<p>This plot shows you survival curves for each sex group, adjusted on the effects of age and ECOG performance score. The result of is plot is that the female survival rate is higher than the male survival rate in time.</p>
+<p>If you have no model, it’s possible to estimate survival curves with Kaplan-Meier estimation by <code class="docutils literal notranslate"><span class="pre">survival::survfit()</span></code>, and you can use <code class="docutils literal notranslate"><span class="pre">survminer::ggsurvplot()</span></code> to plot a Kaplan-Meier survival curve.</p>
+</section>
+<section id="test-the-proportional-hazards-assumption">
+<h2>Test the Proportional Hazards Assumption<a class="headerlink" href="#test-the-proportional-hazards-assumption" title="Link to this heading"></a></h2>
+<p>You can test the proportional hazards assumption for a Cox regression with <code class="docutils literal notranslate"><span class="pre">survival::cox.zph()</span></code> :</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">cox.zph</span><span class="p">(</span><span class="n">coxphGPU_bootstrap</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>        chisq df    p
+age     0.188  1 0.66
+sex     2.297  1 0.13
+ph.ecog 2.052  1 0.15
+GLOBAL  4.451  3 0.22
+</pre></div>
+</div>
+<p>Rejection of the null hypothesis (correlation between the Schoenfeld residuals and ranked failure time is zero) leads to a conclusion that the PH assumption is violated.
+And plot scaled Schoenfeld residuals against the time for each covariates with <code class="docutils literal notranslate"><span class="pre">survminer::ggcoxzph()</span></code> function from <code class="docutils literal notranslate"><span class="pre">survminer</span></code> package.</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="n">survminer</span><span class="o">::</span><span class="nf">ggcoxzph</span><span class="p">(</span><span class="nf">cox.zph</span><span class="p">(</span><span class="n">coxphGPU_bootstrap</span><span class="p">))</span>
+</pre></div>
+</div>
+<p><img alt="plot of chunk unnamed-chunk-7" src="../../_images/unnamed-chunk-7-1.png" /></p>
+<p>If you see a violation of the PH assumption, you can test :</p>
+<ul class="simple">
+<li><p>interaction $covariate*time$ term (not currently implemented in <code class="docutils literal notranslate"><span class="pre">survivalGPU</span></code>)</p></li>
+<li><p>stratification</p></li>
+</ul>
+</section>
+<section id="forestplot">
+<h2>Forestplot<a class="headerlink" href="#forestplot" title="Link to this heading"></a></h2>
+<p>Also with the <code class="docutils literal notranslate"><span class="pre">survminer</span></code> package, you can use <code class="docutils literal notranslate"><span class="pre">survminer::ggforest()</span></code> function to plot forestplot for Cox PH model. The confidence interval plotted is the confidence interval by the normal distribution (not bootstrap)</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="n">survminer</span><span class="o">::</span><span class="nf">ggforest</span><span class="p">(</span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">coxphGPU_bootstrap</span><span class="p">,</span>
+<span class="w">                    </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><img alt="plot of chunk unnamed-chunk-8" src="../../_images/unnamed-chunk-8-1.png" /></p>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+</section>
+</section>
+<hr class="footnotes docutils" />
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="cox1" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Andersen, P. and Gill, R. (1982). Cox’s regression model for counting processes, a large sample study. Annals of Statistics 10, 1100-1120.</p>
+</aside>
+<aside class="footnote brackets" id="cox2" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>Therneau, T., Grambsch, P., Modeling Survival Data: Extending the Cox Model. Springer-Verlag, 2000.</p>
+</aside>
+<aside class="footnote brackets" id="survival" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id3">3</a><span class="fn-bracket">]</span></span>
+<p>Therneau T (2026). A Package for Survival Analysis in R. R package version 3.8-9, <a class="reference external" href="https://CRAN.R-project.org/package=survival">https://CRAN.R-project.org/package=survival</a>. <code class="docutils literal notranslate"><span class="pre">coxphGPU()</span></code> follows the interface of its <code class="docutils literal notranslate"><span class="pre">coxph()</span></code>, calls it for the model frame and the martingale residuals, and is tested against it.</p>
+</aside>
+</aside>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="User guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="WCE.html" class="btn btn-neutral float-right" title="Weighted Cumulative Exposure (WCE)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Jean Feydy, Antoine Poirot-Bourdain, Alexis van Straaten.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

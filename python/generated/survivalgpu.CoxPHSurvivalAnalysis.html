@@ -1,0 +1,268 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>survivalgpu.CoxPHSurvivalAnalysis &mdash; survivalGPU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="survivalgpu.WCESurvivalAnalysis" href="survivalgpu.WCESurvivalAnalysis.html" />
+    <link rel="prev" title="API reference" href="../api.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            survivalGPU
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">survivalGPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Python overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/index.html">User guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../api.html#models">Models</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">survivalgpu.CoxPHSurvivalAnalysis</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#survivalgpu.CoxPHSurvivalAnalysis"><code class="docutils literal notranslate"><span class="pre">CoxPHSurvivalAnalysis</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="survivalgpu.WCESurvivalAnalysis.html">survivalgpu.WCESurvivalAnalysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api.html#simulation">Simulation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api.html#utilities">Utilities</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">R</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../r/index.html">R overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../r/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../r/user_guide/index.html">User guide</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">survivalGPU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../api.html">API reference</a></li>
+      <li class="breadcrumb-item active">survivalgpu.CoxPHSurvivalAnalysis</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/python/generated/survivalgpu.CoxPHSurvivalAnalysis.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="survivalgpu-coxphsurvivalanalysis">
+<h1>survivalgpu.CoxPHSurvivalAnalysis<a class="headerlink" href="#survivalgpu-coxphsurvivalanalysis" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="survivalgpu.CoxPHSurvivalAnalysis">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">survivalgpu.</span></span><span class="sig-name descname"><span class="pre">CoxPHSurvivalAnalysis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ties</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'efron'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxiter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">doscale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbosity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;class</span> <span class="pre">'numpy.float64'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nbootstraps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batchsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#survivalgpu.CoxPHSurvivalAnalysis" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Cox Proportional Hazards model.</p>
+<p>The API of this object is loosely based on scikit-survival.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>alpha</strong> (<em>float</em>) – L2 regularization parameter.</p></li>
+<li><p><strong>ties</strong> (<em>str</em>) – Ties handling method. One of “efron”, “breslow”.</p></li>
+<li><p><strong>bootstrap</strong> (<em>int</em>) – Number of bootstrap samples to use.</p></li>
+<li><p><strong>batchsize</strong> (<em>int</em>) – Number of bootstrap samples to process in parallel.</p></li>
+<li><p><strong>maxiter</strong> (<em>int</em>) – Maximum number of Newton iterations.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – Convergence tolerance.</p></li>
+<li><p><strong>doscale</strong> (<em>bool</em>) – Whether to scale the covariates for stability.</p></li>
+<li><p><strong>verbosity</strong> (<em>int</em>) – Verbosity level.</p></li>
+<li><p><strong>mode</strong> (<em>str</em><em> or </em><em>None</em>) – One of “unit length”, “start zero”, “any”.
+Assumptions made on the (start, stop] intervals.
+Defaults to None, which selects automatically the fastest backend.</p></li>
+<li><p><strong>dtype</strong> – np.float32 or np.float64. Defaults to np.float64.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="survivalgpu.CoxPHSurvivalAnalysis.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ties</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'efron'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxiter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">doscale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbosity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;class</span> <span class="pre">'numpy.float64'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nbootstraps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batchsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#survivalgpu.CoxPHSurvivalAnalysis.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#survivalgpu.CoxPHSurvivalAnalysis.__init__" title="survivalgpu.CoxPHSurvivalAnalysis.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([alpha, ties, maxiter, eps, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#survivalgpu.CoxPHSurvivalAnalysis.bootstrap" title="survivalgpu.CoxPHSurvivalAnalysis.bootstrap"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bootstrap</span></code></a>(*, dataset, n_batch, n_covariates, ...)</p></td>
+<td><p>Fits the CoxPH model on a collection of bootstrap resamples.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#survivalgpu.CoxPHSurvivalAnalysis.fit" title="survivalgpu.CoxPHSurvivalAnalysis.fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit</span></code></a>(covariates, stop, *[, start, event, ...])</p></td>
+<td><p>Fits the CoxPH model to the data and stores the results as attributes.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#survivalgpu.CoxPHSurvivalAnalysis.to_numpy" title="survivalgpu.CoxPHSurvivalAnalysis.to_numpy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_numpy</span></code></a>()</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="survivalgpu.CoxPHSurvivalAnalysis.bootstrap">
+<span class="sig-name descname"><span class="pre">bootstrap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_covariates</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">indices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_indices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#survivalgpu.CoxPHSurvivalAnalysis.bootstrap" title="Link to this definition"></a></dt>
+<dd><p>Fits the CoxPH model on a collection of bootstrap resamples.</p>
+<p>Shared building block for <cite>fit()</cite>’s own bootstrap loop, and for
+external callers (e.g. <cite>WCESurvivalAnalysis</cite>) that need to reuse the
+exact same resamples across several model configurations (e.g.
+several <cite>nknots</cite> candidates), so that each replicate is compared
+fairly across configurations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> – the (sorted, scaled) <cite>TorchSurvivalDataset</cite> built by <cite>_prepare()</cite>.</p></li>
+<li><p><strong>n_batch</strong> (<em>int</em>) – number of independent batches, as in <cite>fit()</cite>.</p></li>
+<li><p><strong>n_covariates</strong> (<em>int</em>) – number of covariates, as in <cite>fit()</cite>.</p></li>
+<li><p><strong>loss</strong> – the <cite>loss(*, bootstrap)</cite> closure built by <cite>_prepare()</cite>.</p></li>
+<li><p><strong>init</strong> (<em>(</em><em>D</em><em>,</em><em>) </em><em>float64 array</em><em>, </em><em>optional</em>) – initial values for the
+coefficients. Defaults to zeros.</p></li>
+<li><p><strong>indices</strong> (<em>optional</em>) – a list of raw (B,P) patient-index tensors to
+replay instead of drawing new ones (see
+<cite>TorchSurvivalDataset.bootstrap_indices()</cite>). Defaults to None,
+i.e. draw <cite>self.nbootstraps</cite> fresh indices, chunked by
+<cite>self.batchsize</cite>.</p></li>
+<li><p><strong>keep_indices</strong> (<em>bool</em><em>, </em><em>optional</em>) – if True, store the index chunks
+(freshly-drawn, or replayed from <cite>indices</cite>) as
+<cite>bootstrap_indices_</cite>, so a caller can replay the exact same
+resamples in a later <cite>bootstrap()</cite> call. Defaults to False.</p></li>
+</ul>
+</dd>
+</dl>
+<p>Sets <cite>self.bootstrap_coef_</cite>, of shape (nbootstraps, n_batch, n_covariates);
+<cite>self.bootstrap_loglik_</cite>, of shape (nbootstraps, n_batch); and
+<cite>self.bootstrap_n_events_</cite>, of shape (nbootstraps,) – the number of
+events in each replicate’s own resampled data (not the original
+dataset’s fixed event count), needed to compute a per-replicate
+information criterion.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="survivalgpu.CoxPHSurvivalAnalysis.fit">
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">covariates</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">event</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patient</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">strata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bootstrap_indices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_bootstrap_indices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#survivalgpu.CoxPHSurvivalAnalysis.fit" title="Link to this definition"></a></dt>
+<dd><p>Fits the CoxPH model to the data and stores the results as attributes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>covariates</strong> (<em>(</em><em>I</em><em>,</em><em>D</em><em>) </em><em>float64 array</em>) – covariate values for each interval.</p></li>
+<li><p><strong>stop</strong> (<em>(</em><em>I</em><em>,</em><em>) </em><em>int64 array</em>) – end time of each interval.</p></li>
+<li><p><strong>start</strong> (<em>(</em><em>I</em><em>,</em><em>) </em><em>int64 array</em><em>, </em><em>optional</em>) – start time of each interval.
+Defaults to 0 for every interval.</p></li>
+<li><p><strong>event</strong> (<em>(</em><em>I</em><em>,</em><em>) </em><em>int64 array</em><em>, </em><em>optional</em>) – 1 if the interval ends with an
+event (death), 0 if it is censored. Defaults to 1 for every interval.</p></li>
+<li><p><strong>patient</strong> (<em>(</em><em>I</em><em>,</em><em>) </em><em>int64 array</em><em>, </em><em>optional</em>) – patient id for each interval.
+Required to draw consistent bootstrap samples when several
+intervals belong to the same patient. Defaults to one interval
+per patient, i.e. patient = [0, 1, …, I-1].</p></li>
+<li><p><strong>strata</strong> (<em>(</em><em>I</em><em>,</em><em>) </em><em>int64 array</em><em>, </em><em>optional</em>) – stratum id for each interval.
+Defaults to a single stratum for all patients.</p></li>
+<li><p><strong>batch</strong> (<em>(</em><em>P</em><em>,</em><em>) </em><em>int64 array</em><em>, </em><em>optional</em>) – batch id for each patient.
+Independent CoxPH models are fitted for each batch.
+Defaults to a single batch for all patients.</p></li>
+<li><p><strong>init</strong> (<em>(</em><em>D</em><em>,</em><em>) </em><em>float64 array</em><em>, </em><em>optional</em>) – initial values for the
+coefficients. Defaults to zeros.</p></li>
+<li><p><strong>bootstrap_indices</strong> (<em>optional</em>) – a list of raw (B,P) patient-index
+tensors to replay instead of drawing new ones – see
+<cite>bootstrap()</cite>. Defaults to None, i.e. draw fresh indices.</p></li>
+<li><p><strong>keep_bootstrap_indices</strong> (<em>bool</em><em>, </em><em>optional</em>) – if True, store the
+(freshly-drawn or replayed) index chunks as
+<cite>bootstrap_indices_</cite>, so they can be replayed later by another
+<cite>fit()</cite> call. Defaults to False.</p></li>
+</ul>
+</dd>
+</dl>
+<p>Results are stored as attributes: <code class="docutils literal notranslate"><span class="pre">coef_</span></code>, <code class="docutils literal notranslate"><span class="pre">std_</span></code>, <code class="docutils literal notranslate"><span class="pre">means_</span></code>,
+<code class="docutils literal notranslate"><span class="pre">score_</span></code>, <code class="docutils literal notranslate"><span class="pre">loglik_</span></code>, <code class="docutils literal notranslate"><span class="pre">loglik_init_</span></code>, <code class="docutils literal notranslate"><span class="pre">sctest_init_</span></code>,
+<code class="docutils literal notranslate"><span class="pre">hessian_</span></code>, <code class="docutils literal notranslate"><span class="pre">imat_</span></code>, <code class="docutils literal notranslate"><span class="pre">iter_</span></code>, and (if nbootstraps is set)
+<code class="docutils literal notranslate"><span class="pre">bootstrap_coef_</span></code>, <code class="docutils literal notranslate"><span class="pre">bootstrap_loglik_</span></code> and <code class="docutils literal notranslate"><span class="pre">bootstrap_n_events_</span></code>
+(see <cite>bootstrap()</cite>).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="survivalgpu.CoxPHSurvivalAnalysis.to_numpy">
+<span class="sig-name descname"><span class="pre">to_numpy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#survivalgpu.CoxPHSurvivalAnalysis.to_numpy" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../api.html" class="btn btn-neutral float-left" title="API reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="survivalgpu.WCESurvivalAnalysis.html" class="btn btn-neutral float-right" title="survivalgpu.WCESurvivalAnalysis" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Jean Feydy, Antoine Poirot-Bourdain, Alexis van Straaten.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

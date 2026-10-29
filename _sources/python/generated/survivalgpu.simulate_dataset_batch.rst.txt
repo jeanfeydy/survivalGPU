@@ -1,0 +1,6 @@
+﻿survivalgpu.simulate\_dataset\_batch
+====================================
+
+.. currentmodule:: survivalgpu
+
+.. autofunction:: simulate_dataset_batch

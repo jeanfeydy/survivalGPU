@@ -1,0 +1,25 @@
+﻿survivalgpu.TimeDependentCovariate
+==================================
+
+.. currentmodule:: survivalgpu
+
+.. autoclass:: TimeDependentCovariate
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~TimeDependentCovariate.__init__
+      ~TimeDependentCovariate.cumulate_exposure
+      ~TimeDependentCovariate.generate_Xvector
+      ~TimeDependentCovariate.initialize_experiment
+   
+   
+
+   
+   
+   

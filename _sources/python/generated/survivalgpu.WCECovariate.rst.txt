@@ -1,0 +1,25 @@
+﻿survivalgpu.WCECovariate
+========================
+
+.. currentmodule:: survivalgpu
+
+.. autoclass:: WCECovariate
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~WCECovariate.__init__
+      ~WCECovariate.generate_WCEvector
+      ~WCECovariate.generate_Xvector
+      ~WCECovariate.initialize_experiment
+   
+   
+
+   
+   
+   

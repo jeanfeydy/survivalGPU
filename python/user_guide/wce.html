@@ -1,0 +1,371 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weighted Cumulative Exposure (WCE) &mdash; survivalGPU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="API reference" href="../api.html" />
+    <link rel="prev" title="Cox Proportional Hazards" href="coxph.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            survivalGPU
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">survivalGPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Python overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">User guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="coxph.html">Cox Proportional Hazards</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Weighted Cumulative Exposure (WCE)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#a-simulated-dataset">A simulated dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fitting-the-model">Fitting the model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#choosing-the-number-of-knots">Choosing the number of knots</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#comparing-exposure-profiles">Comparing exposure profiles</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#bootstrap-resampling">Bootstrap resampling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#references">References</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#going-further">Going further</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">R</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../r/index.html">R overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../r/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../r/user_guide/index.html">User guide</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">survivalGPU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">User guide</a></li>
+      <li class="breadcrumb-item active">Weighted Cumulative Exposure (WCE)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/python/user_guide/wce.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="weighted-cumulative-exposure-wce">
+<h1>Weighted Cumulative Exposure (WCE)<a class="headerlink" href="#weighted-cumulative-exposure-wce" title="Link to this heading"></a></h1>
+<p><a class="reference internal" href="../generated/survivalgpu.WCESurvivalAnalysis.html#survivalgpu.WCESurvivalAnalysis" title="survivalgpu.WCESurvivalAnalysis"><code class="xref py py-class docutils literal notranslate"><span class="pre">WCESurvivalAnalysis</span></code></a> models a time-varying drug exposure
+by combining it with a bank of B-spline basis functions (“atoms”) over a
+<code class="docutils literal notranslate"><span class="pre">cutoff</span></code>-long time window, then fits a Cox model on top of the resulting
+features (plus any extra covariates). The fitted risk function
+(<code class="docutils literal notranslate"><span class="pre">model.risk_function_</span></code>) describes how much a dose received <code class="docutils literal notranslate"><span class="pre">u</span></code> days ago
+still contributes to the current risk.</p>
+<section id="a-simulated-dataset">
+<h2>A simulated dataset<a class="headerlink" href="#a-simulated-dataset" title="Link to this heading"></a></h2>
+<p>We simulate a single time-varying <code class="docutils literal notranslate"><span class="pre">dose</span></code> covariate that follows a
+“bi_linear_scenario” risk shape (risk decreases linearly with time-since-dose
+over the <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> window) with a known target hazard ratio, plus a constant
+<code class="docutils literal notranslate"><span class="pre">sex</span></code> covariate to illustrate mixing WCE and standard covariates in one model.
+Unlike the CoxPH dataset, this one is <em>not</em> compressed, since
+<code class="docutils literal notranslate"><span class="pre">WCESurvivalAnalysis</span></code> currently requires unit-length <code class="docutils literal notranslate"><span class="pre">(start,</span> <span class="pre">start+1]</span></code>
+intervals.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">survivalgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConstantCovariate</span><span class="p">,</span> <span class="n">WCECovariate</span><span class="p">,</span> <span class="n">simulate_dataset</span>
+
+<span class="n">WCE_TRUE_HR</span> <span class="o">=</span> <span class="mf">3.0</span>
+
+<span class="n">dose</span> <span class="o">=</span> <span class="n">WCECovariate</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"dose"</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span>
+    <span class="n">scenario_name</span><span class="o">=</span><span class="s2">"bi_linear_scenario"</span><span class="p">,</span> <span class="n">HR_target</span><span class="o">=</span><span class="n">WCE_TRUE_HR</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">sex</span> <span class="o">=</span> <span class="n">ConstantCovariate</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"sex"</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">weights</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">coef</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+<span class="n">df</span> <span class="o">=</span> <span class="n">simulate_dataset</span><span class="p">(</span>
+    <span class="n">max_time</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">n_patients</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">list_covariates</span><span class="o">=</span><span class="p">[</span><span class="n">dose</span><span class="p">,</span> <span class="n">sex</span><span class="p">],</span> <span class="n">compress</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span>
+
+<span class="n">dose_arr</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">"dose"</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+<span class="n">covariates</span> <span class="o">=</span> <span class="n">df</span><span class="p">[[</span><span class="s2">"sex"</span><span class="p">]]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+<span class="n">start</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">"start"</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+<span class="n">stop</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">"stop"</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+<span class="n">event</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">"events"</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+<span class="n">patient</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">"patients"</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="fitting-the-model">
+<h2>Fitting the model<a class="headerlink" href="#fitting-the-model" title="Link to this heading"></a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">survivalgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">WCESurvivalAnalysis</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">WCESurvivalAnalysis</span><span class="p">(</span>
+    <span class="n">cutoff</span><span class="o">=</span><span class="mi">180</span><span class="p">,</span>      <span class="c1"># size of the exposure time window (in days)</span>
+    <span class="n">nknots</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>        <span class="c1"># number of interior knots for the B-splines</span>
+    <span class="n">order</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>         <span class="c1"># cubic B-splines</span>
+    <span class="n">constrained</span><span class="o">=</span><span class="s2">"right"</span><span class="p">,</span>  <span class="c1"># risk vanishes at the cutoff</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">"cpu"</span><span class="p">,</span>    <span class="c1"># use device="cuda" for a GPU speedup if available</span>
+<span class="p">)</span>
+
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dose</span><span class="o">=</span><span class="n">dose_arr</span><span class="p">,</span> <span class="n">stop</span><span class="o">=</span><span class="n">stop</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">event</span><span class="o">=</span><span class="n">event</span><span class="p">,</span> <span class="n">patient</span><span class="o">=</span><span class="n">patient</span><span class="p">,</span> <span class="n">covariates</span><span class="o">=</span><span class="n">covariates</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Coefficient for 'sex':"</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">coef_</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"risk_function_ shape (n_batch, cutoff):"</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">risk_function_</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Information criterion (BIC by default):"</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">info_criterion_</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/survivalgpu/wce.py:303: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:208.)
+  patient = torch.from_numpy(patient).to(self.device)
+</pre></div>
+</div>
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Coefficient for 'sex': 0.4587665582356777
+risk_function_ shape (n_batch, cutoff): torch.Size([1, 180])
+Information criterion (BIC by default): 2124.2666825838055
+</pre></div>
+</div>
+</div>
+</div>
+<p>Results are stored as attributes on <code class="docutils literal notranslate"><span class="pre">model</span></code>: <code class="docutils literal notranslate"><span class="pre">knots_</span></code>, <code class="docutils literal notranslate"><span class="pre">coef_</span></code>,
+<code class="docutils literal notranslate"><span class="pre">WCE_coef_</span></code>, <code class="docutils literal notranslate"><span class="pre">risk_function_</span></code>, <code class="docutils literal notranslate"><span class="pre">std_</span></code>, <code class="docutils literal notranslate"><span class="pre">SED_</span></code>, <code class="docutils literal notranslate"><span class="pre">means_</span></code>, <code class="docutils literal notranslate"><span class="pre">score_</span></code>,
+<code class="docutils literal notranslate"><span class="pre">loglik_</span></code>, <code class="docutils literal notranslate"><span class="pre">n_events_</span></code>, <code class="docutils literal notranslate"><span class="pre">info_criterion_</span></code> and more — see
+<a class="reference internal" href="../generated/survivalgpu.WCESurvivalAnalysis.html#survivalgpu.WCESurvivalAnalysis" title="survivalgpu.WCESurvivalAnalysis"><code class="xref py py-class docutils literal notranslate"><span class="pre">WCESurvivalAnalysis</span></code></a> for the full list.</p>
+</section>
+<section id="choosing-the-number-of-knots">
+<h2>Choosing the number of knots<a class="headerlink" href="#choosing-the-number-of-knots" title="Link to this heading"></a></h2>
+<p>The number of interior knots is usually not known in advance. Instead of a
+single value, <code class="docutils literal notranslate"><span class="pre">nknots</span></code> accepts a list of candidates: one model is fitted per
+candidate, and the one that minimizes the information criterion is selected
+(<code class="docutils literal notranslate"><span class="pre">criterion=&quot;bic&quot;</span></code> by default, or <code class="docutils literal notranslate"><span class="pre">criterion=&quot;aic&quot;</span></code>). All the flat attributes
+(<code class="docutils literal notranslate"><span class="pre">coef_</span></code>, <code class="docutils literal notranslate"><span class="pre">risk_function_</span></code>, <code class="docutils literal notranslate"><span class="pre">loglik_</span></code>, …) then describe that selected
+model, while every candidate’s results are kept in parallel <code class="docutils literal notranslate"><span class="pre">*_grid_</span></code>
+attributes.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">WCESurvivalAnalysis</span><span class="p">(</span>
+    <span class="n">cutoff</span><span class="o">=</span><span class="mi">180</span><span class="p">,</span> <span class="n">nknots</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">order</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">constrained</span><span class="o">=</span><span class="s2">"right"</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">"cpu"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dose</span><span class="o">=</span><span class="n">dose_arr</span><span class="p">,</span> <span class="n">stop</span><span class="o">=</span><span class="n">stop</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">event</span><span class="o">=</span><span class="n">event</span><span class="p">,</span> <span class="n">patient</span><span class="o">=</span><span class="n">patient</span><span class="p">,</span> <span class="n">covariates</span><span class="o">=</span><span class="n">covariates</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">nknots</span><span class="p">,</span> <span class="n">loglik</span><span class="p">,</span> <span class="n">bic</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">nknots_candidates</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">loglik_grid_</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">model</span><span class="o">.</span><span class="n">info_criterion_grid_</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+<span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"nknots=</span><span class="si">{</span><span class="n">nknots</span><span class="si">}</span><span class="s2">: loglik=</span><span class="si">{</span><span class="n">loglik</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, BIC=</span><span class="si">{</span><span class="n">bic</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Selected number of knots:"</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">best_nknots_</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>nknots=1: loglik=-1051.21, BIC=2124.27
+nknots=2: loglik=-1051.00, BIC=2129.32
+nknots=3: loglik=-1050.70, BIC=2134.18
+Selected number of knots: 1
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="comparing-exposure-profiles">
+<h2>Comparing exposure profiles<a class="headerlink" href="#comparing-exposure-profiles" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">model.HR()</span></code> computes the hazard ratio between two dose “profiles” over the
+<code class="docutils literal notranslate"><span class="pre">cutoff</span></code> window — for example, a constant dose of 1 for the first 30 days
+versus no exposure at all:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">exposed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">180</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+<span class="n">exposed</span><span class="p">[:</span><span class="mi">30</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">unexposed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">180</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+
+<span class="n">hr</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">HR</span><span class="p">(</span><span class="n">exposed</span><span class="p">,</span> <span class="n">unexposed</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"HR(30 days of exposure vs. none) = </span><span class="si">{</span><span class="n">hr</span><span class="p">[</span><span class="s1">'HR'</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"(dataset was simulated with a target HR of </span><span class="si">{</span><span class="n">WCE_TRUE_HR</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>HR(30 days of exposure vs. none) = 2.369
+(dataset was simulated with a target HR of 3.0)
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="bootstrap-resampling">
+<h2>Bootstrap resampling<a class="headerlink" href="#bootstrap-resampling" title="Link to this heading"></a></h2>
+<p>Just like <a class="reference internal" href="../generated/survivalgpu.CoxPHSurvivalAnalysis.html#survivalgpu.CoxPHSurvivalAnalysis" title="survivalgpu.CoxPHSurvivalAnalysis"><code class="xref py py-class docutils literal notranslate"><span class="pre">CoxPHSurvivalAnalysis</span></code></a>,
+<a class="reference internal" href="../generated/survivalgpu.WCESurvivalAnalysis.html#survivalgpu.WCESurvivalAnalysis" title="survivalgpu.WCESurvivalAnalysis"><code class="xref py py-class docutils literal notranslate"><span class="pre">WCESurvivalAnalysis</span></code></a> accepts <code class="docutils literal notranslate"><span class="pre">nbootstraps</span></code>/<code class="docutils literal notranslate"><span class="pre">batchsize</span></code>:
+the model is fitted once on the full data and <code class="docutils literal notranslate"><span class="pre">nbootstraps</span></code> times on
+patient-level resamples.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">nknots</span></code> is a list of candidates, <strong>the number of knots is selected
+again in every bootstrap replicate</strong>:</p>
+<ol class="arabic simple">
+<li><p>the resamples are drawn once and shared by all the candidates, so that
+they are compared on exactly the same data;</p></li>
+<li><p>every candidate is fitted on every resample;</p></li>
+<li><p>each replicate keeps the candidate that minimizes the information
+criterion computed on its own resampled data (for the BIC, with that
+replicate’s own number of events).</p></li>
+</ol>
+<p>The bootstrap distribution therefore reflects the uncertainty on the choice
+of the number of knots, and not only the uncertainty on the coefficients for
+a fixed, pre-selected number of knots.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">boot_model</span> <span class="o">=</span> <span class="n">WCESurvivalAnalysis</span><span class="p">(</span>
+    <span class="n">cutoff</span><span class="o">=</span><span class="mi">180</span><span class="p">,</span> <span class="n">nknots</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">order</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">constrained</span><span class="o">=</span><span class="s2">"right"</span><span class="p">,</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">"cpu"</span><span class="p">,</span> <span class="n">nbootstraps</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">batchsize</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">boot_model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dose</span><span class="o">=</span><span class="n">dose_arr</span><span class="p">,</span> <span class="n">stop</span><span class="o">=</span><span class="n">stop</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">event</span><span class="o">=</span><span class="n">event</span><span class="p">,</span> <span class="n">patient</span><span class="o">=</span><span class="n">patient</span><span class="p">,</span> <span class="n">covariates</span><span class="o">=</span><span class="n">covariates</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Selected number of knots on the full data:"</span><span class="p">,</span> <span class="n">boot_model</span><span class="o">.</span><span class="n">best_nknots_</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">values</span><span class="p">,</span> <span class="n">counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">boot_model</span><span class="o">.</span><span class="n">bootstrap_best_nknots_</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">nknots</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">counts</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"nknots=</span><span class="si">{</span><span class="n">nknots</span><span class="si">}</span><span class="s2"> selected in </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2"> / </span><span class="si">{</span><span class="n">boot_model</span><span class="o">.</span><span class="n">nbootstraps</span><span class="si">}</span><span class="s2"> replicates"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Selected number of knots on the full data: 1
+nknots=1 selected in 85 / 100 replicates
+nknots=2 selected in 13 / 100 replicates
+nknots=3 selected in 2 / 100 replicates
+</pre></div>
+</div>
+</div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">bootstrap_coef_</span></code> (covariates) and <code class="docutils literal notranslate"><span class="pre">bootstrap_risk_functions_</span></code> hold, for
+every replicate, the results of the candidate selected for that replicate.
+The results of every candidate on every replicate are kept in
+<code class="docutils literal notranslate"><span class="pre">bootstrap_coef_grid_</span></code>, <code class="docutils literal notranslate"><span class="pre">bootstrap_WCE_coef_grid_</span></code>,
+<code class="docutils literal notranslate"><span class="pre">bootstrap_risk_functions_grid_</span></code>, <code class="docutils literal notranslate"><span class="pre">bootstrap_loglik_grid_</span></code> and
+<code class="docutils literal notranslate"><span class="pre">bootstrap_info_criterion_grid_</span></code>. Since different replicates may select
+spline bases of different sizes, <code class="docutils literal notranslate"><span class="pre">bootstrap_WCE_coef_</span></code> is only available when
+a single <code class="docutils literal notranslate"><span class="pre">nknots</span></code> value is given.</p>
+<p><code class="docutils literal notranslate"><span class="pre">model.HR()</span></code> automatically detects that bootstrapping was requested and
+returns a percentile confidence interval for the hazard ratio alongside the
+point estimate, using each replicate’s selected risk function:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"bootstrap_risk_functions_ shape (nbootstraps, n_batch, cutoff):"</span><span class="p">,</span> <span class="n">boot_model</span><span class="o">.</span><span class="n">bootstrap_risk_functions_</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+<span class="n">hr</span> <span class="o">=</span> <span class="n">boot_model</span><span class="o">.</span><span class="n">HR</span><span class="p">(</span><span class="n">exposed</span><span class="p">,</span> <span class="n">unexposed</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"HR(30 days of exposure vs. none) = </span><span class="si">{</span><span class="n">hr</span><span class="p">[</span><span class="s1">'HR'</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"95% bootstrap CI: [</span><span class="si">{</span><span class="n">hr</span><span class="p">[</span><span class="s1">'CI_lower'</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">hr</span><span class="p">[</span><span class="s1">'CI_upper'</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">]"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>bootstrap_risk_functions_ shape (nbootstraps, n_batch, cutoff): torch.Size([100, 1, 180])
+HR(30 days of exposure vs. none) = 2.369
+95% bootstrap CI: [1.912, 2.912]
+</pre></div>
+</div>
+</div>
+</div>
+<p>With a single value such as <code class="docutils literal notranslate"><span class="pre">nknots=1</span></code>, there is nothing to select: every
+replicate uses that number of knots, as in a standard bootstrap.</p>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Sylvestre MP, Abrahamowicz M (2009). Flexible modeling of the cumulative
+effects of time-dependent exposures on the hazard. <em>Statistics in Medicine</em>,
+28(27), 3437–3453.
+<a class="reference external" href="https://doi.org/10.1002/sim.3701">doi:10.1002/sim.3701</a></p></li>
+<li><p>Sylvestre M (2025). <em>WCE: Weighted Cumulative Exposure Models</em>, the <code class="docutils literal notranslate"><span class="pre">WCE</span></code> R
+package.
+<a class="reference external" href="https://doi.org/10.32614/CRAN.package.WCE">doi:10.32614/CRAN.package.WCE</a>.
+The reference implementation of the method: survivalGPU’s WCE model follows
+its conventions, and its results are tested against it.</p></li>
+</ul>
+</section>
+<section id="going-further">
+<h2>Going further<a class="headerlink" href="#going-further" title="Link to this heading"></a></h2>
+<p>Full API reference: <a class="reference internal" href="../generated/survivalgpu.WCESurvivalAnalysis.html#survivalgpu.WCESurvivalAnalysis" title="survivalgpu.WCESurvivalAnalysis"><code class="xref py py-class docutils literal notranslate"><span class="pre">WCESurvivalAnalysis</span></code></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="coxph.html" class="btn btn-neutral float-left" title="Cox Proportional Hazards" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../api.html" class="btn btn-neutral float-right" title="API reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Jean Feydy, Antoine Poirot-Bourdain, Alexis van Straaten.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

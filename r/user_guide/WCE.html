@@ -1,0 +1,276 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weighted Cumulative Exposure (WCE) &mdash; survivalGPU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="prev" title="Cox Proportional Hazards" href="coxPH.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            survivalGPU
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">survivalGPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../python/index.html">Python overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python/user_guide/index.html">User guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python/api.html">API reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">R</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index.html">R overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">User guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="coxPH.html">Cox Proportional Hazards</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Weighted Cumulative Exposure (WCE)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#bootstrap-and-selection-of-the-number-of-knots">Bootstrap and selection of the number of knots</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#hazards-ratios">Hazards Ratios</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">survivalGPU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">User guide</a></li>
+      <li class="breadcrumb-item active">Weighted Cumulative Exposure (WCE)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/r/user_guide/WCE.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="weighted-cumulative-exposure-wce">
+<h1>Weighted Cumulative Exposure (WCE)<a class="headerlink" href="#weighted-cumulative-exposure-wce" title="Link to this heading"></a></h1>
+<p>The Weighted Cumulative Exposure (WCE) model<a class="footnote-reference brackets" href="#wce" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> extends the Cox proportional hazards model to time-varying exposures whose effect on the hazard depends not only on the current exposure level but also on how it has evolved over time. It estimates a weight function that captures how the influence of past exposure on the hazard changes with the time elapsed since it occurred, so that the cumulative effect at any given time is a weighted sum of the exposure history up to that point.</p>
+<p>Let’s make an example with <code class="docutils literal notranslate"><span class="pre">drugdata</span></code> dataset from WCE package<a class="footnote-reference brackets" href="#wcepkg" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>. Before load <code class="docutils literal notranslate"><span class="pre">survivalGPU</span></code>, use your virtual python environment (see <code class="docutils literal notranslate"><span class="pre">vignette(&quot;installation&quot;)</span></code>).</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">library</span><span class="p">(</span><span class="n">reticulate</span><span class="p">)</span>
+<span class="nf">use_virtualenv</span><span class="p">(</span><span class="n">virtualenv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"survivalGPU"</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Error in `use_virtualenv()`:
+! Directory ~/.virtualenvs/survivalGPU is not a Python virtualenv
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>  Id Event Start Stop sex age dose
+1  1     0     0    1   1  40    0
+2  1     0     1    2   1  40    0
+3  1     0     2    3   1  40    0
+4  1     0     3    4   1  40    0
+5  1     0     4    5   1  40    0
+6  1     0     5    6   1  40    0
+</pre></div>
+</div>
+<p>Check if CUDA is detected :</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">use_cuda</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[1] FALSE
+</pre></div>
+</div>
+<p>By default, functions run with GPU if detected. Then we specify the number of bootstrap replicates, and consequently the batchsize argument, according to CUDA drivers detection.</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="nf">use_cuda</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">n_bootstrap</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="m">1000</span>
+<span class="w">  </span><span class="n">batchsize</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="m">200</span>
+<span class="p">}</span><span class="w"> </span><span class="kr">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">n_bootstrap</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="m">50</span>
+<span class="w">  </span><span class="n">batchsize</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="m">10</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>To fit a model, use <code class="docutils literal notranslate"><span class="pre">wceGPU()</span></code>: its arguments follow those of <code class="docutils literal notranslate"><span class="pre">WCE::WCE()</span></code> from the ‘WCE’ package.</p>
+<p>The number of interior knots of the splines is usually not known in advance. As in the <code class="docutils literal notranslate"><span class="pre">WCE</span></code> package, <code class="docutils literal notranslate"><span class="pre">nknots</span></code> accepts several candidates (e.g. <code class="docutils literal notranslate"><span class="pre">1:3</span></code>): one model is fitted per candidate, and the one that minimizes the information criterion is selected (the BIC by default, or the AIC with <code class="docutils literal notranslate"><span class="pre">aic</span> <span class="pre">=</span> <span class="pre">TRUE</span></code>).</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="n">wce_gpu</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">wceGPU</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">drugdata</span><span class="p">,</span><span class="w"> </span><span class="n">nknots</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="o">:</span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="n">cutoff</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">90</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"Id"</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"Event"</span><span class="p">,</span><span class="w"> </span><span class="n">start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"Start"</span><span class="p">,</span><span class="w"> </span><span class="n">stop</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"Stop"</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">expos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"dose"</span><span class="p">,</span><span class="w"> </span><span class="n">covariates</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="s">"age"</span><span class="p">,</span><span class="w"> </span><span class="s">"sex"</span><span class="p">),</span>
+<span class="w">                  </span><span class="n">constrained</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">,</span><span class="w"> </span><span class="n">aic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">,</span><span class="w"> </span><span class="n">confint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0.95</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">wceGPU()</span></code> fits the model only; with <code class="docutils literal notranslate"><span class="pre">x</span> <span class="pre">=</span> <span class="pre">TRUE</span></code>, it also stores the columns of <code class="docutils literal notranslate"><span class="pre">data</span></code> that the model uses. Bootstrap confidence intervals are added afterwards with <code class="docutils literal notranslate"><span class="pre">bootstrap()</span></code>, which refits the model on <code class="docutils literal notranslate"><span class="pre">R</span></code> patient-level resamples of that stored data (the patients are identified by the <code class="docutils literal notranslate"><span class="pre">id</span></code> column), processed <code class="docutils literal notranslate"><span class="pre">batchsize</span></code> copies at a time on the GPU. The bootstrap therefore always uses exactly the data the model was fitted on.</p>
+<p>The bootstrap resamples are drawn by PyTorch, not by R, so <code class="docutils literal notranslate"><span class="pre">set.seed()</span></code> has no effect on them. To get reproducible results, set PyTorch’s seed:</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">invisible</span><span class="p">(</span><span class="n">reticulate</span><span class="o">::</span><span class="nf">import</span><span class="p">(</span><span class="s">"torch"</span><span class="p">)</span><span class="o">$</span><span class="nf">manual_seed</span><span class="p">(</span><span class="m">42L</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="n">wce_gpu_bootstrap</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">bootstrap</span><span class="p">(</span><span class="n">wce_gpu</span><span class="p">,</span><span class="w"> </span><span class="n">R</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">n_bootstrap</span><span class="p">,</span><span class="w"> </span><span class="n">batchsize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">batchsize</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In the summary, there are estimated coefficients for the covariates of the selected model with his confidence interval, calculated with var-covariance matrix, and information to see the significance of the covariates. It’s also possible to have confidence interval with bootstrap.</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">summary</span><span class="p">(</span><span class="n">wce_gpu_bootstrap</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Weighted cumulative exposure (WCE) in a Cox proportional hazards model
+Weight function: cubic spline with 1 interior knot(s), unconstrained
+
+Covariates:
+         coef exp(coef)  se(coef)      z  Pr(&gt;|z|)    
+age 0.0115718 1.0116390 0.0039769 2.9097  0.003617 ** 
+sex 0.6875935 1.9889234 0.1188602 5.7849 7.256e-09 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Bootstrap percentile intervals for the coefficients (50 replicates, level 0.95):
+        2.5%   97.5%
+age 0.003853 0.01827
+sex 0.432600 0.93930
+
+Partial log-likelihood: -1891.644, BIC: 3824.924
+Number of events: 383
+
+See plot(wce_gpu_bootstrap) for the estimated weight function.
+</pre></div>
+</div>
+<p>With <code class="docutils literal notranslate"><span class="pre">allres</span> <span class="pre">=</span> <span class="pre">TRUE</span></code>, the summary shows every candidate that was tried, with its partial log-likelihood and information criterion, and the one that was selected (also available in <code class="docutils literal notranslate"><span class="pre">wce_gpu_bootstrap$best.nknots</span></code>).</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">summary</span><span class="p">(</span><span class="n">wce_gpu_bootstrap</span><span class="p">,</span><span class="w"> </span><span class="n">allres</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">TRUE</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>
+Candidate models tried:
+  nknots    loglik      BIC
+1      1 -1891.644 3824.924
+2      2 -1891.752 3831.089
+3      3 -1891.260 3836.053
+
+Best model: 1 knot(s), by BIC.
+</pre></div>
+</div>
+<section id="bootstrap-and-selection-of-the-number-of-knots">
+<h2>Bootstrap and selection of the number of knots<a class="headerlink" href="#bootstrap-and-selection-of-the-number-of-knots" title="Link to this heading"></a></h2>
+<p>With several <code class="docutils literal notranslate"><span class="pre">nknots</span></code> candidates, <code class="docutils literal notranslate"><span class="pre">bootstrap()</span></code> selects the number of knots again in every bootstrap replicate:</p>
+<ol class="arabic simple">
+<li><p>the bootstrap resamples (at the patient level) are drawn once and shared by all the candidates, so that they are compared on exactly the same data;</p></li>
+<li><p>every candidate is fitted on every resample;</p></li>
+<li><p>each replicate keeps the candidate that minimizes the information criterion computed on its own resampled data (for the BIC, with that replicate’s own number of events).</p></li>
+</ol>
+<p>The bootstrap confidence intervals of the weight function, of the covariates and of the hazard ratios therefore account for the uncertainty on the choice of the number of knots, and not only for the uncertainty on the estimates for a fixed number of knots. The number of knots selected by each replicate is stored in <code class="docutils literal notranslate"><span class="pre">bootstrap.best.nknots</span></code>:</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">table</span><span class="p">(</span><span class="n">wce_gpu_bootstrap</span><span class="o">$</span><span class="n">bootstrap.best.nknots</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>
+ 1 
+50 
+</pre></div>
+</div>
+<p>Since different replicates may select splines with different numbers of coefficients, the bootstrap spline coefficients (<code class="docutils literal notranslate"><span class="pre">bootstrap_est</span></code>, <code class="docutils literal notranslate"><span class="pre">est_CI</span></code>) are only returned when a single <code class="docutils literal notranslate"><span class="pre">nknots</span></code> value is given. With a single value, there is nothing to select and every replicate uses that number of knots, as in a standard bootstrap.</p>
+<p>The risk function can be plot, and if you added bootstrap, confidence band intervals will be visible.</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">plot</span><span class="p">(</span><span class="n">wce_gpu_bootstrap</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><img alt="plot of chunk wceGPU_plot" src="../../_images/wceGPU_plot-1.png" /></p>
+</section>
+<section id="hazards-ratios">
+<h2>Hazards Ratios<a class="headerlink" href="#hazards-ratios" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">HR()</span></code> computes the hazard ratio between two exposure profiles — for example a constantly exposed patient versus an unexposed one — using the estimated WCE weight function. If <code class="docutils literal notranslate"><span class="pre">bootstrap()</span></code> was called on the model, it also reports a bootstrap confidence interval for that hazard ratio.</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="c1"># cutoff at 90 in the WCE model</span>
+<span class="n">exposed</span><span class="w">   </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">rep</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="m">90</span><span class="p">)</span>
+<span class="n">unexposed</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">rep</span><span class="p">(</span><span class="m">0</span><span class="p">,</span><span class="w"> </span><span class="m">90</span><span class="p">)</span>
+
+<span class="nf">HR</span><span class="p">(</span><span class="n">wce_gpu_bootstrap</span><span class="p">,</span><span class="w"> </span><span class="n">exposed</span><span class="p">,</span><span class="w"> </span><span class="n">unexposed</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>           HR  CI 2.5% CI 97.5%
+[1,] 3.032552 2.255275 4.005504
+</pre></div>
+</div>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+</section>
+</section>
+<hr class="footnotes docutils" />
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="wce" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov 30;28(27):3437-53. doi:10.1002/sim.3701</p>
+</aside>
+<aside class="footnote brackets" id="wcepkg" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>Sylvestre M (2025). WCE: Weighted Cumulative Exposure Models. R package version 1.0.4, doi:10.32614/CRAN.package.WCE. The reference implementation of the method: <code class="docutils literal notranslate"><span class="pre">wceGPU()</span></code> follows its interface, and its results are tested against it.</p>
+</aside>
+</aside>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="coxPH.html" class="btn btn-neutral float-left" title="Cox Proportional Hazards" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Jean Feydy, Antoine Poirot-Bourdain, Alexis van Straaten.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

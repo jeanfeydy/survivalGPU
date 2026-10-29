@@ -1,0 +1,191 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>survivalGPU &mdash; survivalGPU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Getting started" href="getting_started.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            survivalGPU
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">survivalGPU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="python/index.html">Python overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python/user_guide/index.html">User guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python/api.html">API reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">R</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="r/index.html">R overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="r/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="r/user_guide/index.html">User guide</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">survivalGPU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">survivalGPU</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="survivalgpu">
+<h1>survivalGPU<a class="headerlink" href="#survivalgpu" title="Link to this heading"></a></h1>
+<p><strong>GPU-accelerated survival analysis</strong> — Cox Proportional Hazards (CoxPH) and
+Weighted Cumulative Exposure (WCE) models, built on <a class="reference external" href="https://pytorch.org">PyTorch</a> (with <a class="reference external" href="https://www.kernel-operations.io">KeOps</a>
+additionally powering WCE). Classical survival models don’t scale well to
+large datasets or to heavy bootstrap resampling on CPU; survivalGPU runs the
+core computations on the GPU to make both practical, while still working
+without one (CPU fallback).</p>
+<section id="two-interfaces-one-implementation">
+<h2>Two interfaces, one implementation<a class="headerlink" href="#two-interfaces-one-implementation" title="Link to this heading"></a></h2>
+<p>survivalGPU is usable from both <strong>Python</strong> and <strong>R</strong>, and both give you the
+same models with the same results — there’s a single canonical
+implementation (in Python), not two separate codebases to keep in sync.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">survivalgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoxPHSurvivalAnalysis</span>
+
+<span class="n">stop</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+<span class="n">event</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+<span class="n">covariates</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">1.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">4.0</span><span class="p">]])</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">CoxPHSurvivalAnalysis</span><span class="p">(</span><span class="n">ties</span><span class="o">=</span><span class="s2">"efron"</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">covariates</span><span class="p">,</span> <span class="n">stop</span><span class="p">,</span> <span class="n">event</span><span class="o">=</span><span class="n">event</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">coef_</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="nf">library</span><span class="p">(</span><span class="n">survivalGPU</span><span class="p">)</span>
+<span class="nf">library</span><span class="p">(</span><span class="n">survival</span><span class="p">)</span>
+
+<span class="n">data</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lung</span>
+<span class="n">data</span><span class="o">$</span><span class="n">status</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">lung</span><span class="o">$</span><span class="n">status</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="m">1</span><span class="w">  </span><span class="c1"># recode to 0/1</span>
+
+<span class="n">fit</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">coxphGPU</span><span class="p">(</span><span class="nf">Surv</span><span class="p">(</span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">)</span><span class="w"> </span><span class="o">~</span><span class="w"> </span><span class="n">age</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">sex</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">data</span><span class="p">)</span>
+<span class="nf">summary</span><span class="p">(</span><span class="n">fit</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">coxphGPU()</span></code>/<code class="docutils literal notranslate"><span class="pre">wceGPU()</span></code> are built as drop-in companions to
+<a class="reference external" href="https://cran.r-project.org/package=survival">survival::coxph()</a> and
+<a class="reference external" href="https://cran.r-project.org/package=WCE">WCE::WCE()</a> respectively, so R
+users familiar with those functions should feel at home.</p>
+<p>These two R packages are the reference implementations of the models, and
+survivalGPU is tested against them: <code class="docutils literal notranslate"><span class="pre">survival</span></code> by Terry Therneau, and
+<code class="docutils literal notranslate"><span class="pre">WCE</span></code> by Marie-Pierre Sylvestre and colleagues, which implements the method
+of Sylvestre and Abrahamowicz (2009),
+<a class="reference external" href="https://doi.org/10.1002/sim.3701">doi:10.1002/sim.3701</a>.</p>
+</section>
+<section id="the-reticulate-bridge">
+<h2>The reticulate bridge<a class="headerlink" href="#the-reticulate-bridge" title="Link to this heading"></a></h2>
+<p>The R package doesn’t reimplement the models — <code class="docutils literal notranslate"><span class="pre">coxphGPU()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">wceGPU()</span></code> are thin R wrappers that call directly into the same Python
+classes shown above (<code class="docutils literal notranslate"><span class="pre">CoxPHSurvivalAnalysis</span></code>, <code class="docutils literal notranslate"><span class="pre">WCESurvivalAnalysis</span></code>), via
+<a class="reference external" href="https://rstudio.github.io/reticulate/">reticulate</a>. Concretely: the R
+package’s source tree bundles the actual <code class="docutils literal notranslate"><span class="pre">survivalgpu</span></code> Python package (as a
+copy of the same code, not a separate reimplementation), and on load, points
+reticulate at it with a <em>delayed</em> import — so loading the R package itself
+never requires Python, only actually <em>calling</em> <code class="docutils literal notranslate"><span class="pre">coxphGPU()</span></code>/<code class="docutils literal notranslate"><span class="pre">wceGPU()</span></code>
+does.</p>
+<p>In practice, this means:</p>
+<ul class="simple">
+<li><p>A fix or new feature in the Python implementation is immediately available
+from R too, with no separate porting step.</p></li>
+<li><p>The R side needs a working Python environment (PyTorch, + KeOps for WCE)
+set up once — see <a class="reference internal" href="r/installation.html"><span class="doc">Installation</span></a> — but nothing else Python-specific
+to think about afterwards.</p></li>
+</ul>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="getting_started.html" class="btn btn-neutral float-right" title="Getting started" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Jean Feydy, Antoine Poirot-Bourdain, Alexis van Straaten.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
