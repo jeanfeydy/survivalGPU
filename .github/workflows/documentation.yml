@@ -21,6 +21,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # The deploy step pushes the site to the gh-pages branch.
+    permissions:
+      contents: write
+
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       PYKEOPS_VERBOSE: "0"
