@@ -41,29 +41,36 @@ is written so that checking it never starts Python:
 
 * The Python module is imported with `delay_load = TRUE`: loading or
   attaching the package does not start Python.
-* Examples: `coxphGPU()`, `wceGPU()`, `use_cuda()`, `HR()` and the `predict`
-  and `residuals` methods all need a fitted model, hence the Python backend.
-  Their examples are therefore in `\dontrun{}`. They all run in our
-  environment, with Python and 'PyTorch' installed.
+* Examples: the examples of `coxphGPU()`, `wceGPU()`, `bootstrap()`, `HR()`,
+  `use_cuda()` and the `predict` and `residuals` methods all call the Python
+  backend, so they are in `\dontrun{}`. They all run in our environment, with
+  Python and 'PyTorch' installed.
 * Tests: every test file that needs the backend starts by calling a helper
   whose first statement is `testthat::skip_on_cran()`, before any call to
   'reticulate'. No Python is started, and nothing is downloaded or written
   outside the check directory. Elsewhere the tests run whenever 'PyTorch' is
   available.
-* Vignettes: the two vignettes with results are precomputed. Their sources
+* Vignettes: of the four vignettes, two ('survivalGPU' and 'installation')
+  show code without running it (`eval = FALSE`). The other two ('coxPH' and
+  'WCE') show results and are precomputed: their sources
   (`vignettes/*.Rmd.orig`, not shipped) are knitted on our machine, and the
   shipped `.Rmd` files contain the output and figures as static content.
-  Rebuilding them needs no Python.
+  Rebuilding the vignettes needs no Python.
 * Without Python, or without the required Python packages, the exported
   functions stop with a message that names what is missing and points to
   `vignette("installation")`.
 
-## Code adapted from other packages
+## Use of the 'survival' and 'WCE' packages
 
-Parts of the R code (the pre- and post-processing in `coxphGPU()`) are adapted
-from the 'survival' package (LGPL (>= 2)). The package has no compiled code:
-the model frame and the martingale residuals are computed by calling
-`survival::coxph()` itself. The author of 'survival', Terry Therneau, is
+`coxphGPU()` is built on the 'survival' package (LGPL (>= 2)), in Imports.
+It calls `survival::coxph()` itself, through its exported interface, to
+parse the formula and build the model frame and design matrix, and again to
+compute the martingale residuals at the fitted coefficients. Only the fit
+itself runs in the Python backend. The fitted object inherits from class
+`coxph`, so its `print()`, `summary()`, `residuals()` and `predict()` methods
+call those of 'survival'. Parts of the R code of `coxphGPU()` (argument
+handling and post-processing) are also adapted from `survival::coxph()`. The
+package has no compiled code. The author of 'survival', Terry Therneau, is
 listed in `Authors@R` with the roles `ctb` and `cph`.
 
 The WCE model implements the method of Sylvestre and Abrahamowicz (2009),
