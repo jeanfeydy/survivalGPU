@@ -1,0 +1,81 @@
+# CRAN comments
+
+This is a new submission.
+
+## Test environments
+
+* Local, Ubuntu 22.04, R 4.6.1: `R CMD check --as-cran` on the built
+  tarball, on an account with no Python configured (empty home directory,
+  `RETICULATE_PYTHON` unset), as on a CRAN check machine. This machine
+  reports one more NOTE, only because HTML Tidy is not installed on it.
+* GitHub Actions, macOS Tahoe 26.6.2 (arm64), R-release (4.6.1):
+  `R CMD check --as-cran` without Python, as on CRAN: Status OK. The same
+  check with Python and 'PyTorch' installed also passes, running all the
+  tests.
+* win-builder, R-release (4.6.2, Windows Server 2022): 1 NOTE, the
+  incoming-feasibility NOTE below.
+* win-builder, R-devel (2026-10-28 r90783, Windows Server 2022): 1 NOTE, the
+  incoming-feasibility NOTE below.
+
+## R CMD check results
+
+0 errors | 0 warnings | 1 note
+
+* checking CRAN incoming feasibility ... NOTE
+
+  New submission.
+
+  Possibly misspelled words in DESCRIPTION: Abrahamowicz, GPUs, Sylvestre,
+  WCE, natively.
+
+  These are spelled correctly. "Abrahamowicz" and "Sylvestre" are the authors
+  of the cited reference. "GPUs" and "WCE" are acronyms, both spelled out in
+  the Description. "natively" is an English word.
+
+## Python dependency
+
+The computations run in a Python backend that is bundled with the package
+and called through 'reticulate'. It needs Python with 'PyTorch' (see
+`SystemRequirements`), which CRAN check machines do not provide. The package
+is written so that checking it never starts Python:
+
+* The Python module is imported with `delay_load = TRUE`: loading or
+  attaching the package does not start Python.
+* Examples: the examples of `coxphGPU()`, `wceGPU()`, `bootstrap()`, `HR()`,
+  `use_cuda()` and the `predict` and `residuals` methods all call the Python
+  backend, so they are in `\dontrun{}`. They all run in our environment, with
+  Python and 'PyTorch' installed.
+* Tests: every test file that needs the backend starts by calling a helper
+  whose first statement is `testthat::skip_on_cran()`, before any call to
+  'reticulate'. No Python is started, and nothing is downloaded or written
+  outside the check directory. Elsewhere the tests run whenever 'PyTorch' is
+  available.
+* Vignettes: of the four vignettes, two ('survivalGPU' and 'installation')
+  show code without running it (`eval = FALSE`). The other two ('coxPH' and
+  'WCE') show results and are precomputed: their sources
+  (`vignettes/*.Rmd.orig`, not shipped) are knitted on our machine, and the
+  shipped `.Rmd` files contain the output and figures as static content.
+  Rebuilding the vignettes needs no Python.
+* Without Python, or without the required Python packages, the exported
+  functions stop with a message that names what is missing and points to
+  `vignette("installation")`.
+
+## Use of the 'survival' and 'WCE' packages
+
+`coxphGPU()` is built on the 'survival' package (LGPL (>= 2)), in Imports.
+It calls `survival::coxph()` itself, through its exported interface, to
+parse the formula and build the model frame and design matrix, and again to
+compute the martingale residuals at the fitted coefficients. Only the fit
+itself runs in the Python backend. The fitted object inherits from class
+`coxph`, so its `print()`, `summary()`, `residuals()` and `predict()` methods
+call those of 'survival'. Parts of the R code of `coxphGPU()` (argument
+handling and post-processing) are also adapted from `survival::coxph()`. The
+package has no compiled code. The author of 'survival', Terry Therneau, is
+listed in `Authors@R` with the roles `ctb` and `cph`.
+
+The WCE model implements the method of Sylvestre and Abrahamowicz (2009),
+cited in the Description, and `wceGPU()` follows the interface of the 'WCE'
+package (GPL-2 | GPL-3), cited in the documentation. No code or
+documentation from 'WCE' is included in this package, so its license does
+not apply here. 'WCE' is only in Suggests: for its example dataset
+`drugdata`, and for tests that compare our results with it.

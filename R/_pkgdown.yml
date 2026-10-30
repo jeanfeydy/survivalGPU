@@ -12,6 +12,10 @@ reference:
     - contains("wce")
     - HR
 
+  - title: Bootstrap
+    contents:
+    - bootstrap
+
   - title: Utils
     contents:
     - use_cuda
@@ -23,13 +27,3 @@ navbar:
   left:
     - text: Reference
       href: reference/index.html
-    - text: Articles
-      menu:
-      - text: "Models"
-      - text: "Cox Proportional Hazards regression"
-        href: articles/coxPH.html
-      - text: "Weighted Cumulative Exposure : Signal detection"
-        href: articles/WCE.html
-      - text: "-------"
-      - text: "Python Configuration"
-        href: articles/python_connect.html

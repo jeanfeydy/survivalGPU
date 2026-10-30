@@ -2,7 +2,7 @@
 % Please edit documentation in R/coxphGPU.R
 \name{predict.coxphGPU}
 \alias{predict.coxphGPU}
-\title{Predict method for coxphGPU}
+\title{Predictions from a coxphGPU Model}
 \usage{
 \method{predict}{coxphGPU}(
   object,
@@ -17,7 +17,7 @@
 )
 }
 \arguments{
-\item{object}{the results of a coxphGPU fit.}
+\item{object}{A \code{coxphGPU} object.}
 
 \item{newdata}{
   Optional new data at which to do predictions.
@@ -65,18 +65,26 @@ entry per observation.
 
 \item{...}{For future methods}
 }
+\value{
+The predictions computed by \code{\link[survival:predict.coxph]{survival::predict.coxph()}}: a numeric
+vector with one element per observation, or a matrix with one column per
+model term if \code{type = "terms"}. If \code{se.fit = TRUE}, a list with
+components \code{fit} (the predictions) and \code{se.fit} (their standard errors).
+}
 \description{
-Compute fitted values and regression terms for a model fitted by coxphGPU
+Computes fitted values and regression terms for a model fitted by
+\code{\link[=coxphGPU]{coxphGPU()}}, with \code{\link[survival:predict.coxph]{survival::predict.coxph()}}.
 }
 \examples{
 \dontrun{
 library(survival)
-options(na.action = na.exclude) # retain NA in predictions
+old_options <- options(na.action = na.exclude) # retain NA in predictions
 fit <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung)
 predict(fit, type = "lp")
 predict(fit, type = "expected")
 predict(fit, type = "risk", se.fit = TRUE)
 predict(fit, type = "terms", se.fit = TRUE)
+options(old_options) # restore the previous setting
 }
 }
 \references{

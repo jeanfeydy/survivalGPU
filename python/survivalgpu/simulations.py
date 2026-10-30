@@ -658,7 +658,7 @@ def matching_algo(WCEmat: np.ndarray,
         selected_indices[i] = wce_id
 
 
-    return np.array(selected_indices.to("cpu"))
+    return selected_indices.to("cpu").numpy()
 
 
 def get_dataset(Xmat,covariate_names, n_patients, FUP_tis, events, wce_id_indexes, max_time):

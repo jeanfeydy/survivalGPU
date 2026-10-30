@@ -1,24 +1,21 @@
 #' @name survivalGPU-package
 #' @aliases survivalGPU
-#' @docType package
-#' @title survivalGPU: Fast survival analysis
-#' @description Allows to perform survivals analysis on GPU with coxph and WCE
-#' models, and several features to use bootstrap and manage memory.
+#' @title survivalGPU: Fast Survival Analysis
+#' @description Fits Cox proportional hazards and weighted cumulative exposure
+#' (WCE) models on graphics processing units (GPUs), with bootstrap confidence
+#' intervals computed in batches.
 #'
-#' To learn more about survivalGPU, start with the vignette :
-#' `vignette("survivalGPU")`
+#' To learn more about survivalGPU, start with `vignette("survivalGPU")`.
 #'
 #' @section Functions:
 #'
-#' - `use_cuda()`: check CUDA drivers for GPU use.
-#' - `coxphGPU()`: fit a Cox proportional hazards regression model.
-#' - `wceGPU()`:   fit a Weighted Cumulative Exposure model.
+#' - [use_cuda()]: tells whether computations run on a GPU.
+#' - [coxphGPU()]: fits a Cox proportional hazards model.
+#' - [wceGPU()]: fits a weighted cumulative exposure model.
+#' - [bootstrap()]: adds bootstrap confidence intervals to a fitted model.
+#' - [HR()]: hazard ratio between two exposure histories, for a WCE model.
 #'
-#' @author
-#' - [Jean FEYDY](https://www.jeanfeydy.com)
-#' - Alexis van STRAATEN
-#' @useDynLib survivalGPU, .registration = TRUE
-NULL
+"_PACKAGE"
 
 
 
@@ -33,11 +30,15 @@ use_survivalGPU <- function() {
 }
 
 
-#' CUDA utilisation
+#' Check Whether a GPU Is Used
 #'
 #' @description
-#' Specifies whether you are using GPUs or not. If TRUE, CUDA drivers are
-#' detected, and you are using GPU.
+#' Tells whether computations run on a GPU, i.e. whether 'PyTorch' detects
+#' CUDA drivers and a CUDA-capable GPU.
+#'
+#' @return A single logical value: `TRUE` if 'PyTorch' detects a CUDA-capable
+#'   GPU, in which case computations run on it by default; `FALSE` if they run
+#'   on the CPU. An error is raised if the Python backend cannot be loaded.
 #'
 #' @export
 #'
@@ -47,5 +48,5 @@ use_survivalGPU <- function() {
 #' }
 use_cuda <- function() {
   # survivalgpu <- use_survivalGPU()
-  return(survivalgpu$use_cuda)
+  return(tryCatch(survivalgpu$use_cuda, error = survivalgpu_unavailable_error))
 }

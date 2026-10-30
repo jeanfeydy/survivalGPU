@@ -1,43 +1,55 @@
-#' Fast Cox Proportional Hazards Regression Model
+#' Fast Cox Proportional Hazards Model
 #'
-#' @description Fits a Cox proportional hazards regression model. An extension
-#'   to use (or not) your GPU to speed up calculations, in particular for
-#'   bootstrap.
+#' @description Fits a Cox proportional hazards model on the GPU (or the CPU),
+#'   with the interface of [survival::coxph()]. Only point estimates are
+#'   computed: call [bootstrap()] on the result for bootstrap confidence
+#'   intervals, and inspect it with `summary()`.
 #'
-#' @usage coxphGPU(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
-#'          bootstrap = 0, batchsize = 0, init, all.results = FALSE, control,
-#'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE, ...)
+#' @usage coxphGPU(formula, data, ties = c("efron", "breslow"), init, control,
+#'          singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
+#'          patient_id = NULL, ...)
 #'
 #' @inheritParams survival::coxph
-#' @param formula a formula object, with the response on the left of a ~
-#'   operator, and the terms on the right. The response must be a survival
-#'   object as returned by the Surv function.
-#' @param patient_id Name of the column in `data` that identifies each patient
-#'   (subject). Required if `bootstrap > 0`, so that bootstrap resampling is
-#'   performed at the patient level rather than at the row level (a patient
-#'   can have several rows, e.g. with time-varying covariates).
-#' @param bootstrap Number of repeats for the bootstrap cross-validation.
-#' @param batchsize Number of bootstrap copies that should be handled at a time.
-#'   Defaults to 0, which means that we handle all copies at once. If you run
-#'   into out of memory errors, please consider using batchsize=100, 10 or 1.
-#' @param all.results Post-processing calculations. If TRUE, coxphGPU returns
-#'   linears.predictors, wald.test, concordance for all bootstraps. Default to
-#'   FALSE if bootstraps.
-#' @param ... Other arguments for methods.
+#' @param formula A formula with a survival object (see [survival::Surv()]) on
+#'   the left of `~` and the terms on the right.
+#' @param patient_id Name of the column of `data` that identifies each patient
+#'   (subject). Required by [bootstrap()], which resamples patients rather than
+#'   rows, so that all the rows of a patient (e.g. with time-varying
+#'   covariates) are kept together. With one row per patient, a column of row
+#'   indices (`data$id <- seq_len(nrow(data))`) can be used.
+#' @param ... For `coxphGPU()`: `device` (`"cpu"` or `"cuda"`; default: the
+#'   GPU if one is available), `double_precision` (`TRUE`, the default, for
+#'   64-bit floats; `FALSE` for 32-bit floats, faster on most GPUs), and
+#'   arguments of [survival::coxph.control()] (e.g. `iter.max`). For the
+#'   methods: not used.
+#'
+#' @details
+#' To compute bootstrap confidence intervals with [bootstrap()], fit the model
+#' with both `x = TRUE`, which stores the design matrix, and `patient_id`,
+#' which stores the patient of each row used by the model. The bootstrap then
+#' resamples exactly the data the model was fitted on.
 #'
 #' @import stats
 #' @import survival
 #' @importFrom utils methods
 #' @importFrom utils head
-#' @importFrom data.table data.table
 #'
-#' @return A coxphGPU object representing the fit.
+#' @return `coxphGPU()` returns an object of class `coxphGPU`, with the
+#'   components of a [survival::coxph()] fit (coefficients, variance,
+#'   log-likelihood, ...). With `patient_id`, it also contains `patient_id`
+#'   (the column name) and `patient_ids` (the patient of each row used by the
+#'   model).
 #' @export
 #'
-#' @references Therneau T (2021). _A Package for Survival Analysis in R_. R
-#'   package version 3.2-13
+#' @references Therneau T (2026). _A Package for Survival Analysis in R_. R
+#'   package version 3.8-9, <https://CRAN.R-project.org/package=survival>.
+#'   `coxphGPU()` follows the interface of its `coxph()`, calls it for the
+#'   model frame and the martingale residuals, and is tested against it.
 #'
-#' @seealso [survival::coxph()]
+#'   Therneau TM, Grambsch PM (2000). _Modeling Survival Data: Extending the
+#'   Cox Model_. Springer, New York.
+#'
+#' @seealso [survival::coxph()], [bootstrap()]
 #'
 #' @examples
 #' \dontrun{
@@ -48,33 +60,20 @@
 #' ## Check CUDA drivers (if FALSE you use CPU)
 #' use_cuda()
 #'
-#' ## Cox Proportional Hazards without bootstrap
-#' coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-#'          data = drugdata,
-#'          bootstrap = 1)
+#' ## Cox Proportional Hazards point estimate; x = TRUE and patient_id are
+#' ## required if you plan to call bootstrap() on the result afterwards.
+#' fit <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+#'                 data = drugdata, x = TRUE, patient_id = "Id")
 #'
-#' ## Cox Proportional Hazards with bootstrap
+#' ## Bootstrap-based inference, as a separate step
+#' fit_boot <- bootstrap(fit, R = 1000,
+#'                       batchsize = if (use_cuda()) 200 else 10)
 #'
-#' if (use_cuda()) {
-#'   n_bootstrap <- 1000
-#'   batchsize <- 200
-#' } else {
-#'   n_bootstrap <- 50
-#'   batchsize <- 10
+#' summary(fit_boot)
 #' }
-#'
-#' coxph_bootstrap <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
-#'                             data = drugdata,
-#'                             patient_id = "Id",
-#'                             bootstrap = n_bootstrap,
-#'                             batchsize = batchsize)
-#'
-#' summary(coxph_bootstrap)
-#' }
-coxphGPU <- function(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
-                     bootstrap = 0, batchsize = 0, init, all.results = FALSE, control,
+coxphGPU <- function(formula, data, ties = c("efron", "breslow"), init, control,
                      singular.ok = TRUE, model = FALSE, x = FALSE, y = TRUE,
-                     ...) {
+                     patient_id = NULL, ...) {
   UseMethod("coxphGPU")
 }
 
@@ -82,16 +81,17 @@ coxphGPU <- function(formula, data, ties = c("efron", "breslow"), patient_id = N
 #' @noRd
 #' @method coxphGPU default
 #' @exportS3Method coxphGPU default
-coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patient_id = NULL,
-                             bootstrap = 0, batchsize = 0, init,
-                             all.results = FALSE, control, singular.ok = TRUE,
-                             model = FALSE, x = FALSE, y = TRUE, ..., weights,
+coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), init,
+                             control, singular.ok = TRUE,
+                             model = FALSE, x = FALSE, y = TRUE,
+                             patient_id = NULL, ..., weights,
                              subset, na.action, robust, tt, method = ties, id,
                              cluster, istate, statedata,
                              nocenter = c(-1, 0, 1), device = NULL, double_precision = TRUE) {
 
   if (!missing(weights)) stop("weights are not yet implemented in coxphGPU")
   if (!missing(tt)) stop("tt process is not yet implemented in coxphGPU")
+  if (is.list(formula)) stop("multistate models not yet implemented on coxphGPU")
 
   ##############################################################################
   ##############################################################################
@@ -110,6 +110,15 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   ##  is simply to allow things like "eps=1e6" with easier typing
   # We save in a list all arguments which are not default
   extraArgs <- list(...)
+  # Bootstrap is no longer requested at fit time: point users of the old
+  # arguments to bootstrap() instead of a bare "Argument not matched".
+  removed <- intersect(names(extraArgs),
+                       c("bootstrap", "nbootstraps", "batchsize"))
+  if (length(removed)) {
+    stop("coxphGPU() no longer takes ", paste(removed, collapse = ", "),
+         ": fit with coxphGPU(..., x = TRUE, patient_id = ), then call ",
+         "bootstrap(fit, R = ).", call. = FALSE)
+  }
   if (length(extraArgs)) { # Condition if more options
     controlargs <- names(formals(coxph.control)) # legal arg names
     indx <- pmatch(names(extraArgs), controlargs, nomatch = 0L)
@@ -124,180 +133,50 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # if no 'control' in input, we take the coxph.control() values
   if (missing(control)) control <- coxph.control(...)
 
-  # Move any cluster() term out of the formula, and make it an argument
-  #  instead.  This makes everything easier.  But, I can only do that with
-  #  a local copy, doing otherwise messes up future use of update() on
-  #  the model object for a user stuck in "+ cluster()" mode.
-
   if (missing(formula)) stop("a formula argument is required")
 
-  ss <- "cluster"
-
-  # Condition if formula is a list of formula
-  if (is.list(formula)) {
-
-    # We create a term object
-    # We take the first formula of the list if is list of formula
-    Terms <- if (missing(data)) {
-      terms(formula[[1]], specials = ss)
-    } else {
-      terms(formula[[1]], specials = ss, data = data)
-    }
-  } else {
-    Terms <- if (missing(data)) {
-      terms(formula, specials = ss)
-    } else {
-      terms(formula, specials = ss, data = data)
-    }
-  }
-
   ##############################################################################
-  # Pre processing if presence of cluster/specials
+  # Delegate formula parsing, cluster()/strata() handling, and model.frame /
+  # model.matrix construction to survival::coxph() itself, through its public
+  # API, instead of vendoring a modified copy of that pipeline. iter.max = 0
+  # means no Newton iteration runs here -- `prep` is only used to obtain the
+  # design matrix, response, strata, terms/contrasts/xlevels metadata and
+  # covariate means that coxph() already knows how to build correctly. The
+  # numerical fit still happens below, via the Python/GPU backend.
   ##############################################################################
 
-  # We detect presence of cluster in the formula
-  tcl <- attr(Terms, "specials")$cluster
-  if (length(tcl) > 1) stop("a formula cannot have multiple cluster terms")
+  prep_control <- control
+  prep_control$iter.max <- 0
 
-  if (length(tcl) > 0) {
-    factors <- attr(Terms, "factors")
-    if (any(factors[tcl, ] > 1)) stop("cluster() cannot be in an interaction")
-    if (attr(Terms, "response") == 0) {
-      stop("formula must have a Surv response")
-    }
-
-    # Process if cluster in formula and input function
-    # if no cluster in input, we take cluster of the formula, else we take cluster of input
-    if (is.null(Call$cluster)) {
-      Call$cluster <- attr(Terms, "variables")[[1 + tcl]][[2]]
-    } else {
-      warning("cluster appears both in a formula and as an argument, formula term ignored")
-    }
-
-    # [.terms is broken at least through R 4.1; use our
-    #  local drop.special() function instead.
-    terms_v1 <- Terms
-    Terms <- drop.special(Terms, tcl) # drop.terms() / remove cluster information in Terms
-    formula <- Call$formula <- formula(Terms) # change formula in the Call (because Cluster is now in input)
+  prep_call <- Call
+  prep_call[[1L]] <- quote(survival::coxph)
+  prep_call$ties <- ties
+  prep_call$control <- prep_control
+  prep_call$model <- model
+  prep_call$x <- TRUE
+  prep_call$y <- TRUE
+  # Drop coxphGPU-only arguments that survival::coxph() doesn't accept.
+  # (a call object errors on `[[<- NULL` for a name it doesn't already
+  #  have, unlike a list, so only touch names actually present.)
+  for (nm in c("device", "double_precision", "singular.ok", "patient_id")) {
+    if (nm %in% names(prep_call)) prep_call[[nm]] <- NULL
   }
 
-  # ----- end of cluster process -----------------------------------------------
+  prep <- eval(prep_call, parent.frame())
 
-  # create a call to model.frame() that contains the formula (required)
-  #  and any other of the relevant optional arguments
-  #  but don't evaluate it just yet
-  indx <- match(
-    c(
-      "formula", "data", "weights", "subset", "na.action",
-      "cluster", "id", "istate"
-    ),
-    names(Call),
-    nomatch = 0
-  )
-  if (indx[1] == 0) stop("A formula argument is required")
-  tform <- Call[c(1, indx)]
-  tform[[1L]] <- quote(stats::model.frame)
-
-  # if the formula is a list, do the first level of processing on it.
-
-  # If formula is a list
-  if (is.list(formula)) {
-    multiform <- TRUE
-    stop("multistate models not yet implemented on coxphGPU")
-    dformula <- formula[[1]] # the default formula for transitions
-    if (missing(statedata)) {
-      covlist <- parsecovar1(formula[-1])
-    } else {
-      if (!inherits(statedata, "data.frame")) {
-        stop("statedata must be a data frame")
-      }
-      if (is.null(statedata$state)) {
-        stop("statedata data frame must contain a 'state' variable")
-      }
-      covlist <- parsecovar1(formula[-1], names(statedata))
-    }
-
-    # create the master formula, used for model.frame
-    # the term.labels + reformulate + environment trio is used in [.terms;
-    #  if it's good enough for base R it's good enough for me
-    tlab <- unlist(lapply(covlist$rhs, function(x) {
-      attr(terms.formula(x$formula), "term.labels")
-    }))
-    tlab <- c(attr(terms.formula(dformula), "term.labels"), tlab)
-    newform <- reformulate(tlab, dformula[[2]])
-    environment(newform) <- environment(dformula)
-    formula <- newform
-    tform$na.action <- na.pass # defer any missing value work to later
+  # survival::coxph() sets naive.var only when it decided (from cluster/id/
+  # weights, or an explicit robust=TRUE) that a robust sandwich variance was
+  # needed; reuse that decision instead of re-deriving it ourselves.
+  if (!is.null(prep$naive.var)) {
+    stop("robust variance is not yet implemented in coxphGPU")
   }
 
-  # If only one formula
-  else {
-    multiform <- FALSE # formula is not a list of expressions
-    covlist <- NULL
-    dformula <- formula
-  }
-
-  # add specials to the formula
-  special <- c("strata", "tt", "frailty", "ridge", "pspline")
-  tform$formula <- if (missing(data)) {
-    terms(formula, special)
-  } else {
-    terms(formula, special, data = data)
-  }
-
-  # Make "tt" visible for coxph formulas, without making it visible elsewhere
-
-  # If a tt is specified, we create a new environment and a tt() function
-  if (!is.null(attr(tform$formula, "specials")$tt)) {
-    coxenv <- new.env(parent = environment(formula))
-    assign("tt", function(x) x, envir = coxenv)
-    environment(tform$formula) <- coxenv
-  }
-
-  # okay, now evaluate the formula
-  mf <- eval(tform, parent.frame())
-  Terms <- terms(mf)
-
-  # Grab the response variable, and deal with Surv2 objects
-  n <- nrow(mf)
-  Y <- model.response(mf)
-  Y_temp <- Y
-
-  # Process if Y is a Surv2 object
-  isSurv2 <- inherits(Y, "Surv2")
-  if (isSurv2) {
-    # this is Surv2 style data
-    # if there were any obs removed due to missing, remake the model frame
-    if (length(attr(mf, "na.action"))) {
-      tform$na.action <- na.pass
-      mf <- eval.parent(tform)
-    }
-    if (!is.null(attr(Terms, "specials")$cluster)) {
-      stop("cluster() cannot appear in the model statement")
-    }
-    new <- surv2data(mf)
-    mf <- new$mf
-    istate <- new$istate
-    id <- new$id
-    Y <- new$y
-    n <- nrow(mf)
-  }
-
-  # Process if Y is not a Surv2 object
-  else {
-    if (!is.Surv(Y)) stop("Response must be a survival object")
-    id <- model.extract(mf, "id")
-    istate <- model.extract(mf, "istate")
-  }
-
-  if (n == 0) stop("No (non-missing) observations")
-
-
+  Y <- prep$y
   type <- attr(Y, "type")
-  # several types : right, left, counting, etc...
-  multi <- FALSE
   if (type == "mright" || type == "mcounting") {
-    multi <- TRUE
+    stop("coxphGPU() does not yet support multi-state survival data ",
+         "(response type \"", type, "\"); only single-endpoint \"right\" ",
+         "and \"counting\" responses are currently supported.")
   } else if (type != "right" && type != "counting") {
     stop(paste("Cox model doesn't support \"", type,
                "\" survival data",
@@ -306,466 +185,36 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   }
   data.n <- nrow(Y) # remember this before any time transforms
 
-
-  if (!multi && multiform) {
-    stop("formula is a list but the response is not multi-state")
-  }
-  if (multi && length(attr(Terms, "specials")$frailty) > 0) {
-    stop("multi-state models do not currently support frailty terms")
-  }
-  if (multi && length(attr(Terms, "specials")$pspline) > 0) {
-    stop("multi-state models do not currently support pspline terms")
-  }
-  if (multi && length(attr(Terms, "specials")$ridge) > 0) {
-    stop("multi-state models do not currently support ridge penalties")
+  if (!is.null(prep$offset) && any(prep$offset != 0)) {
+    stop("offset() is not yet implemented in coxphGPU")
   }
 
-  if (control$timefix) Y <- aeqSurv(Y) # timefix == TRUE by default in coxph.control()
-  # aeqSurv : deal with the issue of ties that get incorrectly broken due to floating point imprecision
-
-  # Formula check
-  if (length(attr(Terms, "variables")) > 2) { # a ~1 formula has length 2
-    ytemp <- terms.inner(formula[1:2])
-    suppressWarnings(z <- as.numeric(ytemp)) # are any of the elements numeric?
-    ytemp <- ytemp[is.na(z)] # toss numerics, e.g. Surv(t, 1-s)
-    xtemp <- terms.inner(formula[-2])
-    if (any(!is.na(match(xtemp, ytemp)))) {
-      warning("a variable appears on both the left and right sides of the formula")
-    }
+  if (prep$nevent == 0) {
+    # No events in the data! Mirrors survival::coxph()'s own early return.
+    class(prep) <- "coxph"
+    prep$x <- NULL
+    return(prep)
   }
 
-  # The time transform will expand the data frame mf.  To do this
-  #  it needs Y and the strata.  Everything else (cluster, offset, weights)
-  #  should be extracted after the transform
-
-  # tt (time transform)
-  strats <- attr(Terms, "specials")$strata
-  hasinteractions <- FALSE
-  dropterms <- NULL
-  if (length(strats)) { # if at least one strata
-    stemp <- untangle.specials(Terms, "strata", 1) # detect strata and index in terms matrix
-    if (length(stemp$vars) == 1) {
-      strata.keep <- mf[[stemp$vars]]
-    } # if only one stratification, strata.keep worth strata levels
-    else {
-      strata.keep <- strata(mf[, stemp$vars], shortlabel = TRUE)
-    } # if several strata, as many levels as combinations of strata
-    istrat <- as.integer(strata.keep)
-    # istrat : vector to identify stratification
-
-    for (i in stemp$vars) { # multiple strata terms are allowed
-      # The factors attr has one row for each variable in the frame, one
-      #   col for each term in the model.  Pick rows for each strata
-      #   var, and find if it participates in any interactions.
-      if (any(attr(Terms, "order")[attr(Terms, "factors")[i, ] > 0] > 1)) {
-        hasinteractions <- TRUE
-      }
-    }
-    if (!hasinteractions) dropterms <- stemp$terms
-  } else {
-    istrat <- NULL
-  }
-  # istrat = NULL if no stratification
-
-  if (hasinteractions && multi) {
-    stop("multi-state coxph does not support strata*covariate interactions")
-  }
-
-  ##############################################################################
-  # tt process
-  ##############################################################################
-
-  timetrans <- attr(Terms, "specials")$tt
-  if (missing(tt)) tt <- NULL
-  if (length(timetrans)) {
-    if (multi || isSurv2) stop("the tt() transform is not implemented for multi-state or Surv2 models")
-    timetrans <- untangle.specials(Terms, "tt") # detect tt index in terms matrix
-    ntrans <- length(timetrans$terms) # number of tt()
-
-    if (is.null(tt)) {
-      tt <- function(x, time, riskset, weights) { # default to O'Brien's logit rank
-        obrien <- function(x) {
-          r <- rank(x)
-          (r - .5) / (.5 + length(r) - r)
-        }
-        unlist(tapply(x, riskset, obrien))
-      }
-    }
-    if (is.function(tt)) tt <- list(tt) # single function becomes a list
-
-    if (is.list(tt)) {
-      if (any(!sapply(tt, is.function))) {
-        stop("The tt argument must contain function or list of functions")
-      }
-      if (length(tt) != ntrans) {
-        if (length(tt) == 1) {
-          temp <- vector("list", ntrans)
-          for (i in 1:ntrans) temp[[i]] <- tt[[1]]
-          tt <- temp
-        } else {
-          stop("Wrong length for tt argument")
-        }
-      }
-    } else {
-      stop("The tt argument must contain a function or list of functions")
-    }
-
-    if (ncol(Y) == 2) {
-      if (length(strats) == 0) {
-        sorted <- order(-Y[, 1], Y[, 2])
-        newstrat <- rep.int(0L, nrow(Y))
-        newstrat[1] <- 1L
-      } else {
-        sorted <- order(istrat, -Y[, 1], Y[, 2])
-        # newstrat marks the first obs of each strata
-        newstrat <- as.integer(c(1, 1 * (diff(istrat[sorted]) != 0)))
-      }
-      if (storage.mode(Y) != "double") storage.mode(Y) <- "double"
-      counts <- .Call(
-        "coxcount1", Y[sorted, ],
-        as.integer(newstrat)
-      )
-      tindex <- sorted[counts$index]
-    } else {
-      if (length(strats) == 0) {
-        sort.end <- order(-Y[, 2], Y[, 3])
-        sort.start <- order(-Y[, 1])
-        newstrat <- c(1L, rep(0, nrow(Y) - 1))
-      } else {
-        sort.end <- order(istrat, -Y[, 2], Y[, 3])
-        sort.start <- order(istrat, -Y[, 1])
-        newstrat <- c(1L, as.integer(diff(istrat[sort.end]) != 0))
-      }
-      if (storage.mode(Y) != "double") storage.mode(Y) <- "double"
-      counts <- .Call(
-        "coxcount2", Y,
-        as.integer(sort.start - 1L),
-        as.integer(sort.end - 1L),
-        as.integer(newstrat)
-      )
-      tindex <- counts$index
-    }
-    Y <- Surv(rep(counts$time, counts$nrisk), counts$status)
-    type <- "right" # new Y is right censored, even if the old was (start, stop]
-
-    mf <- mf[tindex, ]
-    istrat <- rep(1:length(counts$nrisk), counts$nrisk)
-    weights <- model.weights(mf)
-    if (!is.null(weights) && any(!is.finite(weights))) {
-      stop("weights must be finite")
-    }
-
-    tcall <- attr(Terms, "variables")[timetrans$terms + 2]
-    pvars <- attr(Terms, "predvars")
-    pmethod <- sub("makepredictcall.", "", as.vector(methods("makepredictcall")))
-    for (i in 1:ntrans) {
-      newtt <- (tt[[i]])(mf[[timetrans$var[i]]], Y[, 1], istrat, weights)
-      mf[[timetrans$var[i]]] <- newtt
-      nclass <- class(newtt)
-      if (any(nclass %in% pmethod)) { # It has a makepredictcall method
-        dummy <- as.call(list(as.name(class(newtt)[1]), tcall[[i]][[2]]))
-        ptemp <- makepredictcall(newtt, dummy)
-        pvars[[timetrans$terms[i] + 2]] <- ptemp
-      }
-    }
-    attr(Terms, "predvars") <- pvars
-  }
-
-  # ------- end of tt process ----------------------------------------
-
-
-  ##############################################################################
-  # Routines depending on id, cluster, weights et robust presence
-  ##############################################################################
-
-  # Return a list with levels/labels of factor covariates
-  xlevels <- .getXlevels(Terms, mf)
-
-  # grab the cluster, if present.  Using cluster() in a formula is no
-  #  longer encouraged
-  cluster <- model.extract(mf, "cluster") # cluster vector
-  weights <- model.weights(mf) # weight vector
-
-  # The user can call with cluster, id, robust, or any combination
-  # Default for robust: if cluster or any id with > 1 event or
-  #  any weights that are not 0 or 1, then TRUE
-  # If only id, treat it as the cluster too
-  has.cluster <- !(missing(cluster) || length(cluster) == 0)
-  has.id <- !(missing(id) || length(id) == 0)
-  has.rwt <- (!is.null(weights) && any(weights != floor(weights)))
-  # has.rwt<- FALSE  # we are rethinking this
-  has.robust <- (!missing(robust) && !is.null(robust)) # arg present
-  if (has.id) id <- as.factor(id)
-
-  if (missing(robust) || is.null(robust)) {
-    if (has.cluster || has.rwt ||
-        (has.id && (multi || anyDuplicated(id[Y[, ncol(Y)] == 1])))) {
-      robust <- TRUE
-    } else {
-      robust <- FALSE
-    }
-  }
-  if (robust == TRUE) stop("robust variance is not yet implemented in coxphGPU")
-
-  if (!is.logical(robust)) stop("robust must be TRUE/FALSE")
-
-  if (has.cluster) {
-    if (!robust) {
-      warning("cluster specified with robust=FALSE, cluster ignored")
-      ncluster <- 0
-      clname <- NULL
-    } else {
-      if (is.factor(cluster)) {
-        clname <- levels(cluster)
-        cluster <- as.integer(cluster)
-      } else {
-        clname <- sort(unique(cluster))
-        cluster <- match(cluster, clname)
-      }
-      ncluster <- length(clname)
-    }
-  } else {
-    if (robust && has.id) {
-      # treat the id as both identifier and clustering
-      clname <- levels(id)
-      cluster <- as.integer(id)
-      ncluster <- length(clname)
-    } else {
-      ncluster <- 0 # has neither
-    }
-  }
-
-  # if the user said "robust", (time1,time2) data, and no cluster or
-  #  id, complain about it
-  if (robust && is.null(cluster)) {
-    if (ncol(Y) == 2 || !has.robust) {
-      cluster <- seq.int(1, nrow(mf))
-    } else {
-      stop("one of cluster or id is needed")
-    }
-  }
-
-  contrast.arg <- NULL # due to shared code with model.matrix.coxph
-  attr(Terms, "intercept") <- 1 # always have a baseline hazard
-
-  # ---- end of routine over id, cluster,and robust ----------------------------
-
-  ##############################################################################
-  # Conditions if multistate model
-  ##############################################################################
-
-  if (multi) {
-    # check for consistency of the states, and create a transition
-    #  matrix
-    if (length(id) == 0) {
-      stop("an id statement is required for multi-state models")
-    }
-
-    mcheck <- survcheck2(Y, id, istate)
-    # error messages here
-    if (mcheck$flag["overlap"] > 0) {
-      stop("data set has overlapping intervals for one or more subjects")
-    }
-
-    transitions <- mcheck$transitions
-    istate <- mcheck$istate
-    states <- mcheck$states
-
-    #  build tmap, which has one row per term, one column per transition
-    if (missing(statedata)) {
-      covlist2 <- parsecovar2(covlist, NULL,
-                              dformula = dformula,
-                              Terms, transitions, states
-      )
-    } else {
-      covlist2 <- parsecovar2(covlist, statedata,
-                              dformula = dformula,
-                              Terms, transitions, states
-      )
-    }
-    tmap <- covlist2$tmap
-    if (!is.null(covlist)) {
-      # first vector will be true if there is at least 1 transition for which all
-      #  covariates are present, second if there is at least 1 for which some are not
-      good.tran <- bad.tran <- rep(FALSE, nrow(Y))
-      # We don't need to check interaction terms
-      termname <- rownames(attr(Terms, "factors"))
-      trow <- (!is.na(match(rownames(tmap), termname)))
-
-      # create a missing indicator for each term
-      termiss <- matrix(0L, nrow(mf), ncol(mf))
-      for (i in 1:ncol(mf)) {
-        xx <- is.na(mf[[i]])
-        if (is.matrix(xx)) {
-          termiss[, i] <- apply(xx, 1, any)
-        } else {
-          termiss[, i] <- xx
-        }
-      }
-
-      for (i in levels(istate)) {
-        rindex <- which(istate == i)
-        j <- which(covlist2$mapid[, 1] == match(i, states)) # possible transitions
-        for (jcol in j) {
-          k <- which(trow & tmap[, jcol] > 0) # the terms involved in that
-          bad.tran[rindex] <- (bad.tran[rindex] |
-                                 apply(termiss[rindex, k, drop = FALSE], 1, any))
-          good.tran[rindex] <- (good.tran[rindex] |
-                                  apply(!termiss[rindex, k, drop = FALSE], 1, all))
-        }
-      }
-      n.partially.used <- sum(good.tran & bad.tran & !is.na(Y))
-      omit <- (!good.tran & bad.tran) | is.na(Y)
-      if (all(omit)) stop("all observations deleted due to missing values")
-      temp <- setNames(seq(omit)[omit], attr(mf, "row.names")[omit])
-      attr(temp, "class") <- "omit"
-      mf <- mf[!omit, , drop = FALSE]
-      attr(mf, "na.action") <- temp
-      Y <- Y[!omit]
-      id <- id[!omit]
-      if (length(istate)) istate <- istate[!omit] # istate can be NULL
-    }
-  }
-  # ----- end of conditions multistate model -----------------------------------
-
-
-
-  ##############################################################################
-  # Routines over strata, offset, and weights
-  ##############################################################################
-
-
-  # Routine strata
-
-  # dropterms if stratification : remove strata attr in terms, and remove strata
-  # in X matrix
-  if (length(dropterms)) {
-    Terms2 <- Terms[-dropterms]
-    X <- model.matrix(Terms2, mf, constrasts.arg = contrast.arg)
-    # we want to number the terms wrt the original model matrix
-    temp <- attr(X, "assign")
-    shift <- sort(dropterms)
-    for (i in seq(along.with = shift)) {
-      temp <- temp + 1 * (shift[i] <= temp)
-    }
-    attr(X, "assign") <- temp
-  } else {
-    X <- model.matrix(Terms, mf, contrasts.arg = contrast.arg)
-  }
-
-
-  # drop the intercept after the fact, and also drop strata if necessary
-  Xatt <- attributes(X)
-  if (hasinteractions) {
-    adrop <- c(0, untangle.specials(Terms, "strata")$terms)
-  } else {
-    adrop <- 0
-  }
-  xdrop <- Xatt$assign %in% adrop # columns to drop (always the intercept)
-  X <- X[, !xdrop, drop = FALSE]
-  attr(X, "assign") <- Xatt$assign[!xdrop]
-  attr(X, "contrasts") <- Xatt$contrasts
-
-  # offset routine
-  offset <- model.offset(mf)
-  if (is.null(offset) | all(offset == 0)) {
-    offset <- rep(0., nrow(mf))
-  } else if (any(!is.finite(offset) | !is.finite(exp(offset)))) {
-    stop("offsets must lead to a finite risk score")
-  }
-
-  # weights routine
-  weights <- model.weights(mf)
-  if (!is.null(weights) && any(!is.finite(weights))) {
-    stop("weights must be finite")
-  }
-
-  # ---- end of routines -------------------------------------------------------
-
-  assign <- attrassign(X, Terms)
-  contr.save <- attr(X, "contrasts")
-
-  # if no event, return result with NA / 0
-  if (sum(Y[, ncol(Y)]) == 0) {
-    # No events in the data!
-    ncoef <- ncol(X)
-    ctemp <- rep(NA, ncoef)
-    names(ctemp) <- colnames(X)
-    concordance <- c(
-      concordant = 0, discordant = 0, tied.x = 0, tied.y = 0, tied.xy = 0,
-      concordance = NA, std = NA, timefix = FALSE
-    )
-    rval <- list(
-      coefficients = ctemp,
-      var = matrix(0.0, ncoef, ncoef),
-      loglik = c(0, 0),
-      score = 0,
-      iter = 0,
-      linear.predictors = offset,
-      residuals = rep(0.0, data.n),
-      means = colMeans(X), method = method,
-      n = data.n, nevent = 0, terms = Terms, assign = assign,
-      concordance = concordance, wald.test = 0.0,
-      y = Y, call = Call
-    )
-    class(rval) <- "coxph"
-    return(rval)
-  }
-
-  ##############################################################################
-  # Conditions if multi = TRUE
-  ##############################################################################
-
-  if (multi) {
-    if (length(strats) > 0) {
-      stratum_map <- tmap[c(1L, strats), ] # strats includes Y, + tmap has an extra row
-      stratum_map[-1, ] <- ifelse(stratum_map[-1, ] > 0, 1L, 0L)
-      if (nrow(stratum_map) > 2) {
-        temp <- stratum_map[-1, ]
-        if (!all(apply(temp, 2, function(x) all(x == 0) || all(x == 1)))) {
-          # the hard case: some transitions use one strata variable, some
-          #  transitions use another.  We need to keep them separate
-          strata.keep <- mf[, strats] # this will be a data frame
-          istrat <- sapply(strata.keep, as.numeric)
-        }
-      }
-    } else {
-      stratum_map <- tmap[1, , drop = FALSE]
-    }
-    cmap <- parsecovar3(tmap, colnames(X), attr(X, "assign"), covlist2$phbaseline)
-    xstack <- stacker(cmap, stratum_map, as.integer(istate), X, Y,
-                      strata = istrat,
-                      states = states
-    )
-
-    rkeep <- unique(xstack$rindex)
-    transitions <- survcheck2(Y[rkeep, ], id[rkeep], istate[rkeep])$transitions
-
-    X <- xstack$X
-    Y <- xstack$Y
-    istrat <- xstack$strata
-    if (length(offset)) offset <- offset[xstack$rindex]
-    if (length(weights)) weights <- weights[xstack$rindex]
-    if (length(cluster)) cluster <- cluster[xstack$rindex]
-    t2 <- tmap[-c(1, strats), , drop = FALSE]
-    r2 <- row(t2)[!duplicated(as.vector(t2)) & t2 != 0]
-    c2 <- col(t2)[!duplicated(as.vector(t2)) & t2 != 0]
-    a2 <- lapply(seq(along.with = r2), function(i) {
-      cmap[assign[[r2[i]]], c2[i]]
-    })
-    tab <- table(r2)
-    count <- tab[r2]
-    names(a2) <- ifelse(count == 1, row.names(t2)[r2],
-                        paste(row.names(t2)[r2], colnames(cmap)[c2], sep = "_")
-    )
-    assign <- a2
-  }
-
-  # ----- end of conditions if multi = TRUE ------------------------------------
-
+  X <- prep$x
+  Terms <- prep$terms
+  assign <- prep$assign
+  xlevels <- prep$xlevels
+  contr.save <- prep$contrasts
+  weights <- prep$weights # NULL unless the (currently blocked) weights arg is used
+  offset <- rep(0.0, nrow(Y)) # always all-zero: any nonzero offset already stopped above
+  istrat <- if (!is.null(prep$strata)) as.integer(prep$strata) else NULL
+  # Below, a few dead-but-harmless branches inherited from survival::coxph()
+  # (robust/cluster, tt, and x/strata attachment) are kept as-is for fidelity
+  # with survival's own code; these three stand in for variables that used to
+  # come from the vendored formula/model.frame parsing this delegates away.
+  robust <- FALSE # any combination that would set this TRUE already stopped above
+  cluster <- NULL # ditto -- cluster()/robust always errors out before this point
+  timetrans <- NULL # tt() always errors out before this point (guard at the top)
+  strats <- prep$strata
+  strata.keep <- prep$strata
 
   # infinite covariates are not screened out by the na.omit routines
-  #  But this needs to be done after the multi-X part
   if (!all(is.finite(X))) {
     stop("data contains an infinite predictor")
   }
@@ -784,174 +233,63 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   }
 
   # TRUE if coxph.penalty class
-  pterms <- sapply(mf, inherits, "coxph.penalty")
+  pterms <- rep(FALSE, length(attr(Terms, "term.labels")))
 
-  rname <- row.names(mf)
+  rname <- rownames(X)
 
-  # if (type == "right") stop("right Surv not yet implemented in coxphGPU.
-  #                          Please use `Surv(time1,time2,event)` in formula")
-
-  if(type == "counting"){
-
-  # from agreg.fit.R (survival) / for counting type Surv object
-  nvar <- ncol(X)
-  event <- Y[, 3]
-
-  if (all(event == 0)) stop("Can't fit a Cox model with 0 failures")
-
-  if (missing(offset) || is.null(offset)) offset <- rep(0.0, nrow(Y))
-  if (missing(weights) || is.null(weights)) {
-    weights <- rep(1.0, nrow(Y))
-  } else if (any(weights <= 0)) {
-    stop("Invalid weights, must be >0")
-  } else {
-    weights <- as.vector(weights)
+  if (!is.null(patient_id)) {
+    if (!is.character(patient_id) || length(patient_id) != 1) {
+      stop("patient_id must be the name of one column of data.")
+    }
+    if (missing(data) || !patient_id %in% names(data)) {
+      stop("patient_id = \"", patient_id, "\" is not a column of data.")
+    }
+    patient_ids <- data[rname, patient_id]
+    if (anyNA(patient_ids)) {
+      stop("the patient_id column \"", patient_id, "\" has missing values ",
+           "in the rows used by the model.")
+    }
   }
 
-  # Find rows to be ignored.  We have to match within strata: a
-  #  value that spans a death in another stratum, but not it its
-  #  own, should be removed.  Hence the per stratum delta
-  if (length(istrat) == 0) {
-    y1 <- Y[, 1]
-    y2 <- Y[, 2]
-    strata <- NULL
-  } else {
-    if (is.numeric(istrat)) {
-      strata <- as.integer(istrat)
+  if (ncol(X) == 0) {
+    stop("coxphGPU() needs at least one covariate; use survival::coxph() ",
+         "for a model without covariates.")
+  }
+
+  maxiter <- control$iter.max
+  storage.mode(X) <- "double"
+
+  # `strata`, sent to Python, has one value per row of X and Y, in the same
+  # (unsorted) row order: the strata as defined by survival::coxph()
+  # (prep$strata), or a single stratum 0 for counting data without strata.
+  if (type == "counting") {
+    # As in survival's agreg.fit(): the times of each stratum are shifted by
+    # a multiple of the overall time range, so that no risk set spans two
+    # strata.
+    if (length(istrat) == 0) {
+      y1 <- Y[, 1]
+      y2 <- Y[, 2]
+      strata <- rep(0L, nrow(Y))
     } else {
-      strata <- as.integer(as.factor(istrat))
-    }
-    delta <- strata * (1 + max(Y[, 2]) - min(Y[, 1]))
-    y1 <- Y[, 1] + delta
-    y2 <- Y[, 2] + delta
-  }
-  event <- Y[, 3] > 0
-  dtime <- sort(unique(y2[event]))
-  indx1 <- findInterval(y1, dtime)
-  indx2 <- findInterval(y2, dtime)
-  # indx1 != indx2 for any obs that spans an event time
-  ignore <- (indx1 == indx2)
-  nused <- sum(!ignore)
-
-  # Sort the data (or rather, get a list of sorted indices)
-  #  For both stop and start times, the indices go from last to first
-  if (length(strata) == 0) {
-    sort.end <- order(ignore, -Y[, 2]) - 1L # indices start at 0 for C code
-    sort.start <- order(ignore, -Y[, 1]) - 1L
-    strata <- rep(0L, nrow(Y))
-  } else {
-    sort.end <- order(ignore, strata, -Y[, 2]) - 1L
-    sort.start <- order(ignore, strata, -Y[, 1]) - 1L
-  }
-
-  if (is.null(nvar) || nvar == 0) {
-    # A special case: Null model.  Just return obvious stuff
-    #  To keep the C code to a small set, we call the usual routines, but
-    #  with a dummy X matrix and 0 iterations
-    nvar <- 1
-    x <- matrix(as.double(1:nrow(Y)), ncol = 1) # keep the .C call happy
-    maxiter <- 0
-    nullmodel <- TRUE
-    if (length(init) != 0) stop("Wrong length for initial values")
-    init <- 0.0 # dummy value to keep a .C call happy (doesn't like 0 length)
-  } else {
-    nullmodel <- FALSE
-    maxiter <- control$iter.max
-
-    # In commentary below because Null value for coxph_R
-    #if (is.null(init)) init <- rep(0., nvar)
-    #if (length(init) != nvar) stop("Wrong length for initial values")
-  }
-
-  # 2021 change: pass in per covariate centering.  This gives
-  #  us more freedom to experiment.  Default is to leave 0/1 variables alone
-
-  # It seems y,
-  if (is.null(nocenter)) zero.one <- rep(FALSE, ncol(X))
-  # zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
-  mat <- as.matrix(X)
-  zero.one <- colSums(!array(mat %in% nocenter, dim(mat))) == 0
-
-  # the returned value of agfit$coef starts as a copy of init, so make sure
-  #  is is a vector and not a matrix; as.double suffices.
-  # Solidify the storage mode of other arguments
-  storage.mode(Y) <- storage.mode(X) <- "double"
-  storage.mode(offset) <- storage.mode(weights) <- "double"
-
-  # # survival routine
-  # agfit <- .Call("agfit4", nused,
-  #                Y, X, strata, weights,
-  #                offset,
-  #                as.double(init),
-  #                sort.start, sort.end,
-  #                as.integer(method=="efron"),
-  #                as.integer(maxiter),
-  #                as.double(control$eps),
-  #                as.double(control$toler.chol),
-  #                ifelse(zero.one, 0L, 1L))
-
-  # agfit4 centers variables within strata, so does not return a vector
-  #  of means.  Use a fill in consistent with other coxph routines
-
-  agmeans <- ifelse(zero.one, 0, colMeans(X))
-
-  }else if(type == "right"){
-
-    n <-  nrow(Y)
-    if (is.matrix(X)) nvar <- ncol(X)
-    else {
-      if (length(X)==0) nvar <-0
-      else nvar <-1
-    }
-    time <- Y[,1]
-    status <- Y[,2]
-
-    # Sort the data (or rather, get a list of sorted indices)
-    if (length(istrat)==0) {
-      sorted <- order(time)
-      strata <- NULL
-      newstrat <- as.integer(rep(0,n))
-    }
-    else {
-      sorted <- order(istrat, time)
-      strata <- istrat[sorted]
-      newstrat <- as.integer(c(1*(diff(as.numeric(strata))!=0), 1))
-    }
-    if (missing(offset) || is.null(offset)) offset <- rep(0,n)
-    if (missing(weights)|| is.null(weights))weights<- rep(1,n)
-    else {
-      if (any(weights<=0)) stop("Invalid weights, must be >0")
-      weights <- weights[sorted]
-    }
-    stime <- as.double(time[sorted])
-    sstat <- as.integer(status[sorted])
-
-    if (nvar==0) {
-      # A special case: Null model.
-      #  (This is why I need the rownames arg- can't use x' names)
-      # Set things up for 0 iterations on a dummy variable
-      x <- as.matrix(rep(1.0, n))
-      nullmodel <- TRUE
-      nvar <- 1
-      init <- 0
-      maxiter <- 0
-    }
-    else {
-      nullmodel <- FALSE
-      maxiter <- control$iter.max
-      if (!missing(init) && length(init)>0) {
-        if (length(init) != nvar) stop("Wrong length for initial values")
-      }
-      else init <- rep(0,nvar)
+      strata <- istrat
+      delta <- strata * (1 + max(Y[, 2]) - min(Y[, 1]))
+      y1 <- Y[, 1] + delta
+      y2 <- Y[, 2] + delta
     }
 
-    # 2012 change: individually choose which variable to rescale
-    # default: leave 0/1 variables alone
-    if (is.null(nocenter)) zero.one <- rep(FALSE, ncol(X))
-    else zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
+    # Covariate means used to centre the linear predictor, as in survival's
+    # agreg.fit(): by default, 0/1 variables are left uncentred.
+    if (is.null(nocenter)) {
+      zero.one <- rep(FALSE, ncol(X))
+    } else {
+      zero.one <- apply(X, 2, function(z) all(z %in% nocenter))
+    }
+    agmeans <- ifelse(zero.one, 0, colMeans(X))
 
-    storage.mode(weights) <- storage.mode(init) <- "double"
-
+  } else if (type == "right") {
+    time <- Y[, 1]
+    status <- Y[, 2]
+    strata <- istrat
   }
 
 
@@ -972,154 +310,34 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   # if(robust == TRUE)
   #   stop("Robust variance is not implemented yet in coxphGPU")
 
-  # Variable 'Stop' and 'Event' for coxph_R
-  if (type == "counting") { # if Surv object is counting type
-
-
-    start <- ytemp[1]
-    stop <- ytemp[2]
-    event <- ytemp[3]
-
-
-    data_Y <- data.table(start = y1,
-                       stop = y2,
-                       status = Y[,3])
-
-
-    names(data_Y)[1] <- start
-    names(data_Y)[2] <- stop
-    names(data_Y)[3] <- event
-
-
-
-
-
-  } else { # if Surv object is right (Without Start in Surv)
-    start = NULL
-    stop <- ytemp[1]
-    event <- ytemp[2]
-
-
-    data_Y <- data.table(stop = time,
-                       status = status)
-
-    names(data_Y)[1] <- stop
-    names(data_Y)[2] <- event
-  }
-
-  # data_Y <- cbind(data_Y,X)
-
-
-  # Add patient_id data if defined for bootstrap purposes
-
-  # Type check for patient_id
-  if (!is.null(patient_id) &&
-      (!is.character(patient_id) || length(patient_id) != 1)) {
-    stop("patient_id must be NULL or a single string")
-  }
-
-  # Logical constraint with bootstrap
-  if (is.null(patient_id) &&
-      !is.null(bootstrap) &&
-      bootstrap > 0) {
-    stop("patient_id must be provided if bootstrap > 0")
-  }
-
-  if (!is.null(patient_id) && !patient_id %in% names(data)) {
-    stop("patient_id must be the name of a column in data")
-  }
-
-
-  if (!is.null(patient_id)){
-    data_Y <- cbind(data[patient_id],data_Y)
-    names(data_Y[1]) = patient_id
-  }
-
-
-
-
-
-  # return(list(y1=y1,
-  #             y=y2,
-  #             x = X,
-  #             event = Y[,3]))
+  db <- .coxphGPU_build_data_Y(formula, type, y1 = y1, y2 = y2, Y = Y,
+                               time = time, status = status)
+  start <- db$start
+  stop <- db$stop
+  event <- db$event
+  data_Y <- db$data_Y
 
   # Covariables
-  #covar <- assign
   covar <- colnames(X)
 
-
-  # # remove NA for coxph_R
-  # #keep_col <- c(stop, event, colnames(X))
-  # keep_col <- c(stop, event, names(covar))
-  # data_real <- as.data.frame(data)[,keep_col]
-
-
-
-
-  # return(list(data_real = data_real,
-  #             data= data))
-  # return(list(dataset = as.data.frame(data),
-  #             y = Y,
-  #             stime=stime,
-  #             sstat=sstat,
-  #             x = X))
-
-  # data <- quote(options()$na.action)
-  data <- na.omit(data)
-
-
-
-  # Python coxph
-  # survivalgpu <- use_survivalGPU() # change due to .onload
-  coxph_R <- survivalgpu$coxph_R
-
-  # time_start = Sys.time()
-  # data_X <- as.data.table(X)
-  # time_stop = Sys.time()
-  # time_data_X = difftime(time_stop, time_start)
-  # print("####### Time data_X")
-  # print(time_data_X)
-
-  # names(data_X) <- colnames(X)
-
-   coxfit <- coxph_R(
-                    data_Y = data_Y,
-                    data_X = X,
-                    start = start,
-                    stop = stop,
-                    death = event,
-                    covars = covar,
-                    ties = ties,
-                    # survtype = type,
-                    strata = strata,
-                    patient_id = patient_id,
-                    bootstrap = bootstrap,
-                    batchsize = batchsize,
-                    maxiter = maxiter,
-                    device = device,
-                    double_precision = double_precision
-                    #init = init
+  coxfit <- .coxphGPU_call_python(
+    data_Y = data_Y, data_X = X, start = start, stop = stop, death = event,
+    covars = covar, ties = ties, strata = strata, patient_id = NULL,
+    bootstrap = 0, batchsize = 0, maxiter = maxiter,
+    init = init, device = device, double_precision = double_precision
   )
-  # maxiter = maxiter (add maxiter argument in coxph_R)
-  # doscale
 
+  if (is.character(coxfit)) {
+    fit <- list(fail = coxfit)
+    class(fit) <- "coxphGPU"
+    return(fit)
+  }
 
   ##############################################################################
   #
   # Post processing of survival::coxph
   #
   ##############################################################################
-
-  if (is.matrix(X)) {
-    nvar <- ncol(X)
-  } else {
-    if (length(X) == 0) {
-      nvar <- 0
-    } else {
-      nvar <- 1
-    }
-  }
 
   coef <- c(coxfit$coef)
   names(coef) <- dimnames(X)[[2]]
@@ -1171,13 +389,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   )
 
   fit$method <- method
-  fit$nbootstraps <- bootstrap
-  if (bootstrap > 1){
-    coef_bootstrap <- matrix(coxfit$`bootstrap_coef`,
-                             ncol = length(coef))
-    colnames(coef_bootstrap) <- dimnames(X)[[2]]
-    fit$coef_bootstrap <- coef_bootstrap
-  }
+  fit$nbootstraps <- 0 # no bootstrap at fit time; see bootstrap()
 
   # structure(
   #   fit,
@@ -1193,23 +405,6 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 
   # return to agreg.fit.R
   lp <- apply(matrix(fit$coefficients, ncol = length(covar)), 1, function(x) c(X %*% x) + offset - sum(x * agmeans))
-  if (any(lp > log(.Machine$double.xmax))) {
-    # prevent a failure message due to overflow
-    #  this occurs with near-infinite coefficients
-    temp <- lp + log(.Machine$double.xmax) - (1 + max(lp))
-    score <- exp(temp)
-  } else {
-    score <- exp(lp)
-  }
-
-
-  residuals <- .Call(
-    "agmart3", nused,
-    Y, score, weights,
-    strata,
-    sort.start, sort.end,
-    as.integer(method == "efron")
-  )
 
   }else if(type == "right"){
 
@@ -1221,7 +416,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     # if (coxfit$flag < nvar) which.sing <- diag(var)==0
     # else which.sing <- rep(FALSE,nvar)
 
-    infs <- abs(coxfit$u %*% var)
+    # infs <- abs(coxfit$u %*% var)
     # if (maxiter >1) {
     #   if (coxfit$flag == 1000) {
     #     warning("Ran out of iterations and did not converge")
@@ -1240,25 +435,19 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     # }
     # if (maxiter > 0) coef[which.sing] <- NA  #leave it be if iter=0 is set
 
-    temp <- lp[sorted]
-    if (any(temp > log(.Machine$double.xmax))) {
-      # prevent a failure message due to overflow
-      #  this occurs with near-infinite coefficients
-      temp <- temp + log(.Machine$double.xmax) - (1 + max(temp))
-    }
-    score <- exp(temp)
-    coxres <- .C("coxmart", as.integer(n),
-                 as.integer(method=='efron'),
-                 stime,
-                 sstat,
-                 newstrat,
-                 as.double(score),
-                 as.double(weights),
-                 resid=double(n))
-    residuals <- double(n)
-    residuals[sorted] <- coxres$resid
-
   }
+
+  # Martingale residuals at the GPU coefficients, computed by survival::coxph()
+  # itself, as for the pre-processing above: with init = coef and
+  # iter.max = 0, it evaluates the model at those coefficients without any
+  # Newton iteration. Residuals don't depend on how the linear predictor is
+  # centred, so they are consistent with `lp` above.
+  resid_call <- prep_call
+  resid_call$init <- unname(ifelse(is.na(coef), 0, coef))
+  resid_call$model <- FALSE
+  resid_call$x <- FALSE
+  resid_call$y <- FALSE
+  residuals <- eval(resid_call, parent.frame())$residuals
 
   names(residuals) <- rname
 
@@ -1322,7 +511,7 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
       fit$rscore <- coxph.wtest(t(temp0) %*% temp0, u, control$toler.chol)$test
     }
 
-    # plusieurs tests de Wald nécessaire ? il faut la matrice de variance covar pour tous les bootstraps
+    # multiple Wald tests needed? requires the variance-covariance matrix for all bootstraps
 
     # # Wald test
     # if (length(fit$coefficients) && is.null(fit$wald.test)) {
@@ -1409,13 +598,13 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     else fit$concordance <- c(temp$count, concordance=temp$concordance,
                               std=sqrt(temp$var))
 
-    na.action <- attr(mf, "na.action")
+    na.action <- prep$na.action
     if (length(na.action)) fit$na.action <- na.action
     if (model) {
       if (length(timetrans)) {
         stop("'model=TRUE' not supported for models with tt terms")
       }
-      fit$model <- mf
+      fit$model <- prep$model
     }
     if (x) {
       fit$x <- X
@@ -1425,33 +614,10 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
     }
     if (y) fit$y <- Y
     fit$timefix <- control$timefix # remember this option
+    fit$control <- control # so bootstrap.coxphGPU() can default maxiter later
   }
 
   if (!is.null(weights) && any(weights != 1)) fit$weights <- weights
-  if (multi) {
-    fit$transitions <- transitions
-    fit$states <- states
-    fit$cmap <- cmap
-    fit$stratum_map <- stratum_map # why not 'stratamap'?  Confusion with fit$strata
-    fit$resid <- rowsum(fit$resid, xstack$rindex)
-    # add a suffix to each coefficient name.  Those that map to multiple transitions
-    #  get the first transition they map to
-    single <- apply(cmap, 1, function(x) all(x %in% c(0, max(x)))) # only 1 coef
-    cindx <- col(cmap)[match(1:length(fit$coefficients), cmap)]
-    rindx <- row(cmap)[match(1:length(fit$coefficients), cmap)]
-    suffix <- ifelse(single[rindx], "", paste0("_", colnames(cmap)[cindx]))
-    newname <- paste0(names(fit$coefficients), suffix)
-    if (any(covlist2$phbaseline > 0)) {
-      # for proporional baselines, use a better name
-      base <- colnames(tmap)[covlist2$phbaseline]
-      child <- colnames(tmap)[which(covlist2$phbaseline > 0)]
-      indx <- 1 + length(newname) - length(base):1 # coefs are the last ones
-      newname[indx] <- paste0("ph(", child, "/", base, ")")
-    }
-    names(fit$coefficients) <- newname
-    if (x) fit$strata <- istrat # save the expanded strata
-    class(fit) <- c("coxphms", class(fit))
-  }
   names(fit$means) <- names(fit$coefficients)
 
   fit$formula <- formula(Terms)
@@ -1459,11 +625,86 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
   fit$contrasts <- contr.save
   if (any(offset != 0)) fit$offset <- offset
 
-  fit$all.results <- all.results
   fit$call <- Call
   fit$pterms <- pterms
 
+  if (!is.null(patient_id)) {
+    fit$patient_id <- patient_id
+    fit$patient_ids <- patient_ids
+  }
+
   return(fit)
+}
+
+
+################################################################################
+
+## Internal helpers, shared between coxphGPU.default() and bootstrap.coxphGPU()
+## ------------------------------------------------------------------------
+
+#' @noRd
+.coxphGPU_build_data_Y <- function(formula, type, y1 = NULL, y2 = NULL, Y,
+                                   time = NULL, status = NULL) {
+  # ytemp gives us the original variable names used inside Surv(...) in the
+  # formula (e.g. "Start","Stop","Event"), reused below purely as data frame
+  # column labels for the bridge to Python.
+  ytemp <- all.vars(formula[1:2])
+  suppressWarnings(z <- as.numeric(ytemp)) # are any of the elements numeric?
+  ytemp <- ytemp[is.na(z)] # toss numerics, e.g. Surv(t, 1-s)
+
+  if (type == "counting") { # if Surv object is counting type
+    start <- ytemp[1]
+    stop <- ytemp[2]
+    event <- ytemp[3]
+
+    data_Y <- data.frame(start = y1, stop = y2, status = Y[, 3])
+    names(data_Y)[1] <- start
+    names(data_Y)[2] <- stop
+    names(data_Y)[3] <- event
+  } else { # if Surv object is right (Without Start in Surv)
+    start <- NULL
+    stop <- ytemp[1]
+    event <- ytemp[2]
+
+    data_Y <- data.frame(stop = time, status = status)
+    names(data_Y)[1] <- stop
+    names(data_Y)[2] <- event
+  }
+
+  list(data_Y = data_Y, start = start, stop = stop, event = event)
+}
+
+#' @noRd
+.coxphGPU_call_python <- function(data_Y, data_X, start, stop, death, covars,
+                                  ties, strata, patient_id, bootstrap,
+                                  batchsize, maxiter, init, device,
+                                  double_precision) {
+  coxph_R <- tryCatch(survivalgpu$coxph_R, error = survivalgpu_unavailable_error)
+
+  coxph_R(
+    data_Y = data_Y,
+    data_X = data_X,
+    start = start,
+    stop = stop,
+    death = death,
+    covars = covars,
+    ties = ties,
+    strata = strata,
+    patient_id = patient_id,
+    bootstrap = bootstrap,
+    batchsize = batchsize,
+    maxiter = maxiter,
+    init = init,
+    device = device,
+    double_precision = double_precision
+  )
+}
+
+#' @noRd
+.coxphGPU_extract_bootstrap_coef <- function(coxfit, coef_names, ncoef) {
+  coef_bootstrap <- matrix(coxfit$`bootstrap_coef`, ncol = ncoef)
+  colnames(coef_bootstrap) <- coef_names
+  coef_bootstrap
 }
 
 
@@ -1472,15 +713,22 @@ coxphGPU.default <- function(formula, data, ties = c("efron", "breslow"), patien
 ## coxphGPU Methods ------------------------
 
 
-#' Print method for coxphGPU object
+#' Print a coxphGPU Model
 #'
-#' @param x a coxphGPU object
-#' @param digits significant digits to print
-#' @param signif.stars show stars to highlight small p-values
-#' @param ... additional argument(s) for methods.
+#' Prints a model fitted by [coxphGPU()] in the same way as a
+#' [survival::coxph()] fit. If [bootstrap()] was called on the model, a note
+#' points to `summary()` for the bootstrap confidence intervals.
+#'
+#' @param x A `coxphGPU` object.
+#' @param digits Number of significant digits to print.
+#' @param signif.stars Logical. If `TRUE`, stars flag the small p-values.
+#' @param ... Not used.
+#'
+#' @return `x`, invisibly. Called for its side effect: printing the model.
+#'
+#' @seealso [coxphGPU()], [survival::coxph()]
 #'
 #' @exportS3Method print coxphGPU
-#' @inherit survival::print.coxph
 print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
                            signif.stars = FALSE) {
 
@@ -1489,27 +737,27 @@ print.coxphGPU <- function(x, ..., digits = max(1L, getOption("digits") - 3L),
   if (x$nbootstraps > 0) {
         cat("\n--- Other results with bootstrap with summary() ---")
       }
+
+  invisible(x)
 }
 
 
-#' Summary method for coxphGPU object
+#' Summary of a coxphGPU Model
 #'
-#' Use `summary()` method to see confidence interval for covariates with two
-#' process : normal distribution and bootstrap (if `bootstrap > 1`).
 #' @inheritParams survival::summary.coxph
-#' @param object a coxphGPU object
+#' @param object A `coxphGPU` object.
 #'
-#' @return With `summary()` :
-#' * `conf.int`:                  a matrix with one row for each coefficient,
-#' containing the confidence limits for exp(coef).
-#' * `conf.int_bootstrap`:        confidence limits for exp(coef) determined by
-#' bootstrap
-#' * `logtest, sctest, waldtest`: the overall likelihood ratio, score, and Wald
-#' test statistics for the model
-#' * `concordance`:               the concordance statistic and its standard
-#' error
-#' * `rsq`:                       an approximate R^2 based on Nagelkirke
-#' (Biometrika 1991).
+#' @return `summary()` returns an object of class `summary.coxphGPU`, with
+#'   confidence intervals for the hazard ratios from the normal approximation
+#'   and, if [bootstrap()] was called on the model, from the bootstrap. Its
+#'   main components are:
+#'   * `conf.int`: matrix with one row per coefficient and the confidence
+#'   limits of `exp(coef)`.
+#'   * `conf.int_bootstrap`: the same limits, from the bootstrap.
+#'   * `logtest`, `sctest`, `waldtest`: likelihood ratio, score and Wald tests
+#'   of the model.
+#'   * `concordance`: concordance statistic and its standard error.
+#'   * `rsq`: approximate \eqn{R^2} of Nagelkerke (Biometrika, 1991).
 #' @exportS3Method summary coxphGPU
 #' @rdname coxphGPU
 summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
@@ -1532,12 +780,12 @@ summary.coxphGPU <- function(object, ..., conf.int = 0.95, scale = 1) {
 }
 
 
-#' Print summary for coxphGPU object
+#' Print the Summary of a coxphGPU Model
 #'
-#' @param x summary.coxphGPU object
-#' @param digits significant digits to print
-#' @param signif.stars show stars to highlight small p-values
-#' @param ... additional argument(s) for methods.
+#' @param x A `summary.coxphGPU` object.
+#' @param digits Number of significant digits to print.
+#' @param signif.stars Logical. If `TRUE`, stars flag the small p-values.
+#' @param ... Not used.
 #'
 #' @exportS3Method print summary.coxphGPU
 #' @noRd
@@ -1547,7 +795,7 @@ print.summary.coxphGPU <- function(x, ...,
 
   NextMethod("print", x)
 
-  if (x$nbootstraps > 1) {
+  if (x$nbootstraps > 0) {
     cat(" ---------------- \n")
     cat(paste0(
       "Confidence interval with ",
@@ -1561,10 +809,10 @@ print.summary.coxphGPU <- function(x, ...,
 }
 
 
-#' Coef method for coxphGPU object
+#' Coefficients of a coxphGPU Model
 #'
-#' @param object coxphGPU object.
-#' @param ... additional argument(s) for methods.
+#' @param object A `coxphGPU` object.
+#' @param ... Not used.
 #' @exportS3Method coef coxphGPU
 #' @noRd
 coef.coxphGPU <- function(object, ...) {
@@ -1572,10 +820,21 @@ coef.coxphGPU <- function(object, ...) {
 }
 
 
-#' Residuals method for coxphGPU
+#' Residuals of a coxphGPU Model
 #'
 #' @inherit survival::residuals.coxph description references
 #' @inheritParams survival::residuals.coxph
+#'
+#' @return A vector or matrix of residuals, computed by
+#'   [survival::residuals.coxph()]:
+#'   * martingale and deviance residuals: a numeric vector with one element
+#'   per observation, or one per group if `collapse` is used;
+#'   * score, dfbeta and dfbetas residuals: a matrix with one row per
+#'   observation and one column per coefficient;
+#'   * Schoenfeld and scaled Schoenfeld residuals: a matrix with one row per
+#'   event and one column per coefficient;
+#'   * partial residuals: a matrix with one row per observation and one column
+#'   per model term.
 #'
 #' @seealso [survival::residuals.coxph()]
 #'
@@ -1601,13 +860,19 @@ residuals.coxphGPU <- function(object, ...,
 }
 
 
-#' Predict method for coxphGPU
+#' Predictions from a coxphGPU Model
 #'
-#' Compute fitted values and regression terms for a model fitted by coxphGPU
+#' Computes fitted values and regression terms for a model fitted by
+#' [coxphGPU()], with [survival::predict.coxph()].
 #'
 #' @inherit survival::predict.coxph references
 #' @inheritParams survival::predict.coxph
-#' @param object the results of a coxphGPU fit.
+#' @param object A `coxphGPU` object.
+#'
+#' @return The predictions computed by [survival::predict.coxph()]: a numeric
+#'   vector with one element per observation, or a matrix with one column per
+#'   model term if `type = "terms"`. If `se.fit = TRUE`, a list with
+#'   components `fit` (the predictions) and `se.fit` (their standard errors).
 #'
 #' @seealso [survival::predict.coxph()]
 #'
@@ -1615,12 +880,13 @@ residuals.coxphGPU <- function(object, ...,
 #' @examples
 #' \dontrun{
 #' library(survival)
-#' options(na.action = na.exclude) # retain NA in predictions
+#' old_options <- options(na.action = na.exclude) # retain NA in predictions
 #' fit <- coxphGPU(Surv(time, status) ~ age + ph.ecog + strata(inst), lung)
 #' predict(fit, type = "lp")
 #' predict(fit, type = "expected")
 #' predict(fit, type = "risk", se.fit = TRUE)
 #' predict(fit, type = "terms", se.fit = TRUE)
+#' options(old_options) # restore the previous setting
 #' }
 predict.coxphGPU <- function(object, newdata,
                              type = c("lp", "risk", "expected", "terms", "survival"),
@@ -1630,4 +896,169 @@ predict.coxphGPU <- function(object, newdata,
 
   NextMethod("predict", object)
 
+}
+
+
+#' Bootstrap Confidence Intervals for a Fitted Model
+#'
+#' Adds bootstrap confidence intervals to a model fitted by [coxphGPU()] or
+#' [wceGPU()]. The model is refitted on `R` resamples of the patients, in
+#' batches on the GPU.
+#'
+#' @param object A `coxphGPU` or `wceGPU` object.
+#' @param R Number of bootstrap replicates.
+#' @param batchsize Number of bootstrap replicates processed at a time. `0`
+#'   (default): all of them at once. If you run out of memory, try `100`, `10`
+#'   or `1`.
+#' @param init Starting coefficients of the refits. `TRUE` (default): the
+#'   coefficients of `object`. `FALSE`: zero. Or a numeric vector. For a
+#'   `wceGPU` model fitted with several `nknots` candidates, whose spline
+#'   coefficients have different lengths, `TRUE` starts from zero and a
+#'   numeric vector is not allowed.
+#' @param device Device on which the refits run (`"cpu"` or `"cuda"`). `NULL`
+#'   (default): the GPU if one is available.
+#' @param double_precision Logical. `TRUE` (default) for 64-bit floats;
+#'   `FALSE` for 32-bit floats, faster on most GPUs.
+#' @param ... Not used.
+#'
+#' @details
+#' For a `coxphGPU` model, `object` must have been fit with `x = TRUE` and
+#' `patient_id` (`coxphGPU(..., x = TRUE, patient_id = "id")`). The bootstrap
+#' resamples patients, not rows, so that all the rows of a patient (e.g. with
+#' time-varying covariates) are kept together: `patient_id` tells which rows
+#' belong to the same patient. The design matrix, the response and the
+#' patient of each row are stored in the fit, so the bootstrap always uses
+#' exactly the data the model was fitted on, including after `subset =` or
+#' rows dropped for missing values.
+#'
+#' For a `wceGPU` model, `object` must have been fit with `x = TRUE`
+#' (`wceGPU(..., x = TRUE)`): the columns used by the model are stored in the
+#' fit, and the bootstrap resamples them, so it always uses exactly the data
+#' the model was fitted on. The spline-basis features are rebuilt from them
+#' with the same knot configuration; the patient identifier is the `id` column
+#' given at the fit.
+#' If the model was fitted with several `nknots` candidates, the number of
+#' knots is selected again in every bootstrap replicate (see
+#' `bootstrap.best.nknots`), so that the confidence intervals account for the
+#' uncertainty on that choice.
+#'
+#' @return A copy of `object` with its bootstrap components updated; the point
+#'   estimates (coefficients, variance, residuals, ...) are unchanged, so
+#'   `summary()`, `plot()` and [HR()] show the bootstrap confidence intervals.
+#'   * For a `coxphGPU` model: `coef_bootstrap` (one row per replicate) and
+#'   `nbootstraps`.
+#'   * For a `wceGPU` model: `bootstrap_beta.hat.covariates`,
+#'   `WCEmat_bootstrap`, `WCEmat_CI`, `coef_CI`, `bootstrap.best.nknots`,
+#'   `nbootstraps`, `is_bootstraps`, and `bootstrap_est`/`est_CI` for a
+#'   single `nknots` value.
+#'
+#' @export
+bootstrap <- function(object, ...) {
+  UseMethod("bootstrap")
+}
+
+#' @param control (`coxphGPU` only) A [survival::coxph.control()] object.
+#'   Default: the one used to fit `object`.
+#'
+#' @rdname bootstrap
+#' @exportS3Method bootstrap coxphGPU
+#' @examples
+#' \dontrun{
+#' library(survival)
+#' drugdata <- WCE::drugdata
+#' fit <- coxphGPU(Surv(Start, Stop, Event) ~ sex + age,
+#'                 data = drugdata, x = TRUE, patient_id = "Id")
+#' fit_boot <- bootstrap(fit, R = 1000, batchsize = 200)
+#' summary(fit_boot)
+#' }
+bootstrap.coxphGPU <- function(object, R, batchsize = 0,
+                               init = TRUE, control,
+                               device = NULL, double_precision = TRUE, ...) {
+
+  if (missing(R) || is.null(R) || R < 1) {
+    stop("R (number of bootstrap replicates) must be a positive integer.")
+  }
+  passed <- intersect(names(list(...)), c("patient_id", "data"))
+  if (length(passed)) {
+    stop("bootstrap() doesn't take ", paste(passed, collapse = " or "),
+         ": give patient_id to the fit instead, with ",
+         "coxphGPU(..., x = TRUE, patient_id = ), then call ",
+         "bootstrap(fit, R = ).", call. = FALSE)
+  }
+  if (is.null(object$x)) {
+    stop("bootstrap() requires the design matrix stored on the fitted ",
+         "object. Refit with coxphGPU(..., x = TRUE, patient_id = ), then ",
+         "call bootstrap() again.", call. = FALSE)
+  }
+  if (is.null(object$patient_ids)) {
+    stop("bootstrap() resamples patients, not rows, so it needs to know ",
+         "which rows belong to the same patient. Refit with ",
+         "coxphGPU(..., x = TRUE, patient_id = \"<id column>\"), then call ",
+         "bootstrap() again. With one row per patient, a column of row ",
+         "indices can be used as patient_id.", call. = FALSE)
+  }
+  patient_id <- object$patient_id
+
+  Y <- object$y
+  type <- attr(Y, "type")
+  X <- object$x
+  covar <- colnames(X)
+  istrat <- if (!is.null(object$strata)) as.integer(object$strata) else NULL
+
+  if (type == "counting") {
+    # Mirrors coxphGPU.default()'s own counting-type response construction
+    # (the per-stratum time delta that keeps risk sets from spanning
+    # strata boundaries), so resampled data is grouped identically.
+    if (length(istrat) == 0) {
+      y1 <- Y[, 1]
+      y2 <- Y[, 2]
+      strata <- rep(0L, nrow(Y))
+    } else {
+      strata <- istrat
+      delta <- strata * (1 + max(Y[, 2]) - min(Y[, 1]))
+      y1 <- Y[, 1] + delta
+      y2 <- Y[, 2] + delta
+    }
+    storage.mode(X) <- "double"
+    db <- .coxphGPU_build_data_Y(object$formula, type, y1 = y1, y2 = y2, Y = Y)
+  } else {
+    strata <- istrat
+    db <- .coxphGPU_build_data_Y(object$formula, type, Y = Y,
+                                 time = Y[, 1], status = Y[, 2])
+  }
+
+  pid_df <- data.frame(object$patient_ids)
+  names(pid_df) <- patient_id
+  data_Y <- cbind(pid_df, db$data_Y)
+
+  if (missing(control)) {
+    control <- if (!is.null(object$control)) object$control else coxph.control()
+  }
+
+  init_vec <- if (isTRUE(init)) {
+    unname(object$coefficients)
+  } else if (isFALSE(init)) {
+    NULL
+  } else {
+    init
+  }
+
+  coxfit <- .coxphGPU_call_python(
+    data_Y = data_Y, data_X = X, start = db$start, stop = db$stop,
+    death = db$event, covars = covar, ties = object$method, strata = strata,
+    patient_id = patient_id, bootstrap = R, batchsize = batchsize,
+    maxiter = control$iter.max, init = init_vec,
+    device = device, double_precision = double_precision
+  )
+
+  if (is.character(coxfit)) {
+    stop("bootstrap() failed: ", coxfit)
+  }
+
+  fit <- object
+  fit$coef_bootstrap <- .coxphGPU_extract_bootstrap_coef(
+    coxfit, names(object$coefficients), length(object$coefficients)
+  )
+  fit$nbootstraps <- R
+  fit
 }

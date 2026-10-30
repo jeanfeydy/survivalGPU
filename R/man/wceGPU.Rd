@@ -5,11 +5,11 @@
 \alias{summary.wceGPU}
 \alias{plot.wceGPU}
 \alias{confint.wceGPU}
-\title{Fast WCE}
+\title{Fast Weighted Cumulative Exposure Model}
 \usage{
 wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
-       event, start, stop, expos, covariates = NULL, nbootstraps = 0,
-       batchsize = 0, confint = 0.95, controls = NULL, ...)
+       event, start, stop, expos, covariates = NULL,
+       confint = 0.95, x = FALSE, ...)
 
 \method{summary}{wceGPU}(object, allres = FALSE, ...)
 
@@ -18,113 +18,151 @@ wceGPU(data, nknots, cutoff, constrained = FALSE, aic = FALSE, id,
 \method{confint}{wceGPU}(object, parm, level = 0.95, ..., digits = 3)
 }
 \arguments{
-\item{data}{A data frame in an interval (long) format, in which each line
-corresponds to one and only one time unit for a given individual.}
+\item{data}{Data frame in counting-process (long) format, with one row per
+subject and time unit.}
 
-\item{nknots}{Corresponds to the number(s) of interior knots for the cubic
-splines to estimate the weight function. For example, if nknots is set to
-2, then a model with two interior knots is fitted.}
+\item{nknots}{Number of interior knots of the cubic spline that models the
+weight function. With several values (e.g. \code{1:3}), one model is fitted
+per value and the one with the smallest information criterion (see
+\code{aic}) is kept; \code{best.nknots} and the \verb{*.grid} components of the result
+describe all the candidates.}
 
-\item{cutoff}{Integer. Time window over which the WCE model is estimated.
-Corresponds to the length of the estimated weight function.}
+\item{cutoff}{Length, in time units, of the exposure history that affects
+the hazard: the weight function is estimated for lags \code{0} to
+\code{cutoff - 1} (the \code{cutoff} columns of \code{WCEmat}), and older exposures have
+no effect.}
 
-\item{constrained}{Controls whether the weight function should be constrained
-to smoothly go to zero. Set to FALSE for unconstrained models, to 'Right'
-or 'R' to constrain the weight function to smoothly go to zero for exposure
-remote in time, and to 'Left' or 'L' to constrain the weight function to
-start a zero for the current values.}
+\item{constrained}{Shape constraint on the weight function. \code{FALSE}
+(default): none. \code{"Right"} (or \code{"R"}): it decreases smoothly to zero at
+the oldest lag. \code{"Left"} (or \code{"L"}): it is zero at lag 0, so the current
+exposure has no effect.}
 
-\item{aic}{Logical. Controls which information criterion is reported in
-\code{info.criterion}: the AIC if TRUE, the BIC if FALSE (default). Note that
-the BIC implemented in WCE is the version suggested by Volinsky and
-Raftery in Biometrics (2000), which corresponds to
-BIC = -2 * log(PL) + p * log(d) where PL is the model's partial
-likelihood, p is the number of estimated parameters and d is the number of
-uncensored events; the AIC replaces the log(d) penalty with 2. See
-Sylvestre and Abrahamowicz (2009) for more details.}
+\item{aic}{Logical. Information criterion used to choose among the
+\code{nknots} candidates and reported in \code{info.criterion}: the AIC if \code{TRUE},
+the BIC if \code{FALSE} (default). Both equal
+\eqn{-2 \log(PL) + k p}{-2 log(PL) + k p}, with \eqn{PL} the partial
+likelihood and \eqn{p} the number of estimated parameters; \eqn{k = 2}
+for the AIC and \eqn{k = \log(d)}{k = log(d)}, with \eqn{d} the number
+of events, for the BIC (Volinsky and Raftery, 2000).}
 
-\item{id}{Name of the variable in data corresponding to the identification of
-subjects.}
+\item{id}{Name of the column of \code{data} that identifies the subjects.}
 
-\item{event}{Name of the variable in data corresponding to event indicator.
-Must be coded 1 = event and 0 = no event.}
+\item{event}{Name of the column of \code{data} with the event indicator, coded
+\code{1} (event) or \code{0} (no event).}
 
-\item{start}{Name of the variable in data corresponding to the starting time
-for the interval. Corresponds to time argument in function Surv in the
-survival package.}
+\item{start}{Name of the column of \code{data} with the start time of each
+interval (the \code{time} argument of \code{\link[survival:Surv]{survival::Surv()}}).}
 
-\item{stop}{Name of the variable in data corresponding to the ending time for
-the interval. Corresponds to time2 argument in function Surv in the
-survival package.}
+\item{stop}{Name of the column of \code{data} with the end time of each interval
+(the \code{time2} argument of \code{\link[survival:Surv]{survival::Surv()}}).}
 
-\item{expos}{Name of the variable in data corresponding to the exposure
-variable.}
+\item{expos}{Name of the column of \code{data} with the exposure.}
 
-\item{covariates}{Optional. Vector of characters corresponding to the name(s)
-of the variable(s) in data corresponding to the covariate(s) to be included
-in the model. Default to NULL, which corresponds to fitting model(s)
-without covariates.}
+\item{covariates}{Character vector with the names of the columns of \code{data}
+to adjust for. \code{NULL} (default): no adjustment.}
 
-\item{nbootstraps}{Number of repeats for the bootstrap cross-validation.}
+\item{confint}{Level of the bootstrap confidence intervals computed by
+\code{\link[=bootstrap]{bootstrap()}} (default \code{0.95}).}
 
-\item{batchsize}{Number of bootstrap copies that should be handled at a time.
-Defaults to 0, which means that we handle all copies at once. If you run
-into out of memory errors, please consider using batchsize=100, 10 or 1.}
+\item{x}{For \code{wceGPU()}: logical. If \code{TRUE}, the columns of \code{data} used by
+the model (\code{id}, \code{event}, \code{start}, \code{stop}, \code{expos} and \code{covariates}) are
+stored in the result, as \code{data}. Required by \code{\link[=bootstrap]{bootstrap()}}, which
+resamples exactly the data the model was fitted on. For \code{plot()}: a
+\code{wceGPU} object.}
 
-\item{confint}{Level for confidence intervals. Default to 0.95.}
+\item{...}{For \code{wceGPU()}: \code{device} (\code{"cpu"} or \code{"cuda"}; default: the GPU
+if one is available) and \code{double_precision} (\code{TRUE}, the default, for
+64-bit floats; \code{FALSE} for 32-bit floats, faster on most GPUs). For the
+methods: not used.}
 
-\item{controls}{List corresponding to the control parameters to be passed to
-the coxph function. See coxph.control for more details.}
+\item{object}{A \code{wceGPU} object.}
 
-\item{...}{additional argument(s) for methods.}
+\item{allres}{Logical. If \code{TRUE}, \code{summary()} prints every candidate number
+of knots that was tried, with its partial log-likelihood and information
+criterion, instead of the summary of the selected model (default
+\code{FALSE}).}
 
-\item{object}{wceGPU object.}
+\item{hist.covariates}{Logical. If \code{TRUE} and \code{\link[=bootstrap]{bootstrap()}} was called on
+the model, \code{plot()} also draws, for each covariate, the histogram of its
+bootstrap coefficients (default \code{FALSE}).}
 
-\item{allres}{Post-processing calculations. If TRUE, returns
-linear predictors, wald.test, concordance for all bootstraps.}
+\item{parm}{Covariates whose coefficients get a confidence interval, as
+numbers or names. Missing (default): all of them.}
 
-\item{x}{wceGPU object.}
+\item{level}{Confidence level of \code{confint()} (default \code{0.95}).}
 
-\item{hist.covariates}{show histogram for each covariates if you use
-bootstrap.}
-
-\item{parm}{a specification of which parameters are to be given confidence
-intervals, either a vector of numbers or a vector of names. If missing, all
-parameters are considered.}
-
-\item{level}{the confidence level required.}
-
-\item{digits}{significant digits to print.}
+\item{digits}{Number of significant digits of the levels in the column
+names of \code{confint()} (default \code{3}).}
 }
 \value{
-WCE results
+\code{wceGPU()} returns an object of class \code{wceGPU}: a list that describes
+the selected model, i.e. the candidate in \code{nknots} that minimizes the
+information criterion. Its main components are:
+\itemize{
+\item \code{WCEmat}: matrix with one row and \code{cutoff} columns, the estimated weight
+function.
+\item \code{beta.hat.covariates}, \code{se.covariates}: one-row matrices with the
+estimated coefficients of the covariates and their standard errors.
+\item \code{est}, \code{SED}: one-row matrices with the estimated spline coefficients
+and their standard errors.
+\item \code{vcovmat}: list holding the variance-covariance matrix of all the
+coefficients (covariates, then spline coefficients).
+\item \code{knotsmat}: one-row matrix with the knots of the spline basis.
+\item \code{loglik}, \code{info.criterion}, \code{nevents}: partial log-likelihood,
+information criterion (the BIC, or the AIC if \code{aic = TRUE}) and number of
+events.
+\item \code{best.nknots}: the selected number of interior knots. \code{nknots.grid},
+\code{info.criterion.grid} and \code{loglik.grid} give the candidates and the
+information criterion and partial log-likelihood obtained for each.
+\item \code{data}: with \code{x = TRUE}, the columns of \code{data} used by the model.
+}
+
+After \code{\link[=bootstrap]{bootstrap()}}, the object also contains:
+\itemize{
+\item \code{WCEmat_bootstrap}, \code{bootstrap_beta.hat.covariates}: matrices with one
+row per bootstrap replicate, for the weight function and for the
+coefficients of the covariates.
+\item \code{WCEmat_CI}, \code{coef_CI}: two-row matrices with their lower and upper
+percentile confidence limits, at level \code{confint}.
+\item \code{bootstrap.best.nknots}: the number of knots selected in each replicate.
+\item \code{bootstrap_est}, \code{est_CI}: the same for the spline coefficients, only
+when a single \code{nknots} value is given.
+}
+
+\code{summary()} and \code{plot()} are called for their side effects (printing the
+model, plotting the weight function) and return \code{NULL} invisibly.
+\code{confint()} returns a matrix with one row per covariate and two columns:
+the lower and upper confidence limits of its coefficient, based on the
+normal approximation.
 }
 \description{
-New implementation of the Weighted Cumulative Exposure model
-(see @details), compatible with GPU to accelerate calculation speed and
-work with large datasets.
-
-Use \code{summary()} and \code{plot()} methods to see results and risk function.
+Fits a weighted cumulative exposure (WCE) model on the GPU (or
+the CPU). Only point estimates are computed: call \code{\link[=bootstrap]{bootstrap()}} on the
+result for bootstrap confidence intervals, and inspect it with
+\code{summary()} and \code{plot()}.
 }
 \details{
-WCE implements a flexible method for modeling cumulative effects of
-time-varying exposures, weighted according to their relative proximity in
-time, and represented by time-dependent covariates. The current
-implementation estimates the weight function in the Cox proportional
-hazards model. The function that assigns weights to doses taken in the past
-is estimated using cubic regression splines.
+At each time \eqn{t}, the exposure enters the Cox model through
+its weighted cumulative exposure over the last \code{cutoff} time units,
+\deqn{WCE(t) = \sum_{u=0}^{cutoff-1} w(u) X(t-u),}{WCE(t) = sum over u = 0, ..., cutoff - 1 of w(u) X(t - u),}
+where \eqn{X(t-u)} is the exposure \eqn{u} time units before \eqn{t}.
+The weight function \eqn{w} is a cubic spline with \code{nknots} interior
+knots. \eqn{WCE(t)} is therefore a linear combination of spline-weighted
+exposure histories, which enter a Cox proportional hazards model as
+time-dependent covariates, together with \code{covariates}. Their estimated
+coefficients give \eqn{w}, returned in \code{WCEmat}.
 }
 \examples{
 \dontrun{
 # Dataset
 drugdata <- WCE::drugdata
 
-# WCE model
+# WCE model, point estimate only
 wce_gpu <- wceGPU(data = drugdata, nknots = 1, cutoff = 90, id = "Id",
                   event = "Event", start = "Start", stop = "Stop",
                   expos = "dose", covariates = c("age", "sex"),
                   constrained = FALSE, aic = FALSE, confint = 0.95,
-                  nbootstraps = 1, batchsize = 0)
+                  x = TRUE)
 
 # Results
 wce_gpu
@@ -133,14 +171,9 @@ summary(wce_gpu)
 # See estimated weight function
 plot(wce_gpu)
 
-# WCE model with bootstrap (example with 20 bootstraps, but normally
-# nbootstraps > 500)
-wce_gpu_bootstrap <- wceGPU(data = drugdata, nknots = 1, cutoff = 90,
-                            id = "Id", event = "Event", start = "Start",
-                            stop = "Stop", expos = "dose",
-                            covariates = c("age", "sex"),
-                            constrained = FALSE, aic = FALSE, confint = 0.95,
-                            nbootstraps = 20, batchsize = 0)
+# Bootstrap-based inference, as a separate step (example with 20
+# replicates, but normally R > 500)
+wce_gpu_bootstrap <- bootstrap(wce_gpu, R = 20)
 
 # See confidence bands for the estimated weight function due to bootstrap
 plot(wce_gpu_bootstrap)
@@ -158,5 +191,17 @@ HR(wce_gpu_bootstrap, exposed, unexposed)
 \references{
 Sylvestre MP, Abrahamowicz M. Flexible modeling of the cumulative
 effects of time-dependent exposures on the hazard. Stat Med. 2009 Nov
-30;28(27):3437-53.
+30;28(27):3437-53. \doi{10.1002/sim.3701}
+
+Sylvestre M (2025). \emph{WCE: Weighted Cumulative Exposure Models}. R package
+version 1.0.4. \doi{10.32614/CRAN.package.WCE}. The reference
+implementation of the method: \code{wceGPU()} follows its interface, and its
+results are tested against it.
+
+Volinsky CT, Raftery AE (2000). Bayesian information criterion for
+censored survival models. Biometrics, 56(1), 256-262.
+\doi{10.1111/j.0006-341X.2000.00256.x}
+}
+\seealso{
+\code{\link[=bootstrap]{bootstrap()}}
 }

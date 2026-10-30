@@ -1,7 +1,11 @@
-"""This file implements the core numerical routines of the WCE package.
+"""This file implements the WCE method of Sylvestre and Abrahamowicz (2009).
 
 We rely on KeOps to compute convolutions with a collection of B-Spline kernels,
 at arbitrary time sampling locations.
+
+PyKeOps is not available on Windows, so it is an optional dependency of
+survivalgpu: importing this module never fails, but any attempt to actually
+run a WCE computation raises a clear ImportError if pykeops is missing.
 
 TODO:
   * Implement a fallback mode that relies on a pure PyTorch implementation
@@ -11,9 +15,30 @@ TODO:
 
 import numpy as np
 import torch
-from pykeops.torch import LazyTensor
 
 from .utils import default_device, float64, int32, int64
+
+try:
+    from pykeops.torch import LazyTensor
+
+    KEOPS_AVAILABLE = True
+    _keops_import_error = None
+except ImportError as e:
+    LazyTensor = None
+    KEOPS_AVAILABLE = False
+    _keops_import_error = e
+
+
+def _check_keops_available():
+    if not KEOPS_AVAILABLE:
+        msg = (
+            "The WCE model requires the optional 'pykeops' dependency, "
+            "which is not installed (PyKeOps is not available on Windows). "
+            "Install it with `pip install survivalgpu[wce]` on Linux/macOS "
+            "to use WCESurvivalAnalysis. The CoxPH model does not require "
+            "pykeops and remains usable."
+        )
+        raise ImportError(msg) from _keops_import_error
 
 
 def place_knots(*, cutoff, nknots, order, knot_placement="quantile"):
@@ -187,6 +212,8 @@ def bspline_conv(
         features ((N, K - order - 1) tensor): the values of the weighted sums
             of B-Spline functions at the N target times.
     """
+    _check_keops_available()
+
     # N.B.: In the original WCE package, the BSpline basis is created
     #       on a domain x = [1, ..., cutoff] instead of [0, ..., cutoff].
     #       As a consequence, we should offset the event times

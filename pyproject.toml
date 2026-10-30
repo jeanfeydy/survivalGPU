@@ -4,9 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "survivalgpu"
+authors = [
+    { name = "Jean Feydy", email = "jean.feydy@gmail.com" },
+    { name = "Antoine Poirot-Bourdain", email = "antoine.poirot.bourdain@gmail.com"},
+    { name = "Alexis van Straaten", email = "alexis.vanstraaten@outlook.fr"}
+]
 dynamic = ["version"]
 description = "Survival analysis with GPU acceleration"
-readme = "README.md"
+readme = "python/README.md"
 license = "LGPL-2.1-or-later"
 license-files = ["LICENSE"]
 requires-python = ">= 3.10"
@@ -14,7 +19,6 @@ dependencies = [
   "numpy",
   "matplotlib",
   "torch",
-  "pykeops",
   "beartype",
   "jaxtyping",
   "pandas",
@@ -34,6 +38,13 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+# PyKeOps powers the WCE model only; it is not available on Windows, so it
+# is kept out of the base dependencies. The CoxPH model does not need it.
+wce = [
+  "pykeops",
+]
+
+[dependency-groups]
 test = [
   "rpy2",
   "black",
@@ -45,12 +56,15 @@ test = [
   "pytest-sphinx @ git+https://github.com/jeanfeydy/pytest-sphinx.git",
 ]
 
-all = ["survivalgpu[test]"] # https://stackoverflow.com/questions/75490231/pip-pyproject-toml-can-optional-dependency-groups-require-other-optional-depend
+
+
+all = [{include-group = "test"}] # https://stackoverflow.com/questions/75490231/pip-pyproject-toml-can-optional-dependency-groups-require-other-optional-depend
 
 
 [project.urls]
-Documentation = "https://github.com/jeanfeydy/survivalGPU"
+Documentation = "https://jeanfeydy.github.io/survivalGPU/"
 Repository = "https://github.com/jeanfeydy/survivalGPU"
+
 
 [tool.setuptools.dynamic]
 version = {attr = "survivalgpu.__version__"}
@@ -80,6 +94,11 @@ addopts = [
 xfail_strict = true
 filterwarnings = [
   "error",
+  # GitHub's macOS runners have a virtual GPU without Metal 2.0
+  "ignore:Skipping device Apple Paravirtual device:UserWarning",
+]
+markers = [
+  "needs_keops: marks tests that require the optional pykeops dependency (WCE model); auto-skipped with a warning when pykeops is not installed (see python/tests/conftest.py).",
 ]
 log_cli_level = "info"
 testpaths = [
@@ -89,14 +108,13 @@ testpaths = [
 
 [tool.repo-review]
 ignore = [
-    "PY004", # explicit doc/ folder
     "PY005", # explicit test/ folder
     "PY007", # nox or tox
     "PC140", # MyPy
     "PC170", # PyGrep (because no rst files)
     "PC180", # Prettier
     "MY", # MyPy
-    "RTD", # ReadTheDocs
+    "RTD", # ReadTheDocs -- docs are hosted on GitHub Pages instead, not RTD
     ]
 
 
@@ -158,6 +176,11 @@ typing-modules = ["survivalgpu.typecheck"]
   ]
 # RUF003: Ambiguous no-break spaces
 # E402: module level import not at top of file
+
+# For conftest.py: pytest hooks (e.g. pytest_terminal_summary's `exitstatus`)
+# have fixed signatures that pluggy fills in by parameter name, so unused
+# hook arguments can't be renamed/prefixed with "_" like normal dummy args.
+"**conftest.py" = ["ARG001"]
 
 
 [tool.codespell]

@@ -400,14 +400,23 @@ class TorchSurvivalDataset:
         )
 
     @typecheck
-    def bootstraps(
+    def bootstrap_indices(
         self,
         *,
         nbootstraps: int,
         batchsize: int | None,
         stratify: bool = True,
-    ) -> Iterator[Resampling]:
-        """Returns a generator of Resampling objects that correspond to bootstrap samples.
+    ) -> Iterator[Int64Tensor["bootstraps samples"]]:
+        """Returns a generator of raw (B, P) patient-index tensors for bootstrap sampling.
+
+        This is the raw, pre-`Resampling` counterpart of `bootstraps()` below:
+        it yields the index tensors themselves instead of wrapping each one in
+        a `Resampling`. This lets a caller draw a bootstrap sampling plan once
+        and reuse the same (cheap, patient-sized) index tensors across several
+        `Resampling` objects -- e.g. to fit several model configurations on
+        the exact same resamples -- without ever having to hold the more
+        expensive, interval-sized `Resampling` tensors for longer than a
+        single chunk's use requires.
 
         This method generates bootstrap sampling indices which are similar to:
         indices = torch.randint(P, (B, P)),
@@ -534,13 +543,37 @@ class TorchSurvivalDataset:
                 dtype=torch.float32,
                 device=self.device,
             )
-            bootstrap_indices = strata_values[
-                strata_offset + (rnd * strata_cardinal).long()
-            ]
+            indices = strata_values[strata_offset + (rnd * strata_cardinal).long()]
 
-            yield(
-                Resampling(
-                    indices=bootstrap_indices,
-                    patient=self.patient,
-                )
+            yield indices
+
+    @typecheck
+    def bootstraps(
+        self,
+        *,
+        nbootstraps: int,
+        batchsize: int | None,
+        stratify: bool = True,
+    ) -> Iterator[Resampling]:
+        """Returns a generator of Resampling objects that correspond to bootstrap samples.
+
+        Thin wrapper around `bootstrap_indices()`: see that method for the
+        sampling scheme. This just wraps each chunk of raw indices into a
+        `Resampling`, exactly as before this method was split in two.
+
+        Args:
+            nbootstraps (int): The number of bootstrap samples to generate.
+            batchsize (int): The number of bootstrap samples that should be handled
+                simultaneously by the CoxPH optimizer.
+            stratify (bool): If True, the bootstrap samples are stratified according
+                to the values of the `batch` and `strata` vectors.
+                Otherwise, we only stratify according to the `batch` vector.
+                Defaults to True.
+        """
+        for indices in self.bootstrap_indices(
+            nbootstraps=nbootstraps, batchsize=batchsize, stratify=stratify
+        ):
+            yield Resampling(
+                indices=indices,
+                patient=self.patient,
             )
