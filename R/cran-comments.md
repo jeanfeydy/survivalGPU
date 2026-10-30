@@ -8,10 +8,13 @@ This is a new submission.
   tarball, on an account with no Python configured (empty home directory,
   `RETICULATE_PYTHON` unset), as on a CRAN check machine. This machine
   reports one more NOTE, only because HTML Tidy is not installed on it.
-* macOS builder, R-release (4.6.1, arm64): Status OK.
-* win-builder, R-release (4.6.1, Windows Server 2022): 1 NOTE, the
+* GitHub Actions, macOS Tahoe 26.6.2 (arm64), R-release (4.6.1):
+  `R CMD check --as-cran` without Python, as on CRAN: Status OK. The same
+  check with Python and 'PyTorch' installed also passes, running all the
+  tests.
+* win-builder, R-release (4.6.2, Windows Server 2022): 1 NOTE, the
   incoming-feasibility NOTE below.
-* win-builder, R-devel (2026-10-18 r90707, Windows Server 2022): 1 NOTE, the
+* win-builder, R-devel (2026-10-28 r90783, Windows Server 2022): 1 NOTE, the
   incoming-feasibility NOTE below.
 
 ## R CMD check results
@@ -22,12 +25,12 @@ This is a new submission.
 
   New submission.
 
-  Possibly misspelled words in DESCRIPTION: Abrahamowicz, Sylvestre, GPUs,
-  WCE, Scalable, natively.
+  Possibly misspelled words in DESCRIPTION: Abrahamowicz, GPUs, Sylvestre,
+  WCE, natively.
 
   These are spelled correctly. "Abrahamowicz" and "Sylvestre" are the authors
   of the cited reference. "GPUs" and "WCE" are acronyms, both spelled out in
-  the Description. "Scalable" and "natively" are English words.
+  the Description. "natively" is an English word.
 
 ## Python dependency
 
